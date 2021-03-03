@@ -29,7 +29,7 @@ namespace matrix {
 
 	void generateRandom(int A[], unsigned short N, unsigned short M) {
 		for (int i = 0; i < N * M; i++)
-			A[i] = std::rand();
+			A[i] = std::rand() % 1000;
 	}
 
 	template<typename T>
