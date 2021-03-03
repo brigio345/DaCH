@@ -2,6 +2,7 @@
 #define MATRIX_H
 
 #include <cstdlib>
+#include <iostream>
 
 namespace matrix {
 	template<typename T>
@@ -30,6 +31,15 @@ namespace matrix {
 		for (int i = 0; i < N * M; i++)
 			A[i] = std::rand();
 	}
+
+	template<typename T>
+		void print(T A[], unsigned short N, unsigned short M) {
+			for (int i = 0; i < N; i++) {
+				for (int j = 0; j < M; j++)
+					std::cout << A[i * M + j] << " ";
+				std::cout << std::endl;
+			}
+		}
 }
 
 #endif /* MATRIX_H */
