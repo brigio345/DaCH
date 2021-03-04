@@ -52,6 +52,15 @@ int main() {
 	// matrix multiplication with caches
 	top(arrA, arrB, arrC, N, M, P);
 
+	std::cout << "A = " << std::endl;
+	matrix::print(arrA, N, M);
+	std::cout << std::endl << "B = " << std::endl;
+	matrix::print(arrB, M, P);
+	std::cout << std::endl << "C (reference) = " << std::endl;
+	matrix::print(arrCRef, N, P);
+	std::cout << std::endl << "C (cache) = " << std::endl;
+	matrix::print(arrC, N, P);
+
 	if (!matrix::compare<int[]>(arrC, arrCRef, N, P)) {
 		std::cerr << "Mismatch detected" << std::endl;
 		return -1;
