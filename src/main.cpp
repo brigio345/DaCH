@@ -10,7 +10,6 @@ void top(int arrA[], int arrB[], int arrC[], const unsigned short N,
 	cache<int> cacheB(B);
 	cache<int> cacheC(C);
 
-	//#define __SYNTHESIS__
 #ifdef __SYNTHESIS__
 #pragma HLS dataflow
 #pragma HLS interface ap_ctrl_none port=return
@@ -29,6 +28,10 @@ void top(int arrA[], int arrB[], int arrC[], const unsigned short N,
 	BThread.detach();
 	CThread.detach();
 	matmulThread.join(); // when matmul returns, kill everything
+
+	cacheA.stopRead();
+	cacheB.stopRead();
+	cacheC.stopWrite();
 #endif	/* __SYNTHESIS__ */
 }
 

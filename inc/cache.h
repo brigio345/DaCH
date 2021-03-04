@@ -11,15 +11,33 @@ class cache {
 	cache(streamedArray<T> &arr): arr(arr) {}
 
 	void read() {
+		unsigned int addr;
+
 		while (1) {
-			arr.rdData.write(arr.arr[arr.rdAddr.read()]);
+			addr = arr.rdAddr.read();
+			if (addr == -1)
+				break;
+			arr.rdData.write(arr.arr[addr]);
 		}
 	}
 
 	void write() {
+		unsigned int addr;
+
 		while (1) {
-			arr.arr[arr.wrAddr.read()] = arr.wrData.read();
+			addr = arr.wrAddr.read();
+			if (addr == -1)
+				break;
+			arr.arr[addr] = arr.wrData.read();
 		}
+	}
+
+	void stopRead() {
+		arr.rdAddr.write(-1);
+	}
+
+	void stopWrite() {
+		arr.wrAddr.write(-1);
 	}
 };
 
