@@ -11,7 +11,7 @@ class cache {
 	cache(streamedArray<T> &arr): arr(arr) {}
 
 	void read() {
-		unsigned int addr;
+		int addr;
 
 		while (1) {
 			addr = arr.rdAddr.read();
@@ -22,7 +22,7 @@ class cache {
 	}
 
 	void write() {
-		unsigned int addr;
+		int addr;
 
 		while (1) {
 			addr = arr.wrAddr.read();
