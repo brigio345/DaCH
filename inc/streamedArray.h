@@ -1,13 +1,16 @@
 #ifndef STREAMED_ARRAY_H
 #define STREAMED_ARRAY_H
 
+#define HLS_STREAM_THREAD_SAFE
+
 #include "hls_stream.h"
+#include "ap_int.h"
 
 template<typename T>
 class streamedArray {
 	public:
 		hls::stream<T> rdData, wrData;
-		hls::stream<int> rdAddr, wrAddr;
+		hls::stream<ap_int<32>> rdAddr, wrAddr;	// TODO: substitute 32 with ADDR_SIZE
 		T *arr;
 
 	public:

@@ -6,9 +6,9 @@
 void top(int arrA[], int arrB[], int arrC[], const unsigned short N,
 		const unsigned short M, const unsigned short P) {
 	streamedArray<int> A(arrA), B(arrB), C(arrC);
-	cache<int> cacheA(A);
-	cache<int> cacheB(B);
-	cache<int> cacheC(C);
+	cache<int> cacheA("A", A);
+	cache<int> cacheB("B", B);
+	cache<int> cacheC("C", C);
 
 #ifdef __SYNTHESIS__
 #pragma HLS dataflow
@@ -21,17 +21,18 @@ void top(int arrA[], int arrB[], int arrC[], const unsigned short N,
 	std::thread AThread(&cache<int>::read, cacheA);
 	std::thread BThread(&cache<int>::read, cacheB);
 	std::thread CThread(&cache<int>::write, cacheC);
-	std::thread matmulThread(matrix::multiply<streamedArray<int> &>,
+	std::thread matmulThread(&matrix::multiply<streamedArray<int> &>,
 			std::ref(A), std::ref(B), std::ref(C), N, M, P);
 
-	AThread.detach();
-	BThread.detach();
-	CThread.detach();
-	matmulThread.join(); // when matmul returns, kill everything
+	matmulThread.join();
 
 	cacheA.stopRead();
 	cacheB.stopRead();
 	cacheC.stopWrite();
+
+	AThread.join();
+	BThread.join();
+	CThread.join();
 #endif	/* __SYNTHESIS__ */
 }
 
