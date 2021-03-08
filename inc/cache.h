@@ -59,7 +59,7 @@ class cache {
 
 			while (1) {
 				// get address to be written to
-				_arr.wrAddr.read(addr_main);
+				addr_main = _arr.wrAddr.read();
 				
 				// stop if address is "end-of-request"
 				if (addr_main == -1)
