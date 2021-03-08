@@ -44,8 +44,10 @@ class cache {
 				// extract information from address
 				addr = new address(addr_main);
 
-				// prepare the cache for the access
-				prepare(*addr);
+				// prepare the cache for accessing addr
+				// (load the line if not present)
+				if (!hit(*addr))
+					fill(*addr);
 
 				// read data from cache
 				data = _cache_mem[addr->_addr_cache];
@@ -72,8 +74,10 @@ class cache {
 				// extract information from address
 				addr = new address(addr_main);
 
-				// prepare the cache for the access
-				prepare(*addr);
+				// prepare the cache for accessing addr
+				// (load the line if not present)
+				if (!hit(*addr))
+					fill(*addr);
 				
 				// store received data to cache
 				T data = _arr.wrData.read();
@@ -164,13 +168,6 @@ class cache {
 			}
 
 			_dirty[addr._line] = false;
-		}
-
-		// prepare the cache for accessing addr
-		// (load the line if not present)
-		void prepare(address addr) {
-			if (!hit(addr))
-				fill(addr);
 		}
 };
 
