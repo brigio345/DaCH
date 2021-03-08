@@ -1,8 +1,9 @@
 #ifndef CACHE_H
 #define CACHE_H
 
+#define HLS_STREAM_THREAD_SAFE
+#include "hls_stream.h"
 #include "ap_int.h"
-#include "streamedArray.h"
 
 // direct mapping, write back
 // TODO: support different policies through virtual functions
@@ -16,14 +17,19 @@ class cache {
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
 		std::string _name;
-		streamedArray<T> &_arr; // TODO: replace with memory pointer + directly override [] operator of cache??
+		hls::stream<T> _rd_data;
+		hls::stream<T> _wr_data;
+		hls::stream<ap_int<ADDR_SIZE>> _rd_addr;
+		hls::stream<ap_int<ADDR_SIZE>> _wr_addr;
 		bool _valid[N_LINES] = {false};
 		bool _dirty[N_LINES];
 		ap_int<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
+		T *_main_mem;
 
 	public:
-		cache(std::string name, streamedArray<T> &arr): _name(name), _arr(arr) {}
+		cache(std::string name, T *main_mem):
+			_name(name), _main_mem(main_mem) {}
 
 		~cache() {
 			flush();
@@ -36,7 +42,7 @@ class cache {
 
 			while (1) {
 				// get address to be read to
-				addr_main = _arr.rdAddr.read();
+				addr_main = _rd_addr.read();
 				// stop if address is "end-of-request"
 				if (addr_main == -1)
 					break;
@@ -53,7 +59,7 @@ class cache {
 				data = _cache_mem[addr->_addr_cache];
 
 				// send read data
-				_arr.rdData.write(data);
+				_rd_data.write(data);
 
 				delete addr;
 			}
@@ -65,7 +71,7 @@ class cache {
 
 			while (1) {
 				// get address to be written to
-				addr_main = _arr.wrAddr.read();
+				addr_main = _wr_addr.read();
 				
 				// stop if address is "end-of-request"
 				if (addr_main == -1)
@@ -80,7 +86,7 @@ class cache {
 					fill(*addr);
 				
 				// store received data to cache
-				T data = _arr.wrData.read();
+				T data = _wr_data.read();
 				_cache_mem[addr->_addr_cache] = data;
 
 				_dirty[addr->_line] = true;
@@ -90,11 +96,11 @@ class cache {
 		}
 
 		void stopRead() {
-			_arr.rdAddr.write(-1);
+			_rd_addr.write(-1);
 		}
 
 		void stopWrite() {
-			_arr.wrAddr.write(-1);
+			_wr_addr.write(-1);
 		}
 
 		// store all valid dirty lines from cache to main memory
@@ -152,7 +158,7 @@ class cache {
 
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 				_cache_mem[addr._addr_cache_first_of_line + off] =
-					_arr.arr[addr._addr_main_first_of_line + off];
+					_main_mem[addr._addr_main_first_of_line + off];
 			}
 
 			_tag[addr._line] = addr._tag;
@@ -163,11 +169,43 @@ class cache {
 		// store line from cache to main memory
 		void spill(address addr) {
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				_arr.arr[addr._addr_main_first_of_line + off] =
+				_main_mem[addr._addr_main_first_of_line + off] =
 					_cache_mem[addr._addr_cache_first_of_line + off];
 			}
 
 			_dirty[addr._line] = false;
+		}
+
+		T get(ap_int<ADDR_SIZE> addr_main) {
+			_rd_addr.write(addr_main);
+			return _rd_data.read();
+		}
+
+		void set(ap_int<ADDR_SIZE> addr_main, T data) {
+			_wr_addr.write(addr_main);
+			_wr_data.write(data);
+		}
+
+		class inner {
+			private:
+				cache *_cache;
+				ap_int<ADDR_SIZE> _addr_main;
+			public:
+				inner(cache *c, ap_int<ADDR_SIZE> addr_main):
+					_cache(c), _addr_main(addr_main) {}
+
+				operator T() const {
+					return _cache->get(_addr_main);
+				}
+
+				void operator=(T data) {
+					_cache->set(_addr_main, data);
+				}
+		};
+
+	public:
+		inner operator[](const int addr_main) {
+			return inner(this, addr_main);
 		}
 };
 
