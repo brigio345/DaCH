@@ -87,6 +87,14 @@ class cache {
 			_arr.wrAddr.write(-1);
 		}
 
+		// store all valid dirty lines from cache to main memory
+		void flush() {
+			for (int line = 0; line < N_LINES; line++) {
+				if (_valid[line] && _dirty[line])
+					spill(address::build(_tag[line], line, 0));
+			}
+		}
+
 	private:
 		class address {
 			private:
@@ -157,14 +165,6 @@ class cache {
 		void prepare(address addr) {
 			if (!hit(addr))
 				fill(addr);
-		}
-
-		// store all valid dirty lines from cache to main memory
-		void flush() {
-			for (int line = 0; line < N_LINES; line++) {
-				if (_valid[line] && _dirty[line])
-					spill(address::build(_tag[line], line, 0));
-			}
 		}
 };
 
