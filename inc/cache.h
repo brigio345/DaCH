@@ -38,7 +38,6 @@ class cache {
 		void read() {
 			ap_int<ADDR_SIZE> addr_main;
 			T data;
-			address *addr;
 
 			while (1) {
 				// get address to be read to
@@ -48,26 +47,23 @@ class cache {
 					break;
 
 				// extract information from address
-				addr = new address(addr_main);
+				address addr(addr_main);
 
 				// prepare the cache for accessing addr
 				// (load the line if not present)
-				if (!hit(*addr))
-					fill(*addr);
+				if (!hit(addr))
+					fill(addr);
 
 				// read data from cache
-				data = _cache_mem[addr->_addr_cache];
+				data = _cache_mem[addr._addr_cache];
 
 				// send read data
 				_rd_data.write(data);
-
-				delete addr;
 			}
 		}
 
 		void write() {
 			ap_int<ADDR_SIZE> addr_main;
-			address *addr;
 
 			while (1) {
 				// get address to be written to
@@ -78,20 +74,18 @@ class cache {
 					break;
 
 				// extract information from address
-				addr = new address(addr_main);
+				address addr(addr_main);
 
 				// prepare the cache for accessing addr
 				// (load the line if not present)
-				if (!hit(*addr))
-					fill(*addr);
+				if (!hit(addr))
+					fill(addr);
 				
 				// store received data to cache
 				T data = _wr_data.read();
-				_cache_mem[addr->_addr_cache] = data;
+				_cache_mem[addr._addr_cache] = data;
 
-				_dirty[addr->_line] = true;
-
-				delete addr;
+				_dirty[addr._line] = true;
 			}
 		}
 
