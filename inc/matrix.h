@@ -11,8 +11,10 @@ namespace matrix {
 			for (int i = 0; i < N; i++) {
 				for (int j = 0; j < P; j++) {
 					int acc = 0;
-					for (int k = 0; k < M; k++)
+					for (int k = 0; k < M; k++) {
+						#pragma HLS pipeline
 						acc += A[i * M + k] * B[k * P + j];
+					}
 					C[i * P + j] = acc;
 				}
 			}

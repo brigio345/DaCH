@@ -2,15 +2,14 @@
 #include "matrix.h"
 #include "cache.h"
 
-void top(int arrA[], int arrB[], int arrC[], const unsigned short N,
-		const unsigned short M, const unsigned short P) {
-	cache<int> cacheA("A", arrA);
-	cache<int> cacheB("B", arrB);
-	cache<int> cacheC("C", arrC);
+extern "C" void top(int * const arrA, int * const arrB, int * const arrC,
+		const unsigned short N, const unsigned short M, const unsigned short P) {
+	#pragma HLS DATAFLOW
+	cache<int> cacheA(arrA);
+	cache<int> cacheB(arrB);
+	cache<int> cacheC(arrC);
 
 #ifdef __SYNTHESIS__
-#pragma HLS dataflow
-#pragma HLS interface ap_ctrl_none port=return
 	matrix::multiply<cache<int> &>(cacheA, cacheB, cacheC, N, M, P);
 	cacheA.read();
 	cacheB.read();

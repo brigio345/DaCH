@@ -16,26 +16,32 @@ class cache {
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
-		std::string _name;
 		hls::stream<T> _rd_data;
 		hls::stream<T> _wr_data;
 		hls::stream<ap_int<ADDR_SIZE>> _rd_addr;
 		hls::stream<ap_int<ADDR_SIZE>> _wr_addr;
-		bool _valid[N_LINES] = {false};
-		bool _dirty[N_LINES];
+		ap_uint<N_LINES> _valid;
+		ap_uint<N_LINES> _dirty;
 		ap_int<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
-		T *_main_mem;
+		T * const _main_mem;
 
 	public:
-		cache(std::string name, T *main_mem):
-			_name(name), _main_mem(main_mem) {}
+		cache(T * const main_mem): _main_mem(main_mem) {
+			//#pragma HLS array_partition variable=_valid complete
+			//#pragma HLS array_partition variable=_dirty complete
+			//#pragma HLS array_partition variable=_tag complete
+			//#pragma HLS array_partition variable=_cache_mem complete
+			// invalidate all cache lines
+			_valid = 0;
+		}
 
 		~cache() {
 			flush();
 		}
 
 		void read() {
+			#pragma HLS inline recursive
 			ap_int<ADDR_SIZE> addr_main;
 			T data;
 
@@ -63,6 +69,7 @@ class cache {
 		}
 
 		void write() {
+			#pragma HLS inline recursive
 			ap_int<ADDR_SIZE> addr_main;
 
 			while (1) {
@@ -100,6 +107,7 @@ class cache {
 		// store all valid dirty lines from cache to main memory
 		void flush() {
 			for (int line = 0; line < N_LINES; line++) {
+				#pragma HLS unroll
 				if (_valid[line] && _dirty[line])
 					spill(address::build(_tag[line], line, 0));
 			}
@@ -151,6 +159,7 @@ class cache {
 				spill(address::build(_tag[addr._line], addr._line));
 
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+				#pragma HLS unroll
 				_cache_mem[addr._addr_cache_first_of_line + off] =
 					_main_mem[addr._addr_main_first_of_line + off];
 			}
@@ -163,6 +172,7 @@ class cache {
 		// store line from cache to main memory
 		void spill(address addr) {
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+				#pragma HLS unroll
 				_main_mem[addr._addr_main_first_of_line + off] =
 					_cache_mem[addr._addr_cache_first_of_line + off];
 			}
