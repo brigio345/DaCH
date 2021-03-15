@@ -1,2 +1,3 @@
 build/*
-hls_stream.h
+*.log
+proj_matmul/*

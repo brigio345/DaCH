@@ -1,116 +1,95 @@
 #ifndef CACHE_H
 #define CACHE_H
 
-#define HLS_STREAM_THREAD_SAFE
-#include "hls_stream.h"
+#include "stream_dep.h"
 #include "ap_int.h"
 
 // direct mapping, write back
 // TODO: support different policies through virtual functions
 // TODO: use more friendly template parameters:
 // 	LINE_SIZE -> N_LINES; TAG_SIZE -> CACHE_LINE_SIZE
-template <typename T, size_t ADDR_SIZE = 32, size_t TAG_SIZE = 28, size_t LINE_SIZE = 2>
+template <typename T, size_t ADDR_SIZE = 32, size_t TAG_SIZE = 28, size_t LINE_SIZE = 2, size_t N_PORTS = 1>
 class cache {
 	private:
+		typedef enum {
+			READ_E, WRITE_E, EOR_E
+		} request_type_t;
+
+		typedef struct {
+			ap_uint<ADDR_SIZE> addr_main;
+			request_type_t type;
+		} request_t;
+
 		static const size_t OFF_SIZE = ADDR_SIZE - (TAG_SIZE + LINE_SIZE);
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
-		hls::stream<T> _rd_data;
-		hls::stream<T> _wr_data;
-		hls::stream<ap_int<ADDR_SIZE>> _rd_addr;
-		hls::stream<ap_int<ADDR_SIZE>> _wr_addr;
+		stream_dep<T> _rd_data[N_PORTS];
+		stream_dep<T> _wr_data[N_PORTS];
+		stream_dep<request_t> _request[N_PORTS];
 		ap_uint<N_LINES> _valid;
 		ap_uint<N_LINES> _dirty;
-		ap_int<TAG_SIZE> _tag[N_LINES];
+		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		T * const _main_mem;
+		bool _dep;
 
 	public:
 		cache(T * const main_mem): _main_mem(main_mem) {
-			//#pragma HLS array_partition variable=_valid complete
-			//#pragma HLS array_partition variable=_dirty complete
-			//#pragma HLS array_partition variable=_tag complete
-			//#pragma HLS array_partition variable=_cache_mem complete
+#pragma HLS array_partition variable=_tag complete dim=1
+#pragma HLS array_partition variable=_cache_mem complete dim=1
+#pragma HLS stream depth=N_PORTS variable=_rd_data
+#pragma HLS stream depth=N_PORTS variable=_wr_data
+#pragma HLS stream depth=N_PORTS variable=_request
 			// invalidate all cache lines
 			_valid = 0;
 		}
 
-		~cache() {
-			flush();
-		}
-
-		void read() {
-			#pragma HLS inline recursive
-			ap_int<ADDR_SIZE> addr_main;
+		void operate() {
+#pragma HLS inline
+			int curr_port = 0;
+			request_t req;
 			T data;
 
-			while (1) {
-				// get address to be read to
-				addr_main = _rd_addr.read();
-				// stop if address is "end-of-request"
-				if (addr_main == -1)
+OPERATE_LOOP:		while (1) {
+#pragma HLS pipeline
+				// get request
+				_dep = _request[curr_port].read(req, _dep);
+				// stop if request is "end-of-request"
+				if (req.type == EOR_E) {
+					flush();
 					break;
+				}
 
 				// extract information from address
-				address addr(addr_main);
+				address addr(req.addr_main);
 
 				// prepare the cache for accessing addr
 				// (load the line if not present)
 				if (!hit(addr))
 					fill(addr);
 
-				// read data from cache
-				data = _cache_mem[addr._addr_cache];
+				if (req.type == READ_E) {
+					// read data from cache
+					data = _cache_mem[addr._addr_cache];
 
-				// send read data
-				_rd_data.write(data);
+					// send read data
+					_dep = _rd_data[curr_port].write(data, _dep);
+				} else {
+					// store received data to cache
+					_dep = _wr_data[curr_port].read(data, _dep);
+					_cache_mem[addr._addr_cache] = data;
+
+					_dirty[addr._line] = true;
+				}
+
+				curr_port = (curr_port + 1) % N_PORTS;
 			}
 		}
 
-		void write() {
-			#pragma HLS inline recursive
-			ap_int<ADDR_SIZE> addr_main;
-
-			while (1) {
-				// get address to be written to
-				addr_main = _wr_addr.read();
-				
-				// stop if address is "end-of-request"
-				if (addr_main == -1)
-					break;
-
-				// extract information from address
-				address addr(addr_main);
-
-				// prepare the cache for accessing addr
-				// (load the line if not present)
-				if (!hit(addr))
-					fill(addr);
-				
-				// store received data to cache
-				T data = _wr_data.read();
-				_cache_mem[addr._addr_cache] = data;
-
-				_dirty[addr._line] = true;
-			}
-		}
-
-		void stopRead() {
-			_rd_addr.write(-1);
-		}
-
-		void stopWrite() {
-			_wr_addr.write(-1);
-		}
-
-		// store all valid dirty lines from cache to main memory
-		void flush() {
-			for (int line = 0; line < N_LINES; line++) {
-				#pragma HLS unroll
-				if (_valid[line] && _dirty[line])
-					spill(address::build(_tag[line], line, 0));
-			}
+		void stop_operation() {
+			for (int port = 0; port < N_PORTS; port++)
+				_dep = _request[port].write((request_t){0, EOR_E}, _dep);
 		}
 
 	private:
@@ -158,8 +137,8 @@ class cache {
 			if (_valid[addr._line] && _dirty[addr._line])
 				spill(address::build(_tag[addr._line], addr._line));
 
-			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				#pragma HLS unroll
+FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS unroll
 				_cache_mem[addr._addr_cache_first_of_line + off] =
 					_main_mem[addr._addr_main_first_of_line + off];
 			}
@@ -171,8 +150,8 @@ class cache {
 
 		// store line from cache to main memory
 		void spill(address addr) {
-			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				#pragma HLS unroll
+SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS unroll
 				_main_mem[addr._addr_main_first_of_line + off] =
 					_cache_mem[addr._addr_cache_first_of_line + off];
 			}
@@ -180,35 +159,61 @@ class cache {
 			_dirty[addr._line] = false;
 		}
 
-		T get(ap_int<ADDR_SIZE> addr_main) {
-			_rd_addr.write(addr_main);
-			return _rd_data.read();
+		// store all valid dirty lines from cache to main memory
+		void flush() {
+#pragma HLS inline
+FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
+#pragma HLS pipeline
+				if (_valid[line] && _dirty[line])
+					spill(address::build(_tag[line], line, 0));
+			}
 		}
 
-		void set(ap_int<ADDR_SIZE> addr_main, T data) {
-			_wr_addr.write(addr_main);
-			_wr_data.write(data);
+		T get(ap_uint<ADDR_SIZE> addr_main) {
+#pragma HLS inline
+			static int curr_port = 0;
+			T data;
+
+			_dep = _request[curr_port].write((request_t){addr_main, READ_E}, _dep);
+			_dep = _rd_data[curr_port].read(data, _dep);
+
+			curr_port = (curr_port + 1) % N_PORTS;
+
+			return data;
+		}
+
+		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
+#pragma HLS inline
+			static int curr_port = 0;
+
+			_dep = _request[curr_port].write((request_t){addr_main, WRITE_E}, _dep);
+			_dep = _wr_data[curr_port].write(data, _dep);
+
+			curr_port = (curr_port + 1) % N_PORTS;
 		}
 
 		class inner {
 			private:
 				cache *_cache;
-				ap_int<ADDR_SIZE> _addr_main;
+				ap_uint<ADDR_SIZE> _addr_main;
 			public:
-				inner(cache *c, ap_int<ADDR_SIZE> addr_main):
+				inner(cache *c, ap_uint<ADDR_SIZE> addr_main):
 					_cache(c), _addr_main(addr_main) {}
 
 				operator T() const {
+#pragma HLS inline
 					return _cache->get(_addr_main);
 				}
 
 				void operator=(T data) {
+#pragma HLS inline
 					_cache->set(_addr_main, data);
 				}
 		};
 
 	public:
 		inner operator[](const int addr_main) {
+#pragma HLS inline
 			return inner(this, addr_main);
 		}
 };
