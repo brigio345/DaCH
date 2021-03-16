@@ -19,12 +19,6 @@ extern "C" void matmul_top(data_type *a_arr, data_type *b_arr, data_type *c_arr)
 #pragma HLS INTERFACE s_axilite port=b_arr bundle=control
 #pragma HLS INTERFACE s_axilite port=c_arr bundle=control
 #pragma HLS INTERFACE s_axilite port=return bundle=control
-
-#pragma HLS stable variable=a_arr
-#pragma HLS stable variable=b_arr
-#pragma HLS stable variable=c_arr
-
-#pragma HLS dataflow
 	cache<data_type> a_cache(a_arr);
 	cache<data_type> b_cache(b_arr);
 	cache<data_type> c_cache(c_arr);
