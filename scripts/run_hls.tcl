@@ -6,7 +6,7 @@ set include_dir "inc"
 set design_files {"src/matmul_test.cpp"}
 set tb_files {"src/matmul_test.cpp"}
 
-set parts {xcvu9p-flga2104-2-i}
+set parts {xczu3eg-sbva484-1-e}
 set clock_period 25
 
 # detect wheter script is run by Vivado HLS or Vitis HLS
