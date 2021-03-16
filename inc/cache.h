@@ -45,6 +45,10 @@ class cache {
 			_valid = 0;
 		}
 
+		~cache() {
+			flush();
+		}
+
 		void operate() {
 #pragma HLS inline
 			int curr_port = 0;
@@ -56,10 +60,8 @@ OPERATE_LOOP:		while (1) {
 				// get request
 				_dep = _request[curr_port].read(req, _dep);
 				// stop if request is "end-of-request"
-				if (req.type == EOR_E) {
-					flush();
+				if (req.type == EOR_E)
 					break;
-				}
 
 				// extract information from address
 				address addr(req.addr_main);
@@ -138,7 +140,7 @@ OPERATE_LOOP:		while (1) {
 				spill(address::build(_tag[addr._line], addr._line));
 
 FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS unroll
+#pragma HLS pipeline
 				_cache_mem[addr._addr_cache_first_of_line + off] =
 					_main_mem[addr._addr_main_first_of_line + off];
 			}
@@ -151,7 +153,7 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 		// store line from cache to main memory
 		void spill(address addr) {
 SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS unroll
+#pragma HLS pipeline
 				_main_mem[addr._addr_main_first_of_line + off] =
 					_cache_mem[addr._addr_cache_first_of_line + off];
 			}
