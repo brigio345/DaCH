@@ -1,40 +1,37 @@
-#
-# Copyright 2020 Xilinx, Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+set project_name "proj_matmul"
+set solution_name "solution1"
+set top "matmul_top"
 
+set include_dir "inc"
+set design_files {"src/matmul_test.cpp"}
+set tb_files {"src/matmul_test.cpp"}
+
+set parts {xcvu9p-flga2104-2-i}
+set clock_period 25
+
+# detect wheter script is run by Vivado HLS or Vitis HLS
 if {[string compare [file tail $argv0] vivado_hls]} {
 	set vivado false
 } else {
 	set vivado true
 }
 
-# Create a project
-open_project -reset proj_matmul
+# create a project
+open_project -reset $project_name
 
-# Add design files
-add_files -cflags "-I inc" src/matmul_test.cpp
-# Add test bench & files
-add_files -tb -cflags "-I inc" src/matmul_test.cpp
+# add design files
+add_files -cflags "-I $include_dir" $design_files
+# add test bench & files
+add_files -tb -cflags "-I $include_dir" $tb_files
 
-# Set the top-level function
-set_top matmul_top
+# set the top-level function
+set_top $top
 
-# Create a solution
-open_solution -reset solution1
-# Define technology and clock rate
-set_part  {xcvu9p-flga2104-2-i}
-create_clock -period 25
+# create a solution
+open_solution -reset $solution_name
+# define technology and clock rate
+set_part $parts
+create_clock -period $clock_period
 
 if {$vivado} {
 	csim_design -compiler gcc
@@ -42,12 +39,10 @@ if {$vivado} {
 	csim_design
 }
 
-# Set any optimization directives
-#set_directive_pipeline loop_pipeline/LOOP_J
-# End of directives
+# set any optimization directives
+# end of directives
 
-# Run Synthesis and Exit
 csynth_design
-#cosim_design
-#export_design
+cosim_design
+export_design
 
