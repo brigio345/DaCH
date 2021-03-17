@@ -58,7 +58,7 @@ class cache {
 OPERATE_LOOP:		while (1) {
 #pragma HLS pipeline
 				// get request
-				_dep = _request[curr_port].read(req, _dep);
+				_request[curr_port].read(req);
 				// stop if request is "end-of-request"
 				if (req.type == EOR_E)
 					break;
@@ -76,10 +76,10 @@ OPERATE_LOOP:		while (1) {
 					data = _cache_mem[addr._addr_cache];
 
 					// send read data
-					_dep = _rd_data[curr_port].write(data, _dep);
+					_rd_data[curr_port].write(data);
 				} else {
 					// store received data to cache
-					_dep = _wr_data[curr_port].read(data, _dep);
+					_wr_data[curr_port].read(data);
 					_cache_mem[addr._addr_cache] = data;
 
 					_dirty[addr._line] = true;
@@ -90,8 +90,10 @@ OPERATE_LOOP:		while (1) {
 		}
 
 		void stop_operation() {
-			for (int port = 0; port < N_PORTS; port++)
-				_dep = _request[port].write((request_t){0, EOR_E}, _dep);
+			for (int port = 0; port < N_PORTS; port++) {
+#pragma HLS unroll
+				_request[port].write((request_t){0, EOR_E});
+			}
 		}
 
 	private:
@@ -136,11 +138,12 @@ OPERATE_LOOP:		while (1) {
 		// load line from main to cache memory
 		// (taking care of writing back dirty lines)
 		void fill(address addr) {
+#pragma HLS inline
 			if (_valid[addr._line] && _dirty[addr._line])
 				spill(address::build(_tag[addr._line], addr._line));
 
 FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS pipeline
+#pragma HLS unroll
 				_cache_mem[addr._addr_cache_first_of_line + off] =
 					_main_mem[addr._addr_main_first_of_line + off];
 			}
@@ -152,8 +155,9 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 
 		// store line from cache to main memory
 		void spill(address addr) {
+#pragma HLS inline
 SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS pipeline
+#pragma HLS unroll
 				_main_mem[addr._addr_main_first_of_line + off] =
 					_cache_mem[addr._addr_cache_first_of_line + off];
 			}
@@ -176,8 +180,9 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 			static int curr_port = 0;
 			T data;
 
-			_dep = _request[curr_port].write((request_t){addr_main, READ_E}, _dep);
-			_dep = _rd_data[curr_port].read(data, _dep);
+			_dep = _request[curr_port].write_dep(
+				(request_t){addr_main, READ_E}, _dep);
+			_dep = _rd_data[curr_port].read_dep(data, _dep);
 
 			curr_port = (curr_port + 1) % N_PORTS;
 
@@ -188,8 +193,9 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 #pragma HLS inline
 			static int curr_port = 0;
 
-			_dep = _request[curr_port].write((request_t){addr_main, WRITE_E}, _dep);
-			_dep = _wr_data[curr_port].write(data, _dep);
+			_dep = _request[curr_port].write_dep(
+				(request_t){addr_main, WRITE_E}, _dep);
+			_dep = _wr_data[curr_port].write_dep(data, _dep);
 
 			curr_port = (curr_port + 1) % N_PORTS;
 		}

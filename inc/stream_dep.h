@@ -10,12 +10,20 @@ class stream_dep {
 		hls::stream<T> _stream;
 
 	public:
-		bool read(T &data, volatile bool dep) {
+		void read(T &data) {
+			data = _stream.read();
+		}
+
+		void write(T data) {
+			_stream.write(data);
+		}
+
+		bool read_dep(T &data, volatile bool dep) {
 			data = _stream.read();
 			return dep;
 		}
 
-		bool write(T data, volatile bool dep) {
+		bool write_dep(T data, volatile bool dep) {
 			_stream.write(data);
 			return dep;
 		}
