@@ -5,13 +5,14 @@
 #include <iostream>
 
 namespace matrix {
-	template<typename T, size_t N, size_t M, size_t P>
+	template<typename T, size_t N, size_t M, size_t P, size_t N_PORTS>
 		void multiply(T A, T B, T C) {
 			for (int i = 0; i < N; i++) {
 				for (int j = 0; j < P; j++) {
 					int acc = 0;
 					for (int k = 0; k < M; k++) {
 #pragma HLS pipeline
+#pragma HLS unroll factor=N_PORTS
 						acc += A[i * M + k] * B[k * P + j];
 					}
 					C[i * P + j] = acc;

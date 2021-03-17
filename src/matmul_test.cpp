@@ -10,20 +10,22 @@ typedef int data_type;
 #define N 5
 #define M 4
 #define P 3
+#define N_PORTS 4
 
-extern "C" void matmul_top(data_type *a_arr, data_type *b_arr, data_type *c_arr) {
-#pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0 
+extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
+#pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0
 #pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1
-#pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2 
+#pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2
 #pragma HLS INTERFACE s_axilite port=a_arr bundle=control
 #pragma HLS INTERFACE s_axilite port=b_arr bundle=control
 #pragma HLS INTERFACE s_axilite port=c_arr bundle=control
 #pragma HLS INTERFACE s_axilite port=return bundle=control
+
 	cache<data_type> a_cache(a_arr);
 	cache<data_type> b_cache(b_arr);
 	cache<data_type> c_cache(c_arr);
 #ifdef __SYNTHESIS__
-	matrix::multiply<cache<data_type> &, N, M, P>(a_cache, b_cache, c_cache);
+	matrix::multiply<cache<data_type> &, N, M, P, N_PORTS>(a_cache, b_cache, c_cache);
 	a_cache.operate();
 	b_cache.operate();
 	c_cache.operate();
@@ -31,7 +33,7 @@ extern "C" void matmul_top(data_type *a_arr, data_type *b_arr, data_type *c_arr)
 	std::thread a_thread(&cache<data_type>::operate, std::ref(a_cache));
 	std::thread b_thread(&cache<data_type>::operate, std::ref(b_cache));
 	std::thread c_thread(&cache<data_type>::operate, std::ref(c_cache));
-	std::thread matmul_thread(&matrix::multiply<cache<data_type> &, N, M, P>,
+	std::thread matmul_thread(&matrix::multiply<cache<data_type> &, N, M, P, N_PORTS>,
 			std::ref(a_cache), std::ref(b_cache), std::ref(c_cache));
 
 	matmul_thread.join();
@@ -58,7 +60,7 @@ int main() {
 	// matrix multiplication with caches
 	matmul_top(a_arr, b_arr, c_arr);
 	// standard matrix multiplication
-	matrix::multiply<data_type *, N, M, P>(a_arr, b_arr, c_arr_ref);
+	matrix::multiply<data_type *, N, M, P, N_PORTS>(a_arr, b_arr, c_arr_ref);
 
 	std::cout << "A = " << std::endl;
 	matrix::print(a_arr, N, M);
