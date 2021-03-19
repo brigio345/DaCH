@@ -4,6 +4,7 @@
 #endif	/* __SYNTHESIS__ */
 #include "matrix.h"
 #include "cache.h"
+#include "cache_ro.h"
 
 typedef int data_type;
 
@@ -20,20 +21,25 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 #pragma HLS INTERFACE s_axilite port=b_arr bundle=control
 #pragma HLS INTERFACE s_axilite port=c_arr bundle=control
 #pragma HLS INTERFACE s_axilite port=return bundle=control
+#pragma HLS array_partition variable=a_arr cyclic factor=5
+#pragma HLS array_partition variable=b_arr cyclic factor=3
+#pragma HLS array_partition variable=c_arr cyclic factor=4
 
-	cache<data_type> a_cache(a_arr);
-	cache<data_type> b_cache(b_arr);
+	cache_ro<data_type> a_cache(a_arr);
+	cache_ro<data_type> b_cache(b_arr);
 	cache<data_type> c_cache(c_arr);
 #ifdef __SYNTHESIS__
-	matrix::multiply<cache<data_type> &, N, M, P, N_PORTS>(a_cache, b_cache, c_cache);
+	matrix::multiply<cache_ro<data_type> &, cache<data_type> &, N, M, P, N_PORTS>
+			(a_cache, b_cache, c_cache);
 	a_cache.operate();
 	b_cache.operate();
 	c_cache.operate();
 #else
-	std::thread a_thread(&cache<data_type>::operate, std::ref(a_cache));
-	std::thread b_thread(&cache<data_type>::operate, std::ref(b_cache));
+	std::thread a_thread(&cache_ro<data_type>::operate, std::ref(a_cache));
+	std::thread b_thread(&cache_ro<data_type>::operate, std::ref(b_cache));
 	std::thread c_thread(&cache<data_type>::operate, std::ref(c_cache));
-	std::thread matmul_thread(&matrix::multiply<cache<data_type> &, N, M, P, N_PORTS>,
+	std::thread matmul_thread(&matrix::multiply<cache_ro<data_type> &,
+			cache<data_type> &, N, M, P, N_PORTS>,
 			std::ref(a_cache), std::ref(b_cache), std::ref(c_cache));
 
 	matmul_thread.join();
@@ -60,7 +66,7 @@ int main() {
 	// matrix multiplication with caches
 	matmul_top(a_arr, b_arr, c_arr);
 	// standard matrix multiplication
-	matrix::multiply<data_type *, N, M, P, N_PORTS>(a_arr, b_arr, c_arr_ref);
+	matrix::multiply<data_type *, data_type *, N, M, P, N_PORTS>(a_arr, b_arr, c_arr_ref);
 
 	std::cout << "A = " << std::endl;
 	matrix::print(a_arr, N, M);

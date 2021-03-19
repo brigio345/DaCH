@@ -5,8 +5,8 @@
 #include <iostream>
 
 namespace matrix {
-	template<typename T, size_t N, size_t M, size_t P, size_t N_PORTS>
-		void multiply(T A, T B, T C) {
+	template<typename T, typename U, size_t N, size_t M, size_t P, size_t N_PORTS>
+		void multiply(T A, T B, U C) {
 			for (int i = 0; i < N; i++) {
 				for (int j = 0; j < P; j++) {
 					int acc = 0;
