@@ -3,8 +3,8 @@
 #include <thread>
 #endif	/* __SYNTHESIS__ */
 #include "matrix.h"
-#include "cache.h"
 #include "cache_ro.h"
+#include "cache_wo.h"
 
 typedef int data_type;
 
@@ -27,9 +27,9 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 
 	cache_ro<data_type> a_cache(a_arr);
 	cache_ro<data_type> b_cache(b_arr);
-	cache<data_type> c_cache(c_arr);
+	cache_wo<data_type> c_cache(c_arr);
 #ifdef __SYNTHESIS__
-	matrix::multiply<cache_ro<data_type> &, cache<data_type> &, N, M, P, N_PORTS>
+	matrix::multiply<cache_ro<data_type> &, cache_wo<data_type> &, N, M, P, N_PORTS>
 			(a_cache, b_cache, c_cache);
 	a_cache.operate();
 	b_cache.operate();
@@ -37,9 +37,9 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 #else
 	std::thread a_thread(&cache_ro<data_type>::operate, std::ref(a_cache));
 	std::thread b_thread(&cache_ro<data_type>::operate, std::ref(b_cache));
-	std::thread c_thread(&cache<data_type>::operate, std::ref(c_cache));
+	std::thread c_thread(&cache_wo<data_type>::operate, std::ref(c_cache));
 	std::thread matmul_thread(&matrix::multiply<cache_ro<data_type> &,
-			cache<data_type> &, N, M, P, N_PORTS>,
+			cache_wo<data_type> &, N, M, P, N_PORTS>,
 			std::ref(a_cache), std::ref(b_cache), std::ref(c_cache));
 
 	matmul_thread.join();
