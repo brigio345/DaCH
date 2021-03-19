@@ -7,7 +7,7 @@ set design_files {"src/matmul_test.cpp"}
 set tb_files {"src/matmul_test.cpp"}
 
 set parts {xczu3eg-sbva484-1-e}
-set clock_period 25
+set clock_period 10
 
 # detect wheter script is run by Vivado HLS or Vitis HLS
 if {[string compare [file tail $argv0] vivado_hls]} {
@@ -43,6 +43,13 @@ if {$vivado} {
 # end of directives
 
 csynth_design
-cosim_design
-export_design
+cosim_design -setup -wave_debug -disable_deadlock_detect -trace_level all -tool xsim
+set sim_root "$project_name/$solution_name/sim/verilog"
+set file_name "$sim_root/$top.v"
+set patch_name "scripts/$top.patch"
+exec patch $file_name < $patch_name
+cd $sim_root
+exec sh run_xsim.sh | tee /dev/tty
+cd -
+#export_design
 

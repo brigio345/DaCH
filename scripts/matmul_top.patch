@@ -1,0 +1,86 @@
+--- proj_matmul/solution1/syn/verilog/matmul_top.v	2021-03-19 11:51:59.306786448 +0000
++++ proj_matmul/solution1/sim/verilog/matmul_top.v	2021-03-19 14:02:36.876827566 +0000
+@@ -1000,12 +1000,12 @@
+ multiply14 multiply14_U0(
+     .ap_clk(ap_clk),
+     .ap_rst(ap_rst_n_inv),
+-    .ap_start(multiply14_U0_ap_start),
++    .ap_start(ap_start),
+     .start_full_n(multiply14_U0_start_full_n),
+-    .ap_done(multiply14_U0_ap_done),
+-    .ap_continue(multiply14_U0_ap_continue),
+-    .ap_idle(multiply14_U0_ap_idle),
+-    .ap_ready(multiply14_U0_ap_ready),
++    .ap_done(ap_done),
++    .ap_continue(1),
++    .ap_idle(ap_idle),
++    .ap_ready(ap_ready),
+     .start_out(multiply14_U0_start_out),
+     .start_write(multiply14_U0_start_write),
+     .A_rd_data_stream_V_dout(a_cache_rd_data_0_s_dout),
+@@ -1043,11 +1043,11 @@
+ Loop_OPERATE_LOOP_pr Loop_OPERATE_LOOP_pr_U0(
+     .ap_clk(ap_clk),
+     .ap_rst(ap_rst_n_inv),
+-    .ap_start(Loop_OPERATE_LOOP_pr_U0_ap_start),
+-    .ap_done(Loop_OPERATE_LOOP_pr_U0_ap_done),
+-    .ap_continue(Loop_OPERATE_LOOP_pr_U0_ap_continue),
+-    .ap_idle(Loop_OPERATE_LOOP_pr_U0_ap_idle),
+-    .ap_ready(Loop_OPERATE_LOOP_pr_U0_ap_ready),
++    .ap_start(1),
++    //.ap_done(Loop_OPERATE_LOOP_pr_U0_ap_done),
++    .ap_continue(1),
++    //.ap_idle(Loop_OPERATE_LOOP_pr_U0_ap_idle),
++    //.ap_ready(Loop_OPERATE_LOOP_pr_U0_ap_ready),
+     .m_axi_a_arr_AWVALID(Loop_OPERATE_LOOP_pr_U0_m_axi_a_arr_AWVALID),
+     .m_axi_a_arr_AWREADY(1'b0),
+     .m_axi_a_arr_AWADDR(Loop_OPERATE_LOOP_pr_U0_m_axi_a_arr_AWADDR),
+@@ -1107,11 +1107,11 @@
+ Loop_OPERATE_LOOP_pr_2 Loop_OPERATE_LOOP_pr_2_U0(
+     .ap_clk(ap_clk),
+     .ap_rst(ap_rst_n_inv),
+-    .ap_start(Loop_OPERATE_LOOP_pr_2_U0_ap_start),
+-    .ap_done(Loop_OPERATE_LOOP_pr_2_U0_ap_done),
+-    .ap_continue(Loop_OPERATE_LOOP_pr_2_U0_ap_continue),
+-    .ap_idle(Loop_OPERATE_LOOP_pr_2_U0_ap_idle),
+-    .ap_ready(Loop_OPERATE_LOOP_pr_2_U0_ap_ready),
++    .ap_start(1),
++    //.ap_done(Loop_OPERATE_LOOP_pr_2_U0_ap_done),
++    .ap_continue(1),
++    //.ap_idle(Loop_OPERATE_LOOP_pr_2_U0_ap_idle),
++    //.ap_ready(Loop_OPERATE_LOOP_pr_2_U0_ap_ready),
+     .m_axi_b_arr_AWVALID(Loop_OPERATE_LOOP_pr_2_U0_m_axi_b_arr_AWVALID),
+     .m_axi_b_arr_AWREADY(1'b0),
+     .m_axi_b_arr_AWADDR(Loop_OPERATE_LOOP_pr_2_U0_m_axi_b_arr_AWADDR),
+@@ -1171,11 +1171,11 @@
+ Loop_OPERATE_LOOP_pr_1 Loop_OPERATE_LOOP_pr_1_U0(
+     .ap_clk(ap_clk),
+     .ap_rst(ap_rst_n_inv),
+-    .ap_start(Loop_OPERATE_LOOP_pr_1_U0_ap_start),
+-    .ap_done(Loop_OPERATE_LOOP_pr_1_U0_ap_done),
+-    .ap_continue(Loop_OPERATE_LOOP_pr_1_U0_ap_continue),
+-    .ap_idle(Loop_OPERATE_LOOP_pr_1_U0_ap_idle),
+-    .ap_ready(Loop_OPERATE_LOOP_pr_1_U0_ap_ready),
++    .ap_start(1),
++    //.ap_done(Loop_OPERATE_LOOP_pr_1_U0_ap_done),
++    .ap_continue(1),
++    //.ap_idle(Loop_OPERATE_LOOP_pr_1_U0_ap_idle),
++    //.ap_ready(Loop_OPERATE_LOOP_pr_1_U0_ap_ready),
+     .m_axi_c_arr_AWVALID(Loop_OPERATE_LOOP_pr_1_U0_m_axi_c_arr_AWVALID),
+     .m_axi_c_arr_AWREADY(gmem2_AWREADY),
+     .m_axi_c_arr_AWADDR(Loop_OPERATE_LOOP_pr_1_U0_m_axi_c_arr_AWADDR),
+@@ -1412,11 +1412,11 @@
+ 
+ assign Loop_OPERATE_LOOP_pr_U0_start_write = 1'b0;
+ 
+-assign ap_done = ap_sync_done;
++//assign ap_done = ap_sync_done;
+ 
+-assign ap_idle = (multiply14_U0_ap_idle & Loop_OPERATE_LOOP_pr_U0_ap_idle & Loop_OPERATE_LOOP_pr_2_U0_ap_idle & Loop_OPERATE_LOOP_pr_1_U0_ap_idle);
++//assign ap_idle = (multiply14_U0_ap_idle & Loop_OPERATE_LOOP_pr_U0_ap_idle & Loop_OPERATE_LOOP_pr_2_U0_ap_idle & Loop_OPERATE_LOOP_pr_1_U0_ap_idle);
+ 
+-assign ap_ready = multiply14_U0_ap_ready;
++//assign ap_ready = multiply14_U0_ap_ready;
+ 
+ always @ (*) begin
+     ap_rst_n_inv = ~ap_rst_n;
