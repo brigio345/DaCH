@@ -45,7 +45,6 @@ class cache_wo {
 			T data;
 
 OPERATE_LOOP:		while (1) {
-#pragma HLS pipeline
 				// get request
 				_wr_addr[curr_port].read(addr_main);
 				// stop if request is "end-of-request"
@@ -72,7 +71,6 @@ OPERATE_LOOP:		while (1) {
 
 		void stop_operation() {
 			for (int port = 0; port < N_PORTS; port++) {
-#pragma HLS unroll
 				_wr_addr[port].write(-1);
 			}
 		}
@@ -125,7 +123,6 @@ OPERATE_LOOP:		while (1) {
 				spill(address::build(_tag[addr._line], addr._line));
 
 FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS unroll
 				_cache_mem[addr._addr_cache_first_of_line + off] =
 					_main_mem[addr._addr_main_first_of_line + off];
 			}
@@ -139,7 +136,6 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 		void spill(address addr) {
 #pragma HLS inline
 SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS unroll
 				_main_mem[addr._addr_main_first_of_line + off] =
 					_cache_mem[addr._addr_cache_first_of_line + off];
 			}
@@ -151,7 +147,6 @@ SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 		void flush() {
 #pragma HLS inline
 FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
-#pragma HLS pipeline
 				if (_valid[line] && _dirty[line])
 					spill(address::build(_tag[line], line, 0));
 			}

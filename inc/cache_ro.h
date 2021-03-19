@@ -40,7 +40,6 @@ class cache_ro {
 			T data;
 
 OPERATE_LOOP:		while (1) {
-#pragma HLS pipeline
 				// get request
 				_rd_addr[curr_port].read(addr_main);
 				// stop if request is "end-of-request"
@@ -67,7 +66,6 @@ OPERATE_LOOP:		while (1) {
 
 		void stop_operation() {
 			for (int port = 0; port < N_PORTS; port++) {
-#pragma HLS unroll
 				_rd_addr[port].write(-1);
 			}
 		}
@@ -115,7 +113,6 @@ OPERATE_LOOP:		while (1) {
 		void fill(address addr) {
 #pragma HLS inline
 FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS unroll
 				_cache_mem[addr._addr_cache_first_of_line + off] =
 					_main_mem[addr._addr_main_first_of_line + off];
 			}

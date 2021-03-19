@@ -11,8 +11,6 @@ namespace matrix {
 				for (int j = 0; j < P; j++) {
 					int acc = 0;
 					for (int k = 0; k < M; k++) {
-#pragma HLS pipeline
-#pragma HLS unroll factor=N_PORTS
 						acc += A[i * M + k] * B[k * P + j];
 					}
 					C[i * P + j] = acc;
