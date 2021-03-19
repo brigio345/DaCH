@@ -8,7 +8,8 @@
 // TODO: support different policies through virtual functions
 // TODO: use more friendly template parameters:
 // 	LINE_SIZE -> N_LINES; TAG_SIZE -> CACHE_LINE_SIZE
-template <typename T, size_t ADDR_SIZE = 32, size_t TAG_SIZE = 28, size_t LINE_SIZE = 2, size_t N_PORTS = 1>
+template <typename T, size_t ADDR_SIZE = 32, size_t TAG_SIZE = 28, size_t LINE_SIZE = 2,
+		size_t RD_PORTS = 1, size_t WR_PORTS = 1>
 class cache {
 	private:
 		typedef enum {
@@ -20,12 +21,13 @@ class cache {
 			request_type_t type;
 		} request_t;
 
+		static const size_t N_PORTS = RD_PORTS + WR_PORTS;
 		static const size_t OFF_SIZE = ADDR_SIZE - (TAG_SIZE + LINE_SIZE);
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
-		stream_dep<T> _rd_data[N_PORTS];
-		stream_dep<T> _wr_data[N_PORTS];
+		stream_dep<T> _rd_data[RD_PORTS];
+		stream_dep<T> _wr_data[WR_PORTS];
 		stream_dep<request_t> _request[N_PORTS];
 		ap_uint<N_LINES> _valid;
 		ap_uint<N_LINES> _dirty;
@@ -33,16 +35,18 @@ class cache {
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		T * const _main_mem;
 		bool _dep;
+		int _req_port;
 
 	public:
 		cache(T * const main_mem): _main_mem(main_mem) {
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_cache_mem complete dim=1
-#pragma HLS stream depth=N_PORTS variable=_rd_data
-#pragma HLS stream depth=N_PORTS variable=_wr_data
+#pragma HLS stream depth=RD_PORTS variable=_rd_data
+#pragma HLS stream depth=WR_PORTS variable=_wr_data
 #pragma HLS stream depth=N_PORTS variable=_request
 			// invalidate all cache lines
 			_valid = 0;
+			_req_port = 0;
 		}
 
 		~cache() {
@@ -51,14 +55,16 @@ class cache {
 
 		void operate() {
 #pragma HLS inline
-			int curr_port = 0;
+			int req_port = 0;
+			int rd_port = 0;
+			int wr_port = 0;
 			request_t req;
 			T data;
 
 OPERATE_LOOP:		while (1) {
 #pragma HLS pipeline
 				// get request
-				_request[curr_port].read(req);
+				_request[req_port].read(req);
 				// stop if request is "end-of-request"
 				if (req.type == EOR_E)
 					break;
@@ -76,16 +82,20 @@ OPERATE_LOOP:		while (1) {
 					data = _cache_mem[addr._addr_cache];
 
 					// send read data
-					_rd_data[curr_port].write(data);
+					_rd_data[rd_port].write(data);
+
+					rd_port = (rd_port + 1) % RD_PORTS;
 				} else {
 					// store received data to cache
-					_wr_data[curr_port].read(data);
+					_wr_data[wr_port].read(data);
 					_cache_mem[addr._addr_cache] = data;
 
 					_dirty[addr._line] = true;
+
+					wr_port = (wr_port + 1) % WR_PORTS;
 				}
 
-				curr_port = (curr_port + 1) % N_PORTS;
+				req_port = (req_port + 1) % N_PORTS;
 			}
 		}
 
@@ -178,27 +188,29 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 
 		T get(ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
-			static int curr_port = 0;
+			static int rd_port = 0;
 			T data;
 
-			_dep = _request[curr_port].write_dep(
+			_dep = _request[_req_port].write_dep(
 				(request_t){addr_main, READ_E}, _dep);
-			_dep = _rd_data[curr_port].read_dep(data, _dep);
+			_dep = _rd_data[rd_port].read_dep(data, _dep);
 
-			curr_port = (curr_port + 1) % N_PORTS;
+			rd_port = (rd_port + 1) % RD_PORTS;
+			_req_port = (_req_port + 1) % N_PORTS;
 
 			return data;
 		}
 
 		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
 #pragma HLS inline
-			static int curr_port = 0;
+			static int wr_port = 0;
 
-			_dep = _request[curr_port].write_dep(
+			_dep = _request[_req_port].write_dep(
 				(request_t){addr_main, WRITE_E}, _dep);
-			_dep = _wr_data[curr_port].write_dep(data, _dep);
+			_dep = _wr_data[wr_port].write_dep(data, _dep);
 
-			curr_port = (curr_port + 1) % N_PORTS;
+			wr_port = (wr_port + 1) % WR_PORTS;
+			_req_port = (_req_port + 1) % N_PORTS;
 		}
 
 		class inner {
