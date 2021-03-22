@@ -29,15 +29,15 @@ class cache_ro {
 #pragma HLS array_partition variable=_cache_mem complete dim=1
 #pragma HLS stream depth=N_PORTS variable=_rd_data
 #pragma HLS stream depth=N_PORTS variable=_rd_addr
-			// invalidate all cache lines
-			_valid = 0;
 		}
 
 		void operate() {
-#pragma HLS inline
 			int curr_port = 0;
 			ap_int<ADDR_SIZE> addr_main;
 			T data;
+
+			// invalidate all cache lines
+			_valid = 0;
 
 OPERATE_LOOP:		while (1) {
 				// get request

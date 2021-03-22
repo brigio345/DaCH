@@ -30,26 +30,24 @@ class cache_wo {
 #pragma HLS array_partition variable=_cache_mem complete dim=1
 #pragma HLS stream depth=N_PORTS variable=_wr_data
 #pragma HLS stream depth=N_PORTS variable=_wr_addr
-			// invalidate all cache lines
-			_valid = 0;
-		}
-
-		~cache_wo() {
-			flush();
 		}
 
 		void operate() {
-#pragma HLS inline
 			int curr_port = 0;
 			ap_int<ADDR_SIZE> addr_main;
 			T data;
+			
+			// invalidate all cache lines
+			_valid = 0;
 
 OPERATE_LOOP:		while (1) {
 				// get request
 				_wr_addr[curr_port].read(addr_main);
 				// stop if request is "end-of-request"
-				if (addr_main < 0)
+				if (addr_main < 0) {
+					flush();
 					break;
+				}
 
 				// extract information from address
 				address addr(addr_main);
@@ -118,7 +116,6 @@ OPERATE_LOOP:		while (1) {
 		// (taking care of writing back dirty lines)
 		void fill(address addr) {
 #pragma HLS inline
-#pragma HLS dependence variable=_main_mem inter false
 			if (_valid[addr._line] && _dirty[addr._line])
 				spill(address::build(_tag[addr._line], addr._line));
 
