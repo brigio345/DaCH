@@ -23,9 +23,9 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 #pragma HLS stable variable=a_arr
 #pragma HLS stable variable=b_arr
 #pragma HLS stable variable=c_arr
-//#pragma HLS INTERFACE ap_ctrl_none port=return
+#pragma HLS INTERFACE ap_ctrl_hs port=return
 
-#pragma HLS dataflow
+#pragma HLS dataflow disable_start_propagation
 	cache_ro<data_type> a_cache(a_arr);
 	cache_ro<data_type> b_cache(b_arr);
 	cache_wo<data_type> c_cache(c_arr);
