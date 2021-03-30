@@ -19,11 +19,13 @@ class stream_dep {
 		}
 
 		bool read_dep(T &data, volatile bool dep) {
+#pragma HLS inline off
 			data = _stream.read();
 			return dep;
 		}
 
 		bool write_dep(T data, volatile bool dep) {
+#pragma HLS inline off
 			_stream.write(data);
 			return dep;
 		}

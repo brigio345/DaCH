@@ -43,13 +43,6 @@ if {$vivado} {
 # end of directives
 
 csynth_design
-cosim_design -setup -wave_debug -disable_deadlock_detect -trace_level all -tool xsim
-set sim_root "$project_name/$solution_name/sim/verilog"
-set file_name "$sim_root/$top.v"
-set patch_name "scripts/$top.patch"
-exec patch $file_name < $patch_name
-cd $sim_root
-exec sh run_xsim.sh | tee /dev/tty
-cd -
-#export_design
+cosim_design -disable_deadlock_detect
+export_design
 

@@ -13,13 +13,18 @@ typedef int data_type;
 #define P 3
 #define N_PORTS 1
 
+void multiply_syn(cache_ro<data_type> &a_cache, cache_ro<data_type> &b_cache, cache_wo<data_type> &c_cache) {
+	matrix::multiply<cache_ro<data_type> &, cache_wo<data_type> &, N, M, P, N_PORTS>
+			(a_cache, b_cache, c_cache);
+	a_cache.stop_operation();
+	b_cache.stop_operation();
+	c_cache.stop_operation();
+}
+
 extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
 #pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0
 #pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1
 #pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2
-#pragma HLS INTERFACE s_axilite port=a_arr bundle=control
-#pragma HLS INTERFACE s_axilite port=b_arr bundle=control
-#pragma HLS INTERFACE s_axilite port=c_arr bundle=control
 #pragma HLS stable variable=a_arr
 #pragma HLS stable variable=b_arr
 #pragma HLS stable variable=c_arr
@@ -30,8 +35,7 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	cache_ro<data_type> b_cache(b_arr);
 	cache_wo<data_type> c_cache(c_arr);
 #ifdef __SYNTHESIS__
-	matrix::multiply<cache_ro<data_type> &, cache_wo<data_type> &, N, M, P, N_PORTS>
-			(a_cache, b_cache, c_cache);
+	multiply_syn(a_cache, b_cache, c_cache);
 	a_cache.operate();
 	b_cache.operate();
 	c_cache.operate();
