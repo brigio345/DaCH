@@ -5,6 +5,12 @@
 #include <iostream>
 
 namespace matrix {
+	void mult_core(int &acc, int a, int b) {
+#pragma HLS inline
+#pragma HLS pipeline enable_flush
+		acc += a * b;
+	}
+
 	template<typename T, typename U, size_t N, size_t M, size_t P, size_t N_PORTS>
 		void multiply(T A, T B, U C) {
 #pragma HLS inline
@@ -12,7 +18,7 @@ namespace matrix {
 				for (int j = 0; j < P; j++) {
 					int acc = 0;
 					for (int k = 0; k < M; k++) {
-						acc += A[i * M + k] * B[k * P + j];
+						mult_core(acc, A[i * M + k], B[k * P + j]);
 					}
 					C[i * P + j] = acc;
 				}
