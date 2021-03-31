@@ -32,39 +32,45 @@ class cache_wo {
 #pragma HLS stream depth=N_PORTS variable=_wr_addr
 		}
 
-		void operate() {
-			int curr_port = 0;
+		bool operate_body() {
+#pragma HLS inline
+#pragma HLS pipeline enable_flush
+			static int curr_port = 0;
 			ap_int<ADDR_SIZE> addr_main;
 			T data;
-			
+
+			// get request
+			_wr_addr[curr_port].read(addr_main);
+			// stop if request is "end-of-request"
+			if (addr_main < 0)
+				return false;
+
+			// extract information from address
+			address addr(addr_main);
+
+			// prepare the cache for accessing addr
+			// (load the line if not present)
+			if (!hit(addr))
+				fill(addr);
+
+			// store received data to cache
+			_wr_data[curr_port].read(data);
+			_cache_mem[addr._addr_cache] = data;
+
+			_dirty[addr._line] = true;
+
+			curr_port = (curr_port + 1) % N_PORTS;
+
+			return true;
+		}
+
+		void operate() {
 			// invalidate all cache lines
 			_valid = 0;
 
-OPERATE_LOOP:		while (1) {
-				// get request
-				_wr_addr[curr_port].read(addr_main);
-				// stop if request is "end-of-request"
-				if (addr_main < 0) {
-					flush();
-					break;
-				}
+OPERATE_LOOP:		while (operate_body());
 
-				// extract information from address
-				address addr(addr_main);
-
-				// prepare the cache for accessing addr
-				// (load the line if not present)
-				if (!hit(addr))
-					fill(addr);
-
-				// store received data to cache
-				_wr_data[curr_port].read(data);
-				_cache_mem[addr._addr_cache] = data;
-
-				_dirty[addr._line] = true;
-
-				curr_port = (curr_port + 1) % N_PORTS;
-			}
+			flush();
 		}
 
 		void stop_operation() {
