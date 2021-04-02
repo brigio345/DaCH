@@ -15,8 +15,8 @@ class cache_ro {
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
-		stream_dep<T, N_PORTS> _rd_data[N_PORTS];
-		stream_dep<ap_int<ADDR_SIZE>, N_PORTS> _rd_addr[N_PORTS];
+		stream_dep<T, 256> _rd_data[N_PORTS];
+		stream_dep<ap_int<ADDR_SIZE>, 256> _rd_addr[N_PORTS];
 		ap_uint<N_LINES> _valid;
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
@@ -31,41 +31,44 @@ class cache_ro {
 
 		bool operate_body() {
 #pragma HLS inline
-#pragma HLS pipeline enable_flush
-			static int curr_port = 0;
-			ap_int<ADDR_SIZE> addr_main;
-			T data;
-
-			// get request
-			_rd_addr[curr_port].read(addr_main);
-			// stop if request is "end-of-request"
-			if (addr_main < 0)
-				return false;
-
-			// extract information from address
-			address addr(addr_main);
-
-			// prepare the cache for accessing addr
-			// (load the line if not present)
-			if (!hit(addr))
-				fill(addr);
-
-			// read data from cache
-			data = _cache_mem[addr._addr_cache];
-
-			// send read data
-			_rd_data[curr_port].write(data);
-
-			curr_port = (curr_port + 1) % N_PORTS;
-
-			return true;
 		}
 
 		void operate() {
+			int curr_port = 0;
 			// invalidate all cache lines
 			_valid = 0;
 
-OPERATE_LOOP:		while (operate_body());
+OPERATE_LOOP:		while (1) {
+#pragma HLS pipeline
+				if (_rd_addr[curr_port].empty())
+					continue;
+
+				ap_int<ADDR_SIZE> addr_main;
+				T data;
+
+				// get request
+				_rd_addr[curr_port].read(addr_main);
+				// stop if request is "end-of-request"
+				if (addr_main < 0)
+					break;
+
+				// extract information from address
+				address addr(addr_main);
+
+				// prepare the cache for accessing addr
+				// (load the line if not present)
+				if (!hit(addr))
+					fill(addr);
+
+				// read data from cache
+				data = _cache_mem[addr._addr_cache];
+
+				// send read data
+				_rd_data[curr_port].write(data);
+
+				curr_port = (curr_port + 1) % N_PORTS;
+
+			}
 		}
 
 		void stop_operation() {
