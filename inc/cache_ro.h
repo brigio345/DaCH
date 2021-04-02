@@ -15,8 +15,8 @@ class cache_ro {
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
-		stream_dep<T> _rd_data[N_PORTS];
-		stream_dep<ap_int<ADDR_SIZE> > _rd_addr[N_PORTS];
+		stream_dep<T, N_PORTS> _rd_data[N_PORTS];
+		stream_dep<ap_int<ADDR_SIZE>, N_PORTS> _rd_addr[N_PORTS];
 		ap_uint<N_LINES> _valid;
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
@@ -27,8 +27,6 @@ class cache_ro {
 		cache_ro(T * const main_mem): _main_mem(main_mem) {
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_cache_mem complete dim=1
-#pragma HLS stream depth=N_PORTS variable=_rd_data
-#pragma HLS stream depth=N_PORTS variable=_rd_addr
 		}
 
 		bool operate_body() {
