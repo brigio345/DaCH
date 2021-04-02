@@ -4,7 +4,7 @@
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 
-template <typename T, size_t DEPTH = 1>
+template <typename T, size_t DEPTH = 2>
 class stream_dep {
 	private:
 		hls::stream<T> _stream;
@@ -32,6 +32,10 @@ class stream_dep {
 #pragma HLS inline off
 			_stream.write(data);
 			return dep;
+		}
+
+		bool empty() {
+			return _stream.empty();
 		}
 };
 
