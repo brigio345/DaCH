@@ -4,12 +4,16 @@
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 
-template <typename T>
+template <typename T, size_t DEPTH = 1>
 class stream_dep {
 	private:
 		hls::stream<T> _stream;
 
 	public:
+		stream_dep() {
+#pragma HLS stream depth=DEPTH variable=_stream
+		}
+
 		void read(T &data) {
 			data = _stream.read();
 		}
