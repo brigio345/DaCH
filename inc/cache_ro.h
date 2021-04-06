@@ -29,25 +29,20 @@ class cache_ro {
 #pragma HLS array_partition variable=_cache_mem complete dim=1
 		}
 
-		bool operate_body() {
-#pragma HLS inline
-		}
-
 		void operate() {
-			int curr_port = 0;
+			ap_int<ADDR_SIZE> addr_main;
+			T data;
+			int curr_port;
+			bool dep;
+
 			// invalidate all cache lines
 			_valid = 0;
+			curr_port = 0;
 
 OPERATE_LOOP:		while (1) {
 #pragma HLS pipeline
-				if (_rd_addr[curr_port].empty())
-					continue;
-
-				ap_int<ADDR_SIZE> addr_main;
-				T data;
-
 				// get request
-				_rd_addr[curr_port].read(addr_main);
+				dep = _rd_addr[curr_port].read_dep(addr_main, dep);
 				// stop if request is "end-of-request"
 				if (addr_main < 0)
 					break;
@@ -64,7 +59,7 @@ OPERATE_LOOP:		while (1) {
 				data = _cache_mem[addr._addr_cache];
 
 				// send read data
-				_rd_data[curr_port].write(data);
+				dep = _rd_data[curr_port].write_dep(data, dep);
 
 				curr_port = (curr_port + 1) % N_PORTS;
 
