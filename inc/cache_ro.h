@@ -15,8 +15,8 @@ class cache_ro {
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
-		stream_dep<T, 256> _rd_data[N_PORTS];
-		stream_dep<ap_int<ADDR_SIZE>, 256> _rd_addr[N_PORTS];
+		stream_dep<T, 2 * N_PORTS> _rd_data[N_PORTS];
+		stream_dep<ap_int<ADDR_SIZE>, 2 * N_PORTS> _rd_addr[N_PORTS];
 		ap_uint<N_LINES> _valid;
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
