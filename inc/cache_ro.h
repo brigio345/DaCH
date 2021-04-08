@@ -17,13 +17,14 @@ class cache_ro {
 
 		stream_dep<T, 2 * N_PORTS> _rd_data[N_PORTS];
 		stream_dep<ap_int<ADDR_SIZE>, 2 * N_PORTS> _rd_addr[N_PORTS];
-		ap_uint<N_LINES> _valid;
+		bool _valid[N_LINES];
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		T * const _main_mem;
 
 	public:
 		cache_ro(T * const main_mem): _main_mem(main_mem) {
+#pragma HLS array_partition variable=_valid complete dim=1
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_LINES dim=1
 		}
@@ -35,7 +36,8 @@ class cache_ro {
 			bool dep;
 
 			// invalidate all cache lines
-			_valid = 0;
+			for (int line = 0; line < N_LINES; line++)
+				_valid[line] = false;
 			curr_port = 0;
 
 #pragma HLS dependence variable=dep inter false
