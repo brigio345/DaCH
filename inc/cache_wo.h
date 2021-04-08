@@ -22,7 +22,6 @@ class cache_wo {
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		T * const _main_mem;
-		bool _dep;
 
 	public:
 		cache_wo(T * const main_mem): _main_mem(main_mem) {
@@ -154,9 +153,10 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
 #pragma HLS inline
 			static int curr_port = 0;
+			bool dep;
 
-			_dep = _wr_addr[curr_port].write_dep(addr_main, _dep);
-			_dep = _wr_data[curr_port].write_dep(data, _dep);
+			dep = _wr_addr[curr_port].write_dep(addr_main, dep);
+			dep = _wr_data[curr_port].write_dep(data, dep);
 
 			curr_port = (curr_port + 1) % N_PORTS;
 		}
