@@ -40,6 +40,7 @@ class cache_wo {
 			_valid = 0;
 			curr_port = 0;
 
+#pragma HLS dependence variable=dep inter false
 OPERATE_LOOP:		while (1) {
 #pragma HLS pipeline
 				// get request
