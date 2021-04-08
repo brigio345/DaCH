@@ -27,7 +27,7 @@ class cache_wo {
 	public:
 		cache_wo(T * const main_mem): _main_mem(main_mem) {
 #pragma HLS array_partition variable=_tag complete dim=1
-#pragma HLS array_partition variable=_cache_mem complete dim=1
+#pragma HLS array_partition variable=_cache_mem cyclic factor=N_LINES dim=1
 		}
 
 		void operate() {
