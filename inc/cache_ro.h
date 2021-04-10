@@ -99,6 +99,7 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 			_valid[addr._line] = true;
 		}
 
+	public:
 		T get(ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
 			static int curr_port = 0;
@@ -111,12 +112,6 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 			curr_port = (curr_port + 1) % N_PORTS;
 
 			return data;
-		}
-
-	public:
-		T operator[](const int addr_main) {
-#pragma HLS inline
-			return get(addr_main);
 		}
 };
 
