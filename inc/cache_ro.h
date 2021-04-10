@@ -9,12 +9,11 @@
 // TODO: support different policies through virtual functions
 // TODO: use more friendly template parameters:
 // 	LINE_SIZE -> N_LINES; TAG_SIZE -> CACHE_LINE_SIZE
-template <typename T, size_t ADDR_SIZE = 32, size_t TAG_SIZE = 28,
-	size_t LINE_SIZE = 2, size_t N_PORTS = 2>
+template <typename T, size_t ADDR_SIZE = 32, size_t LINE_SIZE = 3,
+		size_t OFF_SIZE = 2, size_t N_PORTS = 2>
 class cache_ro {
 	private:
-
-		static const size_t OFF_SIZE = ADDR_SIZE - (TAG_SIZE + LINE_SIZE);
+		static const size_t TAG_SIZE = ADDR_SIZE - (LINE_SIZE + OFF_SIZE);
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
