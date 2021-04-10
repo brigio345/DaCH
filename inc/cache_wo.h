@@ -10,7 +10,7 @@
 // TODO: use more friendly template parameters:
 // 	LINE_SIZE -> N_LINES; TAG_SIZE -> CACHE_LINE_SIZE
 template <typename T, size_t ADDR_SIZE = 32, size_t LINE_SIZE = 3,
-		size_t OFF_SIZE = 2, size_t N_PORTS = 2>
+		size_t OFF_SIZE = 2, size_t N_PORTS = 1>
 class cache_wo {
 	private:
 		static const size_t TAG_SIZE = ADDR_SIZE - (LINE_SIZE + OFF_SIZE);
@@ -40,15 +40,14 @@ class cache_wo {
 			ap_int<ADDR_SIZE> addr_main;
 			T data;
 			int curr_port;
-			bool dep;
 
 			// invalidate all cache lines
 			for (int line = 0; line < N_LINES; line++)
 				_valid[line] = false;
 			curr_port = 0;
 
-#pragma HLS dependence variable=dep inter false
 OPERATE_LOOP:		while (1) {
+				bool dep;
 #pragma HLS pipeline
 #ifdef __SYNTHESIS__
 				// make pipeline flushable
@@ -71,7 +70,7 @@ OPERATE_LOOP:		while (1) {
 					fill(addr);
 
 				// store received data to cache
-				dep = _wr_data[curr_port].read_dep(data, dep);
+				_wr_data[curr_port].read_dep(data, dep);
 				_cache_mem[addr._addr_cache] = data;
 
 				_dirty[addr._line] = true;
