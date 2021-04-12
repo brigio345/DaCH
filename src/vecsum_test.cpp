@@ -31,19 +31,19 @@ void vecsum_syn(cache_ro<int> &vec, int &sum) {
 	vec.stop_operation();
 }
 
-void vecsum_top(int vec[N], int &sum) {
+extern "C" void vecsum_top(int vec[N], int &sum) {
 #pragma HLS INTERFACE m_axi port=vec offset=slave bundle=gmem0
 #pragma HLS stable variable=vec
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #pragma HLS dataflow disable_start_propagation
-	cache_ro<int> vec_cache(vec);
+	cache_ro<int> vec_cache;
 
 #ifdef __SYNTHESIS__
 	vecsum_syn(vec_cache, sum);
-	vec_cache.operate();
+	vec_cache.operate(vec);
 #else
-	std::thread vec_thread(&cache_ro<int>::operate, std::ref(vec_cache));
+	std::thread vec_thread(&cache_ro<int>::operate, std::ref(vec_cache), std::ref(vec));
 	std::thread vecsum_thread(vecsum_cache<cache_ro<int> &>, std::ref(vec_cache), std::ref(sum));
 
 	vecsum_thread.join();

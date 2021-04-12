@@ -28,7 +28,11 @@ add_files -tb -cflags "-I $include_dir" $tb_files
 set_top $top
 
 # create a solution
-open_solution -reset $solution_name
+if {$vivado} {
+	open_solution -reset $solution_name
+} else {
+	open_solution -flow_target vitis -reset $solution_name
+}
 # define technology and clock rate
 set_part $parts
 create_clock -period $clock_period
@@ -43,6 +47,10 @@ if {$vivado} {
 # end of directives
 
 csynth_design
-cosim_design -disable_deadlock_detect
+if {$vivado} {
+	cosim_design -disable_deadlock_detect
+} else {
+	cosim_design -disable_deadlock_detection
+}
 export_design
 

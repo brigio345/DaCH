@@ -2,7 +2,8 @@
 #define CACHE_RO_H
 
 #include "address.h"
-#include "stream_dep.h"
+#define HLS_STREAM_THREAD_SAFE
+#include "hls_stream.h"
 #include "ap_int.h"
 
 // direct mapping, write back
@@ -17,23 +18,22 @@ class cache_ro {
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
-		stream_dep<T, 2 * N_PORTS> _rd_data[N_PORTS];
-		stream_dep<ap_int<ADDR_SIZE>, 2 * N_PORTS> _rd_addr[N_PORTS];
+		hls::stream<T, 2 * N_PORTS> _rd_data[N_PORTS];
+		hls::stream<ap_int<ADDR_SIZE>, 2 * N_PORTS> _rd_addr[N_PORTS];
 		bool _valid[N_LINES];
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
-		T * const _main_mem;
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE, OFF_SIZE, N_ENTRIES_PER_LINE>
 			addr_t;
 	public:
-		cache_ro(T * const main_mem): _main_mem(main_mem) {
+		cache_ro() {
 #pragma HLS array_partition variable=_valid complete dim=1
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_LINES dim=1
 		}
 
-		void operate() {
+		void operate(T *main_mem) {
 			ap_int<ADDR_SIZE> addr_main;
 			T data;
 			int curr_port;
@@ -53,7 +53,7 @@ OPERATE_LOOP:		while (1) {
 #endif /* __SYNTHESIS__ */
 
 				// get request
-				dep = _rd_addr[curr_port].read_dep(addr_main, dep);
+				dep = _rd_addr[curr_port].read_dep(addr_main, false);
 				// stop if request is "end-of-request"
 				if (addr_main < 0)
 					break;
@@ -64,7 +64,7 @@ OPERATE_LOOP:		while (1) {
 				// prepare the cache for accessing addr
 				// (load the line if not present)
 				if (!hit(addr))
-					fill(addr);
+					fill(main_mem, addr);
 
 				// read data from cache
 				data = _cache_mem[addr._addr_cache];
@@ -88,11 +88,11 @@ OPERATE_LOOP:		while (1) {
 		}
 
 		// load line from main to cache memory
-		void fill(addr_t addr) {
+		void fill(T *main_mem, addr_t addr) {
 #pragma HLS inline
 FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				_cache_mem[addr._addr_cache_first_of_line + off] =
-					_main_mem[addr._addr_main_first_of_line + off];
+				_cache_mem[addr._addr_cache_first_of_line + off] = 
+					main_mem[addr._addr_main_first_of_line + off];
 			}
 
 			_tag[addr._line] = addr._tag;
@@ -106,8 +106,8 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 			T data;
 			bool dep;
 
-			dep = _rd_addr[curr_port].write_dep(addr_main, dep);
-			dep = _rd_data[curr_port].read_dep(data, dep);
+			dep = _rd_addr[curr_port].write_dep(addr_main, false);
+			_rd_data[curr_port].read_dep(data, dep);
 
 			curr_port = (curr_port + 1) % N_PORTS;
 

@@ -2,7 +2,8 @@
 #define CACHE_WO_H
 
 #include "address.h"
-#include "stream_dep.h"
+#define HLS_STREAM_THREAD_SAFE
+#include "hls_stream.h"
 #include "ap_int.h"
 
 // direct mapping, write back
@@ -17,26 +18,25 @@ class cache_wo {
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
 
-		stream_dep<T, 2 * N_PORTS> _wr_data[N_PORTS];
-		stream_dep<ap_int<ADDR_SIZE>, 2 * N_PORTS> _wr_addr[N_PORTS];
+		hls::stream<T, 2 * N_PORTS> _wr_data[N_PORTS];
+		hls::stream<ap_int<ADDR_SIZE>, 2 * N_PORTS> _wr_addr[N_PORTS];
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
-		T * const _main_mem;
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE, OFF_SIZE, N_ENTRIES_PER_LINE>
 			addr_t;
 
 	public:
-		cache_wo(T * const main_mem): _main_mem(main_mem) {
+		cache_wo() {
 #pragma HLS array_partition variable=_valid complete dim=1
 #pragma HLS array_partition variable=_dirty complete dim=1
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_LINES dim=1
 		}
 
-		void operate() {
+		void operate(T *main_mem) {
 			ap_int<ADDR_SIZE> addr_main;
 			T data;
 			int curr_port;
@@ -56,7 +56,7 @@ OPERATE_LOOP:		while (1) {
 #endif /* __SYNTHESIS__ */
 
 				// get request
-				dep = _wr_addr[curr_port].read_dep(addr_main, dep);
+				dep = _wr_addr[curr_port].read_dep(addr_main, false);
 				// stop if request is "end-of-request"
 				if (addr_main < 0)
 					break;
@@ -67,7 +67,7 @@ OPERATE_LOOP:		while (1) {
 				// prepare the cache for accessing addr
 				// (load the line if not present)
 				if (!hit(addr))
-					fill(addr);
+					fill(main_mem, addr);
 
 				// store received data to cache
 				_wr_data[curr_port].read_dep(data, dep);
@@ -78,7 +78,7 @@ OPERATE_LOOP:		while (1) {
 				curr_port = (curr_port + 1) % N_PORTS;
 			}
 
-			flush();
+			flush(main_mem);
 		}
 
 		void stop_operation() {
@@ -94,14 +94,14 @@ OPERATE_LOOP:		while (1) {
 
 		// load line from main to cache memory
 		// (taking care of writing back dirty lines)
-		void fill(addr_t addr) {
+		void fill(T *main_mem, addr_t addr) {
 #pragma HLS inline
 			if (_valid[addr._line] && _dirty[addr._line])
-				spill(addr_t::build(_tag[addr._line], addr._line));
+				spill(main_mem, addr_t::build(_tag[addr._line], addr._line));
 
 FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 				_cache_mem[addr._addr_cache_first_of_line + off] =
-					_main_mem[addr._addr_main_first_of_line + off];
+					main_mem[addr._addr_main_first_of_line + off];
 			}
 
 			_tag[addr._line] = addr._tag;
@@ -110,10 +110,10 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 		}
 
 		// store line from cache to main memory
-		void spill(addr_t addr) {
+		void spill(T *main_mem, addr_t addr) {
 #pragma HLS inline
 SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				_main_mem[addr._addr_main_first_of_line + off] =
+				main_mem[addr._addr_main_first_of_line + off] =
 					_cache_mem[addr._addr_cache_first_of_line + off];
 			}
 
@@ -121,21 +121,22 @@ SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 		}
 
 		// store all valid dirty lines from cache to main memory
-		void flush() {
+		void flush(T *main_mem) {
 #pragma HLS inline
 FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 				if (_valid[line] && _dirty[line])
-					spill(addr_t::build(_tag[line], line, 0));
+					spill(main_mem, addr_t::build(_tag[line], line, 0));
 			}
 		}
 
+	public:
 		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
 #pragma HLS inline
 			static int curr_port = 0;
 			bool dep;
 
-			dep = _wr_addr[curr_port].write_dep(addr_main, dep);
-			dep = _wr_data[curr_port].write_dep(data, dep);
+			dep = _wr_addr[curr_port].write_dep(addr_main, false);
+			_wr_data[curr_port].write_dep(data, dep);
 
 			curr_port = (curr_port + 1) % N_PORTS;
 		}
