@@ -5,6 +5,7 @@
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 #include "ap_int.h"
+#include "ap_utils.h"
 
 // direct mapping, write back
 // TODO: support different policies through virtual functions
@@ -108,6 +109,7 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 			bool dep;
 
 			dep = _rd_addr[_curr_req_port].write_dep(addr_main, false);
+			ap_wait();
 			_rd_data[_curr_req_port].read_dep(data, dep);
 
 			_curr_req_port = (_curr_req_port + 1) % N_PORTS;
