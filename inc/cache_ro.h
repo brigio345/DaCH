@@ -23,6 +23,7 @@ class cache_ro {
 		bool _valid[N_LINES];
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
+		int _curr_req_port;
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE, OFF_SIZE, N_ENTRIES_PER_LINE>
 			addr_t;
@@ -31,6 +32,7 @@ class cache_ro {
 #pragma HLS array_partition variable=_valid complete dim=1
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_LINES dim=1
+			_curr_req_port = 0;
 		}
 
 		void operate(T *main_mem) {
@@ -102,14 +104,13 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 	public:
 		T get(ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
-			static int curr_port = 0;
 			T data;
 			bool dep;
 
-			dep = _rd_addr[curr_port].write_dep(addr_main, false);
-			_rd_data[curr_port].read_dep(data, dep);
+			dep = _rd_addr[_curr_req_port].write_dep(addr_main, false);
+			_rd_data[_curr_req_port].read_dep(data, dep);
 
-			curr_port = (curr_port + 1) % N_PORTS;
+			_curr_req_port = (_curr_req_port + 1) % N_PORTS;
 
 			return data;
 		}

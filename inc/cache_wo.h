@@ -24,6 +24,7 @@ class cache_wo {
 		bool _dirty[N_LINES];
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
+		int _curr_req_port;
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE, OFF_SIZE, N_ENTRIES_PER_LINE>
 			addr_t;
@@ -34,6 +35,7 @@ class cache_wo {
 #pragma HLS array_partition variable=_dirty complete dim=1
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_LINES dim=1
+			_curr_req_port = 0;
 		}
 
 		void operate(T *main_mem) {
@@ -132,13 +134,12 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 	public:
 		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
 #pragma HLS inline
-			static int curr_port = 0;
 			bool dep;
 
-			dep = _wr_addr[curr_port].write_dep(addr_main, false);
-			_wr_data[curr_port].write_dep(data, dep);
+			dep = _wr_addr[_curr_req_port].write_dep(addr_main, false);
+			_wr_data[_curr_req_port].write_dep(data, dep);
 
-			curr_port = (curr_port + 1) % N_PORTS;
+			_curr_req_port = (_curr_req_port + 1) % N_PORTS;
 		}
 
 		class inner {
