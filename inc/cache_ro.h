@@ -31,7 +31,7 @@ class cache_ro {
 		cache_ro() {
 #pragma HLS array_partition variable=_valid complete dim=1
 #pragma HLS array_partition variable=_tag complete dim=1
-#pragma HLS array_partition variable=_cache_mem cyclic factor=N_LINES dim=1
+#pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 			_curr_req_port = 0;
 		}
 
