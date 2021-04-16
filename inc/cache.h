@@ -110,7 +110,8 @@ OPERATE_LOOP:		while (1) {
 				req_port = (req_port + 1) % N_PORTS;
 			}
 
-			flush(main_mem);
+			if (WR_PORTS > 0)
+				flush(main_mem);
 		}
 
 		void stop_operation() {
@@ -128,7 +129,7 @@ OPERATE_LOOP:		while (1) {
 		// (taking care of writing back dirty lines)
 		void fill(T *main_mem, addr_t addr) {
 #pragma HLS inline
-			if (_valid[addr._line] && _dirty[addr._line])
+			if ((WR_PORTS > 0) && _valid[addr._line] && _dirty[addr._line])
 				spill(main_mem, addr_t::build(_tag[addr._line], addr._line));
 
 FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
