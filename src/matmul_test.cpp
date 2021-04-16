@@ -3,18 +3,18 @@
 #include <thread>
 #endif	/* __SYNTHESIS__ */
 #include "matrix.h"
-#include "cache_ro.h"
-#include "cache_wo.h"
+#include "cache.h"
 
 typedef int data_type;
+typedef cache<data_type, 1, 0> cache_in;
+typedef cache<data_type, 0, 1> cache_out;
 
 #define N 5
 #define M 4
 #define P 3
-#define N_PORTS 1
 
-void multiply_syn(cache_ro<data_type> &a_cache, cache_ro<data_type> &b_cache, cache_wo<data_type> &c_cache) {
-	matrix::multiply<cache_ro<data_type> &, cache_wo<data_type> &, N, M, P, N_PORTS>
+void multiply_syn(cache_in &a_cache, cache_in &b_cache, cache_out &c_cache) {
+	matrix::multiply<cache_in &, cache_out &, N, M, P>
 			(a_cache, b_cache, c_cache);
 	a_cache.stop_operation();
 	b_cache.stop_operation();
@@ -31,20 +31,20 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #pragma HLS dataflow disable_start_propagation
-	cache_ro<data_type> a_cache;
-	cache_ro<data_type> b_cache;
-	cache_wo<data_type> c_cache;
+	cache_in a_cache;
+	cache_in b_cache;
+	cache_out c_cache;
 #ifdef __SYNTHESIS__
 	multiply_syn(a_cache, b_cache, c_cache);
 	a_cache.operate(a_arr);
 	b_cache.operate(b_arr);
 	c_cache.operate(c_arr);
 #else
-	std::thread a_thread(&cache_ro<data_type>::operate, std::ref(a_cache), std::ref(a_arr));
-	std::thread b_thread(&cache_ro<data_type>::operate, std::ref(b_cache), std::ref(b_arr));
-	std::thread c_thread(&cache_wo<data_type>::operate, std::ref(c_cache), std::ref(c_arr));
-	std::thread matmul_thread(&matrix::multiply<cache_ro<data_type> &,
-			cache_wo<data_type> &, N, M, P, N_PORTS>,
+	std::thread a_thread(&cache_in::operate, std::ref(a_cache), std::ref(a_arr));
+	std::thread b_thread(&cache_in::operate, std::ref(b_cache), std::ref(b_arr));
+	std::thread c_thread(&cache_out::operate, std::ref(c_cache), std::ref(c_arr));
+	std::thread matmul_thread(&matrix::multiply<cache_in &,
+			cache_out &, N, M, P>,
 			std::ref(a_cache), std::ref(b_cache), std::ref(c_cache));
 
 	matmul_thread.join();

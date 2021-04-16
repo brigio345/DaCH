@@ -3,7 +3,7 @@
 #include <thread>
 #endif	/* __SYNTHESIS__ */
 #include "matrix.h"
-#include "cache_ro.h"
+#include "cache.h"
 
 #define N 20
 #define N_PORTS 1
@@ -26,8 +26,8 @@ template <typename T>
 		sum = tmp;
 	}
 
-void vecsum_syn(cache_ro<int> &vec, int &sum) {
-	vecsum_cache<cache_ro<int> &>(vec, sum);
+void vecsum_syn(cache<int, 1, 0> &vec, int &sum) {
+	vecsum_cache<cache<int, 1, 0> &>(vec, sum);
 	vec.stop_operation();
 }
 
@@ -37,14 +37,14 @@ extern "C" void vecsum_top(int vec[N], int &sum) {
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #pragma HLS dataflow disable_start_propagation
-	cache_ro<int> vec_cache;
+	cache<int, 1, 0> vec_cache;
 
 #ifdef __SYNTHESIS__
 	vecsum_syn(vec_cache, sum);
 	vec_cache.operate(vec);
 #else
-	std::thread vec_thread(&cache_ro<int>::operate, std::ref(vec_cache), std::ref(vec));
-	std::thread vecsum_thread(vecsum_cache<cache_ro<int> &>, std::ref(vec_cache), std::ref(sum));
+	std::thread vec_thread(&cache<int, 1, 0>::operate, std::ref(vec_cache), std::ref(vec));
+	std::thread vecsum_thread(vecsum_cache<cache<int, 1, 0> &>, std::ref(vec_cache), std::ref(sum));
 
 	vecsum_thread.join();
 	vec_cache.stop_operation();
