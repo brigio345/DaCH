@@ -120,6 +120,44 @@ OPERATE_LOOP:		while (1) {
 			}
 		}
 
+		T get(ap_uint<ADDR_SIZE> addr_main) {
+#pragma HLS inline
+			T data;
+			bool dep;
+
+			dep = _request[_client_req_port].write_dep(
+				(request_t){addr_main, READ_E}, false);
+			ap_wait();
+			_rd_data[_client_rd_port].read_dep(data, dep);
+
+			_client_rd_port = (_client_rd_port + 1) % RD_PORTS;
+			_client_req_port = (_client_req_port + 1) % N_PORTS;
+
+			return data;
+		}
+
+		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
+#pragma HLS inline
+			bool dep;
+
+			dep = _request[_client_req_port].write_dep(
+				(request_t){addr_main, WRITE_E}, false);
+			ap_wait();
+			_wr_data[_client_wr_port].write_dep(data, dep);
+
+			_client_wr_port = (_client_wr_port + 1) % WR_PORTS;
+			_client_req_port = (_client_req_port + 1) % N_PORTS;
+		}
+
+		// store all valid dirty lines from cache to main memory
+		void flush(T *main_mem) {
+#pragma HLS inline
+FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
+				if (_valid[line] && _dirty[line])
+					spill(main_mem, addr_t::build(_tag[line], line, 0));
+			}
+		}
+
 	private:
 		inline bool hit(addr_t addr) {
 			return (_valid[addr._line] && (addr._tag == _tag[addr._line]));
@@ -151,45 +189,6 @@ SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 			}
 
 			_dirty[addr._line] = false;
-		}
-
-		// store all valid dirty lines from cache to main memory
-		void flush(T *main_mem) {
-#pragma HLS inline
-FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
-				if (_valid[line] && _dirty[line])
-					spill(main_mem, addr_t::build(_tag[line], line, 0));
-			}
-		}
-
-	public:
-		T get(ap_uint<ADDR_SIZE> addr_main) {
-#pragma HLS inline
-			T data;
-			bool dep;
-
-			dep = _request[_client_req_port].write_dep(
-				(request_t){addr_main, READ_E}, false);
-			ap_wait();
-			_rd_data[_client_rd_port].read_dep(data, dep);
-
-			_client_rd_port = (_client_rd_port + 1) % RD_PORTS;
-			_client_req_port = (_client_req_port + 1) % N_PORTS;
-
-			return data;
-		}
-
-		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
-#pragma HLS inline
-			bool dep;
-
-			dep = _request[_client_req_port].write_dep(
-				(request_t){addr_main, WRITE_E}, false);
-			ap_wait();
-			_wr_data[_client_wr_port].write_dep(data, dep);
-
-			_client_wr_port = (_client_wr_port + 1) % WR_PORTS;
-			_client_req_port = (_client_req_port + 1) % N_PORTS;
 		}
 
 #ifndef __SYNTHESIS__
