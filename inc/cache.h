@@ -170,9 +170,11 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 			if ((WR_PORTS > 0) && _valid[addr._line] && _dirty[addr._line])
 				spill(main_mem, addr_t::build(_tag[addr._line], addr._line));
 
+			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
+			T *main_line = &(main_mem[addr._addr_main_first_of_line]);
+
 FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				_cache_mem[addr._addr_cache_first_of_line + off] =
-					main_mem[addr._addr_main_first_of_line + off];
+				cache_line[off] = main_line[off];
 			}
 
 			_tag[addr._line] = addr._tag;
@@ -183,9 +185,11 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 		// store line from cache to main memory
 		void spill(T *main_mem, addr_t addr) {
 #pragma HLS inline
+			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
+			T *main_line = &(main_mem[addr._addr_main_first_of_line]);
+
 SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				main_mem[addr._addr_main_first_of_line + off] =
-					_cache_mem[addr._addr_cache_first_of_line + off];
+				main_line[off] = cache_line[off];
 			}
 
 			_dirty[addr._line] = false;
