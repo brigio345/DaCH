@@ -189,6 +189,8 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 			T *main_line = &(main_mem[addr._addr_main_first_of_line]);
 
 SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS dependence inter variable=main_mem false
+#pragma HLS dependence inter variable=cache_mem false
 				main_line[off] = cache_line[off];
 			}
 
