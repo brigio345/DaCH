@@ -20,8 +20,8 @@ namespace matrix {
 			}
 		}
 
-	template<typename T, typename U, size_t N, size_t M, size_t P>
-		void multiply(T A, T B, U C) {
+	template<typename T, typename U, typename V, size_t N, size_t M, size_t P>
+		void multiply(T A, U B, V C) {
 #pragma HLS inline
 			for (int i = 0; i < N; i++) {
 				for (int j = 0; j < P; j++) {
