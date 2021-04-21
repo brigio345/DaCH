@@ -11,7 +11,7 @@
 // TODO: support different policies through virtual functions
 // TODO: use more friendly template parameters:
 // 	LINE_SIZE -> N_LINES; TAG_SIZE -> CACHE_LINE_SIZE
-template <typename T, size_t RD_PORTS, size_t WR_PORTS,
+template <typename T, size_t MAIN_SIZE, size_t RD_PORTS, size_t WR_PORTS,
 	 size_t ADDR_SIZE = 32, size_t LINE_SIZE = 3, size_t OFF_SIZE = 5>
 class cache {
 	private:
@@ -122,6 +122,9 @@ OPERATE_LOOP:		while (1) {
 
 		T get(ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
+			if (addr_main >= MAIN_SIZE)
+				return NULL;
+
 			T data;
 			bool dep;
 
@@ -138,6 +141,9 @@ OPERATE_LOOP:		while (1) {
 
 		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
 #pragma HLS inline
+			if (addr_main >= MAIN_SIZE)
+				return;
+
 			bool dep;
 
 			dep = _request[_client_req_port].write_dep(
