@@ -5,9 +5,9 @@
 #include "matrix.h"
 #include "cache.h"
 
-#define N 5
+#define N 6
 #define M 4
-#define P 3
+#define P 8
 
 typedef int data_type;
 typedef cache<data_type, N * M, 1, 0> cache_a;
