@@ -12,7 +12,7 @@
 // TODO: use more friendly template parameters:
 // 	LINE_SIZE -> N_LINES; TAG_SIZE -> CACHE_LINE_SIZE
 template <typename T, size_t MAIN_SIZE, size_t RD_PORTS, size_t WR_PORTS,
-	 size_t ADDR_SIZE = 32, size_t LINE_SIZE = 3, size_t OFF_SIZE = 5>
+	 size_t ADDR_SIZE = 32, size_t LINE_SIZE = 3, size_t OFF_SIZE = 3>
 class cache {
 	private:
 		typedef enum {
