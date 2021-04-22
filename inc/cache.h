@@ -28,6 +28,8 @@ class cache {
 		static const size_t TAG_SIZE = ADDR_SIZE - (LINE_SIZE + OFF_SIZE);
 		static const size_t N_LINES = 1 << LINE_SIZE;
 		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
+		static_assert(MAIN_SIZE % N_ENTRIES_PER_LINE == 0,
+			"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
 
 		hls::stream<T, RD_PORTS> _rd_data[RD_PORTS];
 		hls::stream<T, WR_PORTS> _wr_data[WR_PORTS];
