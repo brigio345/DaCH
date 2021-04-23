@@ -128,7 +128,7 @@ OPERATE_LOOP:		while (1) {
 		T get(ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
 			if (addr_main >= MAIN_SIZE)
-				return NULL;
+				return 0;
 
 			T data;
 			bool dep;
