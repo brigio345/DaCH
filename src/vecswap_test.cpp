@@ -5,7 +5,7 @@
 #include "matrix.h"
 #include "cache.h"
 
-#define N 64
+#define N 512
 
 void vecswap(int a[N], int b[N]) {
 	int tmp;
@@ -17,7 +17,7 @@ void vecswap(int a[N], int b[N]) {
 	}
 }
 
-void vecswap_cache(cache<int, N, 1, 1> &a, cache<int, N, 1, 1> &b) {
+void vecswap_cache(cache<int, 1, 1, N> &a, cache<int, 1, 1, N> &b) {
 	int tmp;
 
 	for (int i = 0; i < N; i++) {
@@ -32,7 +32,7 @@ void vecswap_cache(cache<int, N, 1, 1> &a, cache<int, N, 1, 1> &b) {
 	}
 }
 
-void vecswap_syn(cache<int, N, 1, 1> &a, cache<int, N, 1, 1> &b) {
+void vecswap_syn(cache<int, 1, 1, N> &a, cache<int, 1, 1, N> &b) {
 	vecswap_cache(a, b);
 
 	a.stop_operation();
@@ -45,16 +45,16 @@ extern "C" void vecswap_top(int a[N], int b[N]) {
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #pragma HLS dataflow disable_start_propagation
-	cache<int, N, 1, 1> a_cache;
-	cache<int, N, 1, 1> b_cache;
+	cache<int, 1, 1, N> a_cache;
+	cache<int, 1, 1, N> b_cache;
 
 #ifdef __SYNTHESIS__
 	vecswap_syn(a_cache, b_cache);
 	a_cache.operate(a);
 	b_cache.operate(b);
 #else
-	std::thread a_thread(&cache<int, N, 1, 1>::operate, std::ref(a_cache), std::ref(a));
-	std::thread b_thread(&cache<int, N, 1, 1>::operate, std::ref(b_cache), std::ref(b));
+	std::thread a_thread(&cache<int, 1, 1, N>::operate, std::ref(a_cache), std::ref(a));
+	std::thread b_thread(&cache<int, 1, 1, N>::operate, std::ref(b_cache), std::ref(b));
 	std::thread vecswap_thread(vecswap_cache, std::ref(a_cache), std::ref(b_cache));
 
 	vecswap_thread.join();

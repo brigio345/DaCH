@@ -5,14 +5,14 @@
 #include "matrix.h"
 #include "cache.h"
 
-#define N 6
-#define M 4
+#define N 16
+#define M 46
 #define P 8
 
 typedef int data_type;
-typedef cache<data_type, N * M, 1, 0> cache_a;
-typedef cache<data_type, M * P, 1, 0> cache_b;
-typedef cache<data_type, N * P, 0, 1> cache_c;
+typedef cache<data_type, 1, 0, N * M> cache_a;
+typedef cache<data_type, 1, 0, M * P> cache_b;
+typedef cache<data_type, 0, 1, N * P> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 	matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P>

@@ -6,15 +6,30 @@
 #include "hls_stream.h"
 #include "ap_int.h"
 #include "ap_utils.h"
+#include "utils.h"
 
 // direct mapping, write back
-// TODO: support different policies through virtual functions
-// TODO: use more friendly template parameters:
-// 	LINE_SIZE -> N_LINES; TAG_SIZE -> CACHE_LINE_SIZE
-template <typename T, size_t MAIN_SIZE, size_t RD_PORTS, size_t WR_PORTS,
-	 size_t ADDR_SIZE = 32, size_t LINE_SIZE = 3, size_t OFF_SIZE = 3>
+template <typename T, size_t RD_PORTS, size_t WR_PORTS, size_t MAIN_SIZE,
+	 size_t N_LINES = 8, size_t N_ENTRIES_PER_LINE = 8>
 class cache {
 	private:
+		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
+		static const size_t LINE_SIZE = utils::log2_ceil(N_LINES);
+		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
+		static const size_t TAG_SIZE = (ADDR_SIZE - (LINE_SIZE + OFF_SIZE));
+		static const size_t N_PORTS = (RD_PORTS + WR_PORTS);
+
+		static_assert((N_PORTS > 0),
+				"RD_PORTS or WR_PORTS must be at least 1");
+		static_assert(((1 << LINE_SIZE) == N_LINES),
+				"N_LINES must be a power of 2");
+		static_assert(((1 << OFF_SIZE) == N_ENTRIES_PER_LINE),
+				"N_ENTRIES_PER_LINE must be a power of 2");
+		static_assert((TAG_SIZE > 0),
+				"N_LINES and/or N_ENTRIES_PER_LINE are too big for the specified MAIN_SIZE");
+		static_assert(((MAIN_SIZE % N_ENTRIES_PER_LINE) == 0),
+			"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
+
 		typedef enum {
 			READ_E, WRITE_E, EOR_E
 		} request_type_t;
@@ -24,12 +39,8 @@ class cache {
 			request_type_t type;
 		} request_t;
 
-		static const size_t N_PORTS = RD_PORTS + WR_PORTS;
-		static const size_t TAG_SIZE = ADDR_SIZE - (LINE_SIZE + OFF_SIZE);
-		static const size_t N_LINES = 1 << LINE_SIZE;
-		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
-		static_assert(MAIN_SIZE % N_ENTRIES_PER_LINE == 0,
-			"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
+		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE, OFF_SIZE, N_ENTRIES_PER_LINE>
+			addr_t;
 
 		hls::stream<T, RD_PORTS> _rd_data[RD_PORTS];
 		hls::stream<T, WR_PORTS> _wr_data[WR_PORTS];
@@ -41,9 +52,6 @@ class cache {
 		int _client_req_port;
 		int _client_rd_port;
 		int _client_wr_port;
-
-		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE, OFF_SIZE, N_ENTRIES_PER_LINE>
-			addr_t;
 
 	public:
 		cache() {
