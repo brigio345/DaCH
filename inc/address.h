@@ -28,8 +28,8 @@ class address {
 			_line = addr_main.range(LINE_HIGH, LINE_LOW);
 			_off = addr_main.range(OFF_HIGH, OFF_LOW);
 			_addr_cache = _line * N_ENTRIES_PER_LINE + _off;
-			_addr_cache_first_of_line = _addr_cache & (-1 << OFF_SIZE);
-			_addr_main_first_of_line = addr_main & (-1 << OFF_SIZE);
+			_addr_cache_first_of_line = _addr_cache & (-1u << OFF_SIZE);
+			_addr_main_first_of_line = addr_main & (-1u << OFF_SIZE);
 		}
 
 		static address build(ap_uint<TAG_SIZE> tag,
