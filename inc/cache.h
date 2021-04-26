@@ -102,7 +102,8 @@ RUN_LOOP:		while (1) {
 				if (!hit(addr))
 					fill(main_mem, addr);
 
-				if ((RD_PORTS > 0) && (req.type == READ_REQ)) {
+				if ((WR_PORTS == 0) ||
+						((RD_PORTS > 0) && (req.type == READ_REQ))) {
 					// read data from cache
 					data = _cache_mem[addr._addr_cache];
 
