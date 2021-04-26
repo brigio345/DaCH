@@ -31,7 +31,7 @@ class cache {
 			"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
 
 		typedef enum {
-			READ_E, WRITE_E, EOR_E
+			READ_REQ, WRITE_REQ, STOP_REQ
 		} request_type_t;
 
 		typedef struct {
@@ -64,7 +64,7 @@ class cache {
 			_client_wr_port = 0;
 		}
 
-		void operate(T *main_mem) {
+		void run(T *main_mem) {
 #pragma HLS inline
 			request_t req;
 			T data;
@@ -77,7 +77,7 @@ class cache {
 			for (int line = 0; line < N_LINES; line++)
 				_valid[line] = false;
 
-OPERATE_LOOP:		while (1) {
+RUN_LOOP:		while (1) {
 				bool dep;
 #pragma HLS pipeline
 #ifdef __SYNTHESIS__
@@ -89,7 +89,7 @@ OPERATE_LOOP:		while (1) {
 				// get request
 				dep = _request[req_port].read_dep(req, false);
 				// stop if request is "end-of-request"
-				if ((!first_iteration) && (req.type == EOR_E))
+				if ((!first_iteration) && (req.type == STOP_REQ))
 					break;
 
 				first_iteration = false;
@@ -102,7 +102,7 @@ OPERATE_LOOP:		while (1) {
 				if (!hit(addr))
 					fill(main_mem, addr);
 
-				if ((RD_PORTS > 0) && (req.type == READ_E)) {
+				if ((RD_PORTS > 0) && (req.type == READ_REQ)) {
 					// read data from cache
 					data = _cache_mem[addr._addr_cache];
 
@@ -127,9 +127,9 @@ OPERATE_LOOP:		while (1) {
 				flush(main_mem);
 		}
 
-		void stop_operation() {
+		void stop() {
 			for (int port = 0; port < N_PORTS; port++) {
-				_request[port].write((request_t){0, EOR_E});
+				_request[port].write((request_t){0, STOP_REQ});
 			}
 		}
 
@@ -142,7 +142,7 @@ OPERATE_LOOP:		while (1) {
 			bool dep;
 
 			dep = _request[_client_req_port].write_dep(
-				(request_t){addr_main, READ_E}, false);
+				(request_t){addr_main, READ_REQ}, false);
 			ap_wait();
 			_rd_data[_client_rd_port].read_dep(data, dep);
 
@@ -160,7 +160,7 @@ OPERATE_LOOP:		while (1) {
 			bool dep;
 
 			dep = _request[_client_req_port].write_dep(
-				(request_t){addr_main, WRITE_E}, false);
+				(request_t){addr_main, WRITE_REQ}, false);
 			ap_wait();
 			_wr_data[_client_wr_port].write_dep(data, dep);
 

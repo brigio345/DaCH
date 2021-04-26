@@ -17,9 +17,9 @@ typedef cache<data_type, 0, 1, N * P> cache_c;
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 	matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P>
 			(a_cache, b_cache, c_cache);
-	a_cache.stop_operation();
-	b_cache.stop_operation();
-	c_cache.stop_operation();
+	a_cache.stop();
+	b_cache.stop();
+	c_cache.stop();
 }
 
 extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
@@ -37,21 +37,21 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	cache_c c_cache;
 #ifdef __SYNTHESIS__
 	multiply_syn(a_cache, b_cache, c_cache);
-	a_cache.operate(a_arr);
-	b_cache.operate(b_arr);
-	c_cache.operate(c_arr);
+	a_cache.run(a_arr);
+	b_cache.run(b_arr);
+	c_cache.run(c_arr);
 #else
-	std::thread a_thread(&cache_a::operate, std::ref(a_cache), std::ref(a_arr));
-	std::thread b_thread(&cache_b::operate, std::ref(b_cache), std::ref(b_arr));
-	std::thread c_thread(&cache_c::operate, std::ref(c_cache), std::ref(c_arr));
+	std::thread a_thread(&cache_a::run, std::ref(a_cache), std::ref(a_arr));
+	std::thread b_thread(&cache_b::run, std::ref(b_cache), std::ref(b_arr));
+	std::thread c_thread(&cache_c::run, std::ref(c_cache), std::ref(c_arr));
 	std::thread matmul_thread(&matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P>,
 			std::ref(a_cache), std::ref(b_cache), std::ref(c_cache));
 
 	matmul_thread.join();
 
-	a_cache.stop_operation();
-	b_cache.stop_operation();
-	c_cache.stop_operation();
+	a_cache.stop();
+	b_cache.stop();
+	c_cache.stop();
 
 	a_thread.join();
 	b_thread.join();

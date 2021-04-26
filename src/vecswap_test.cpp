@@ -35,8 +35,8 @@ void vecswap_cache(cache<int, 1, 1, N> &a, cache<int, 1, 1, N> &b) {
 void vecswap_syn(cache<int, 1, 1, N> &a, cache<int, 1, 1, N> &b) {
 	vecswap_cache(a, b);
 
-	a.stop_operation();
-	b.stop_operation();
+	a.stop();
+	b.stop();
 }
 
 extern "C" void vecswap_top(int a[N], int b[N]) {
@@ -50,16 +50,16 @@ extern "C" void vecswap_top(int a[N], int b[N]) {
 
 #ifdef __SYNTHESIS__
 	vecswap_syn(a_cache, b_cache);
-	a_cache.operate(a);
-	b_cache.operate(b);
+	a_cache.run(a);
+	b_cache.run(b);
 #else
-	std::thread a_thread(&cache<int, 1, 1, N>::operate, std::ref(a_cache), std::ref(a));
-	std::thread b_thread(&cache<int, 1, 1, N>::operate, std::ref(b_cache), std::ref(b));
+	std::thread a_thread(&cache<int, 1, 1, N>::run, std::ref(a_cache), std::ref(a));
+	std::thread b_thread(&cache<int, 1, 1, N>::run, std::ref(b_cache), std::ref(b));
 	std::thread vecswap_thread(vecswap_cache, std::ref(a_cache), std::ref(b_cache));
 
 	vecswap_thread.join();
-	a_cache.stop_operation();
-	b_cache.stop_operation();
+	a_cache.stop();
+	b_cache.stop();
 	a_thread.join();
 	b_thread.join();
 #endif	/* __SYNTHESIS__ */
