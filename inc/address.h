@@ -25,9 +25,9 @@ class address {
 		ap_uint<OFF_SIZE> _off;
 
 		address(ap_uint<ADDR_SIZE> addr_main): _addr_main(addr_main) {
-			_tag = addr_main.range(TAG_HIGH, TAG_LOW);
-			_line = ((LINE_SIZE > 0) ? addr_main.range(LINE_HIGH, LINE_LOW) : 0);
-			_off = addr_main.range(OFF_HIGH, OFF_LOW);
+			_tag = addr_main(TAG_HIGH, TAG_LOW);
+			_line = ((LINE_SIZE > 0) ? addr_main(LINE_HIGH, LINE_LOW) : 0);
+			_off = addr_main(OFF_HIGH, OFF_LOW);
 			_addr_cache = _line * N_ENTRIES_PER_LINE + _off;
 			_addr_cache_first_of_line = _addr_cache & (-1u << OFF_SIZE);
 			_addr_main_first_of_line = addr_main & (-1u << OFF_SIZE);
