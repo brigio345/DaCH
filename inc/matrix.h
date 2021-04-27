@@ -23,10 +23,10 @@ namespace matrix {
 	template<typename T, typename U, typename V, size_t N, size_t M, size_t P>
 		void multiply(T A, U B, V C) {
 #pragma HLS inline
-			for (int i = 0; i < N; i++) {
-				for (int j = 0; j < P; j++) {
+MULT_I_LOOP:		for (int i = 0; i < N; i++) {
+MULT_J_LOOP:			for (int j = 0; j < P; j++) {
 					int acc = 0;
-					for (int k = 0; k < M; k++) {
+MULT_K_LOOP:				for (int k = 0; k < M; k++) {
 #pragma HLS pipeline
 						acc += A.get(i * M + k) * B.get(k * P + j);
 					}
