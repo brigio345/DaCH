@@ -12,7 +12,7 @@ class address {
 		static const unsigned int TAG_LOW = TAG_HIGH - TAG_SIZE + 1;
 		static const unsigned int LINE_HIGH = TAG_LOW - 1;
 		static const unsigned int LINE_LOW = LINE_HIGH - LINE_SIZE + 1;
-		static const unsigned int OFF_HIGH = LINE_LOW - 1;
+		static const unsigned int OFF_HIGH = ((LINE_SIZE > 0) ? (LINE_LOW - 1) : (TAG_LOW - 1));
 		static const unsigned int OFF_LOW = 0;
 
 	public:
@@ -26,7 +26,7 @@ class address {
 
 		address(ap_uint<ADDR_SIZE> addr_main): _addr_main(addr_main) {
 			_tag = addr_main.range(TAG_HIGH, TAG_LOW);
-			_line = addr_main.range(LINE_HIGH, LINE_LOW);
+			_line = ((LINE_SIZE > 0) ? addr_main.range(LINE_HIGH, LINE_LOW) : 0);
 			_off = addr_main.range(OFF_HIGH, OFF_LOW);
 			_addr_cache = _line * N_ENTRIES_PER_LINE + _off;
 			_addr_cache_first_of_line = _addr_cache & (-1u << OFF_SIZE);
