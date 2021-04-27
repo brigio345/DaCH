@@ -3,10 +3,11 @@
 
 #include "ap_int.h"
 
-template <size_t ADDR_SIZE = 32, size_t TAG_SIZE = 28, size_t LINE_SIZE = 2,
-	size_t OFF_SIZE = 2, size_t N_ENTRIES_PER_LINE = 4>
+template <size_t ADDR_SIZE, size_t TAG_SIZE, size_t LINE_SIZE>
 class address {
 	private:
+		static const size_t OFF_SIZE = (ADDR_SIZE - (TAG_SIZE + LINE_SIZE));
+		static const size_t N_ENTRIES_PER_LINE = (1 << LINE_SIZE);
 		static const unsigned int TAG_HIGH = ADDR_SIZE - 1;
 		static const unsigned int TAG_LOW = TAG_HIGH - TAG_SIZE + 1;
 		static const unsigned int LINE_HIGH = TAG_LOW - 1;

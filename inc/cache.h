@@ -39,8 +39,7 @@ class cache {
 			request_type_t type;
 		} request_t;
 
-		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE, OFF_SIZE, N_ENTRIES_PER_LINE>
-			addr_t;
+		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
 
 		hls::stream<T, RD_PORTS> _rd_data[RD_PORTS];
 		hls::stream<T, WR_PORTS> _wr_data[WR_PORTS];
