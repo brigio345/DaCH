@@ -173,7 +173,7 @@ RUN_LOOP:		while (1) {
 #pragma HLS inline
 FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 				if (_valid[line] && _dirty[line])
-					spill(main_mem, addr_t::build(_tag[line], line, 0));
+					spill(main_mem, addr_t(_tag[line], line, 0));
 			}
 		}
 
@@ -187,7 +187,7 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 		void fill(T *main_mem, addr_t addr) {
 #pragma HLS inline
 			if ((WR_PORTS > 0) && _valid[addr._line] && _dirty[addr._line])
-				spill(main_mem, addr_t::build(_tag[addr._line], addr._line));
+				spill(main_mem, addr_t(_tag[addr._line], addr._line, 0));
 
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
 			T *main_line = &(main_mem[addr._addr_main_first_of_line]);
