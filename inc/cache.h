@@ -100,11 +100,13 @@ RUN_LOOP:		while (1) {
 				_n_requests++;
 #endif /* __PROFILE__ */
 
+#ifndef __SYNTHESIS__
 				// stop if request is "end-of-request"
 				if ((!first_iteration) && (req.type == STOP_REQ))
 					break;
 
 				first_iteration = false;
+#endif /* __SYNTHESIS__ */
 
 				// extract information from address
 				addr_t addr(req.addr_main);
