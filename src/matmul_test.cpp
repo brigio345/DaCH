@@ -5,9 +5,9 @@
 #include "matrix.h"
 #include "cache.h"
 
-#define N 16
-#define M 46
-#define P 8
+#define N 4
+#define M 4
+#define P 4
 
 typedef int data_type;
 typedef cache<data_type, 1, 0, N * M> cache_a;
@@ -37,13 +37,19 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	cache_c c_cache;
 #ifdef __SYNTHESIS__
 	multiply_syn(a_cache, b_cache, c_cache);
-	a_cache.run(a_arr);
-	b_cache.run(b_arr);
-	c_cache.run(c_arr);
+	a_cache.run();
+	a_cache.run_mem_man(a_arr);
+	b_cache.run();
+	b_cache.run_mem_man(b_arr);
+	c_cache.run();
+	c_cache.run_mem_man(c_arr);
 #else
-	std::thread a_thread(&cache_a::run, std::ref(a_cache), std::ref(a_arr));
-	std::thread b_thread(&cache_b::run, std::ref(b_cache), std::ref(b_arr));
-	std::thread c_thread(&cache_c::run, std::ref(c_cache), std::ref(c_arr));
+	std::thread a_thread(&cache_a::run, std::ref(a_cache));
+	std::thread a_thread_mm(&cache_a::run_mem_man, std::ref(a_cache), std::ref(a_arr));
+	std::thread b_thread(&cache_b::run, std::ref(b_cache));
+	std::thread b_thread_mm(&cache_b::run_mem_man, std::ref(b_cache), std::ref(b_arr));
+	std::thread c_thread(&cache_c::run, std::ref(c_cache));
+	std::thread c_thread_mm(&cache_c::run_mem_man, std::ref(c_cache), std::ref(c_arr));
 	std::thread matmul_thread(&matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P>,
 			std::ref(a_cache), std::ref(b_cache), std::ref(c_cache));
 
@@ -54,8 +60,11 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	c_cache.stop();
 
 	a_thread.join();
+	a_thread_mm.join();
 	b_thread.join();
+	b_thread_mm.join();
 	c_thread.join();
+	c_thread_mm.join();
 #endif	/* __SYNTHESIS__ */
 }
 
