@@ -88,13 +88,15 @@ RUN_LOOP:		while (1) {
 				bool dep;
 #pragma HLS pipeline
 #ifdef __SYNTHESIS__
-				// make pipeline flushable
-				if (_request[req_port].empty())
-					continue;
-#endif /* __SYNTHESIS__ */
+				dep = _request[req_port].read_nb(req);
 
+				// make pipeline flushable
+				if (!dep)
+					continue;
+#else
 				// get request
-				dep = _request[req_port].read_dep(req, false);
+				_request[req_port].read(req);
+#endif /* __SYNTHESIS__ */
 
 #ifdef __PROFILE__
 				_n_requests++;
@@ -126,7 +128,7 @@ RUN_LOOP:		while (1) {
 					data = _cache_mem[addr._addr_cache];
 
 					// send read data
-					_rd_data[rd_port].write_dep(data, dep);
+					_rd_data[rd_port].write(data);
 
 					rd_port = (rd_port + 1) % RD_PORTS;
 				} else if (WR_PORTS > 0) {
