@@ -95,7 +95,7 @@ RUN_LOOP:		while (1) {
 				// get request
 				_request[req_port].read(req);
 #endif /* __SYNTHESIS__ */
-				
+
 				// stop if request is "end-of-request"
 				if (req.type == STOP_REQ)
 					break;
@@ -157,8 +157,7 @@ MEM_MAN_LOOP:		while (1) {
 
 				main_line = &(main_mem[req.addr_main & (-1u << OFF_SIZE)]);
 
-				if ((WR_PORTS == 0) ||
-						((RD_PORTS > 0) && req.type == READ_REQ)) {
+				if (req.type == READ_REQ) {
 					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 						_fill_data[off].write(main_line[off]);
 					}
@@ -224,11 +223,11 @@ MEM_MAN_LOOP:		while (1) {
 				spill(addr_t(_tag[addr._line], addr._line, 0));
 
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
-			bool dep;
 
-			dep = _int_request.write_dep({addr._addr_main, READ_REQ}, false);
+			bool dep = _int_request.write_dep({addr._addr_main, READ_REQ}, false);
 			ap_wait();
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS dependence variable=cache_line inter false
 				_fill_data[off].read_dep(cache_line[off], dep);
 			}
 
