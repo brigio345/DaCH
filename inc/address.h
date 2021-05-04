@@ -16,7 +16,6 @@ class address {
 
 	public:
 		ap_uint<ADDR_SIZE> _addr_main;
-		ap_uint<ADDR_SIZE> _addr_main_first_of_line;
 		ap_uint<ADDR_SIZE> _addr_cache;
 		ap_uint<ADDR_SIZE> _addr_cache_first_of_line;
 		ap_uint<TAG_SIZE> _tag;
@@ -30,21 +29,18 @@ class address {
 				_off = 0;
 				_addr_cache = _line;
 				_addr_cache_first_of_line = _addr_cache;
-				_addr_main_first_of_line = addr_main;
 			} else if (LINE_SIZE == 0) {
 				_tag = addr_main(TAG_HIGH, TAG_LOW);
 				_line = 0;
 				_off = addr_main(OFF_HIGH, OFF_LOW);
 				_addr_cache = _off;
 				_addr_cache_first_of_line = _addr_cache & (-1u << OFF_SIZE);
-				_addr_main_first_of_line = addr_main & (-1u << OFF_SIZE);
 			} else {
 				_tag = addr_main(TAG_HIGH, TAG_LOW);
 				_line = addr_main(LINE_HIGH, LINE_LOW);
 				_off = addr_main(OFF_HIGH, OFF_LOW);
 				_addr_cache = (_line, _off);
 				_addr_cache_first_of_line = _addr_cache & (-1u << OFF_SIZE);
-				_addr_main_first_of_line = addr_main & (-1u << OFF_SIZE);
 			}
 		}
 
@@ -54,17 +50,14 @@ class address {
 				_tag(tag), _line(line), _off(off) {
 			if (OFF_SIZE == 0) {
 				_addr_main = (tag, line);
-				_addr_main_first_of_line = _addr_main;
 				_addr_cache = line;
 				_addr_cache_first_of_line = line;
 			} else if (LINE_SIZE == 0) {
 				_addr_main = (tag, off);
-				_addr_main_first_of_line = _addr_main & (-1u << OFF_SIZE);
 				_addr_cache = off;
 				_addr_cache_first_of_line = 0;
 			} else {
 				_addr_main = (tag, line, off);
-				_addr_main_first_of_line = _addr_main & (-1u << OFF_SIZE);
 				_addr_cache = (line, off);
 				_addr_cache_first_of_line = _addr_cache & (-1u << OFF_SIZE);
 			}

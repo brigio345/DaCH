@@ -48,8 +48,8 @@ class cache {
 		hls::stream<T, 128> _rd_data[RD_PORTS];
 		hls::stream<T, WR_PORTS> _wr_data[WR_PORTS];
 		hls::stream<request_t, 128> _request[N_PORTS];
-		hls::stream<T_vec, 128> _fill_data;
-		hls::stream<T_vec, 128> _spill_data;
+		hls::stream<T, 128> _fill_data[N_ENTRIES_PER_LINE];
+		hls::stream<T, 128> _spill_data[N_ENTRIES_PER_LINE];
 		hls::stream<request_t, 128> _int_request;
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
@@ -94,11 +94,11 @@ RUN_LOOP:		while (1) {
 #else
 				// get request
 				_request[req_port].read(req);
+#endif /* __SYNTHESIS__ */
 				
 				// stop if request is "end-of-request"
 				if (req.type == STOP_REQ)
 					break;
-#endif /* __SYNTHESIS__ */
 
 				// extract information from address
 				addr_t addr(req.addr_main);
@@ -137,7 +137,6 @@ RUN_LOOP:		while (1) {
 		}
 
 		void run_mem_man(T *main_mem) {
-			T_vec data;
 			request_t req;
 			T *main_line;
 			
@@ -151,31 +150,21 @@ MEM_MAN_LOOP:		while (1) {
 					continue;
 #else
 				_int_request.read(req);
+#endif /* __SYNTHESIS__ */
 
 				if (req.type == STOP_REQ)
 					break;
-#endif /* __SYNTHESIS__ */
 
-				main_line = &(main_mem[req.addr_main]);
+				main_line = &(main_mem[req.addr_main & (-1u << OFF_SIZE)]);
 
 				if ((WR_PORTS == 0) ||
 						((RD_PORTS > 0) && req.type == READ_REQ)) {
 					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS unroll
-						int low = off * T_SIZE;
-						int high = low + T_SIZE - 1;
-						data(low, high) = main_line[off];
+						_fill_data[off].write(main_line[off]);
 					}
-
-					_fill_data.write(data);
 				} else if (WR_PORTS > 0) {
-					_spill_data.read(data);
-
 					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS unroll
-						int low = off * T_SIZE;
-						int high = low + T_SIZE - 1;
-						main_line[off] = (T)data(low, high);
+						_spill_data[off].read(main_line[off]);
 					}
 				}
 			}
@@ -235,15 +224,12 @@ MEM_MAN_LOOP:		while (1) {
 				spill(addr_t(_tag[addr._line], addr._line, 0));
 
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
-			T_vec data;
 			bool dep;
 
-			dep = _int_request.write_dep({addr._addr_main_first_of_line, READ_REQ}, false);
+			dep = _int_request.write_dep({addr._addr_main, READ_REQ}, false);
 			ap_wait();
-			_fill_data.read_dep(data, dep);
-
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				cache_line[off] = (T)data(off * T_SIZE, (off + 1) * T_SIZE - 1);
+				_fill_data[off].read_dep(cache_line[off], dep);
 			}
 
 			_tag[addr._line] = addr._tag;
@@ -255,15 +241,13 @@ MEM_MAN_LOOP:		while (1) {
 		void spill(addr_t addr) {
 #pragma HLS inline
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
-			T_vec data;
 
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				data(off * T_SIZE, (off + 1) * T_SIZE) = cache_line[off];
+				_spill_data[off].write(cache_line[off]);
 			}
 
-			_spill_data.write(data);
 			ap_wait();
-			_int_request.write({addr._addr_main_first_of_line, WRITE_REQ});
+			_int_request.write({addr._addr_main, WRITE_REQ});
 
 			_dirty[addr._line] = false;
 		}
