@@ -68,7 +68,7 @@ class cache {
 		}
 
 		void run(T *main_mem) {
-#pragma HLS inline
+#pragma HLS inline off
 			request_t req;
 			T data;
 			int req_port = 0;
