@@ -18,6 +18,7 @@ class cache {
 		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
 		static const size_t TAG_SIZE = (ADDR_SIZE - (LINE_SIZE + OFF_SIZE));
 		static const size_t N_PORTS = (RD_PORTS + WR_PORTS);
+		static const size_t T_SIZE = sizeof(T) * 8;
 
 		static_assert((N_PORTS > 0),
 				"RD_PORTS or WR_PORTS must be at least 1");
@@ -41,9 +42,15 @@ class cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
 
-		hls::stream<T, RD_PORTS> _rd_data[RD_PORTS];
+		//typedef T T_vec __attribute__ ((vector_size(sizeof(T) * N_ENTRIES_PER_LINE)));
+		typedef ap_uint<T_SIZE * N_ENTRIES_PER_LINE> T_vec;
+
+		hls::stream<T, 128> _rd_data[RD_PORTS];
 		hls::stream<T, WR_PORTS> _wr_data[WR_PORTS];
-		hls::stream<request_t, N_PORTS> _request[N_PORTS];
+		hls::stream<request_t, 128> _request[N_PORTS];
+		hls::stream<T_vec, 128> _fill_data;
+		hls::stream<T_vec, 128> _spill_data;
+		hls::stream<request_t, 128> _int_request;
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
 		ap_uint<TAG_SIZE> _tag[N_LINES];
@@ -63,7 +70,7 @@ class cache {
 			_client_wr_port = 0;
 		}
 
-		void run(T *main_mem) {
+		void run() {
 #pragma HLS inline off
 			request_t req;
 			T data;
@@ -99,7 +106,7 @@ RUN_LOOP:		while (1) {
 				// prepare the cache for accessing addr
 				// (load the line if not present)
 				if (!hit(addr))
-					fill(main_mem, addr);
+					fill(addr);
 
 				if ((WR_PORTS == 0) ||
 						((RD_PORTS > 0) && (req.type == READ_REQ))) {
@@ -124,7 +131,54 @@ RUN_LOOP:		while (1) {
 			}
 
 			if (WR_PORTS > 0)
-				flush(main_mem);
+				flush();
+
+			_int_request.write((request_t){0, STOP_REQ});
+		}
+
+		void run_mem_man(T *main_mem) {
+			T_vec data;
+			request_t req;
+			T *main_line;
+			
+MEM_MAN_LOOP:		while (1) {
+#pragma HLS pipeline
+				bool dep;
+#ifdef __SYNTHESIS__
+				dep = _int_request.read_nb(req);
+
+				if (!dep)
+					continue;
+#else
+				_int_request.read(req);
+
+				if (req.type == STOP_REQ)
+					break;
+#endif /* __SYNTHESIS__ */
+
+				main_line = &(main_mem[req.addr_main]);
+
+				if ((WR_PORTS == 0) ||
+						((RD_PORTS > 0) && req.type == READ_REQ)) {
+					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS unroll
+						int low = off * T_SIZE;
+						int high = low + T_SIZE - 1;
+						data(low, high) = main_line[off];
+					}
+
+					_fill_data.write(data);
+				} else if (WR_PORTS > 0) {
+					_spill_data.read(data);
+
+					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS unroll
+						int low = off * T_SIZE;
+						int high = low + T_SIZE - 1;
+						main_line[off] = (T)data(low, high);
+					}
+				}
+			}
 		}
 
 		void stop() {
@@ -168,15 +222,6 @@ RUN_LOOP:		while (1) {
 			_client_req_port = (_client_req_port + 1) % N_PORTS;
 		}
 
-		// store all valid dirty lines from cache to main memory
-		void flush(T *main_mem) {
-#pragma HLS inline
-FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
-				if (_valid[line] && _dirty[line])
-					spill(main_mem, addr_t(_tag[line], line, 0));
-			}
-		}
-
 	private:
 		inline bool hit(addr_t addr) {
 			return (_valid[addr._line] && (addr._tag == _tag[addr._line]));
@@ -184,16 +229,21 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 
 		// load line from main to cache memory
 		// (taking care of writing back dirty lines)
-		void fill(T *main_mem, addr_t addr) {
+		void fill(addr_t addr) {
 #pragma HLS inline
 			if ((WR_PORTS > 0) && _valid[addr._line] && _dirty[addr._line])
-				spill(main_mem, addr_t(_tag[addr._line], addr._line, 0));
+				spill(addr_t(_tag[addr._line], addr._line, 0));
 
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
-			T *main_line = &(main_mem[addr._addr_main_first_of_line]);
+			T_vec data;
+			bool dep;
 
-FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				cache_line[off] = main_line[off];
+			dep = _int_request.write_dep({addr._addr_main_first_of_line, READ_REQ}, false);
+			ap_wait();
+			_fill_data.read_dep(data, dep);
+
+			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+				cache_line[off] = (T)data(off * T_SIZE, (off + 1) * T_SIZE - 1);
 			}
 
 			_tag[addr._line] = addr._tag;
@@ -202,18 +252,29 @@ FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 		}
 
 		// store line from cache to main memory
-		void spill(T *main_mem, addr_t addr) {
+		void spill(addr_t addr) {
 #pragma HLS inline
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
-			T *main_line = &(main_mem[addr._addr_main_first_of_line]);
+			T_vec data;
 
-SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS dependence inter variable=main_mem false
-#pragma HLS dependence inter variable=_cache_mem false
-				main_line[off] = cache_line[off];
+			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+				data(off * T_SIZE, (off + 1) * T_SIZE) = cache_line[off];
 			}
 
+			_spill_data.write(data);
+			ap_wait();
+			_int_request.write({addr._addr_main_first_of_line, WRITE_REQ});
+
 			_dirty[addr._line] = false;
+		}
+
+		// store all valid dirty lines from cache to main memory
+		void flush() {
+#pragma HLS inline
+FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
+				if (_valid[line] && _dirty[line])
+					spill(addr_t(_tag[line], line, 0));
+			}
 		}
 
 #ifndef __SYNTHESIS__
