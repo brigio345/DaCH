@@ -88,9 +88,7 @@ RUN_LOOP:		while (1) {
 #else
 				// get request
 				_request[req_port].read(req);
-#endif /* __SYNTHESIS__ */
-
-#ifndef __SYNTHESIS__
+				
 				// stop if request is "end-of-request"
 				if ((!first_iteration) && (req.type == STOP_REQ))
 					break;
