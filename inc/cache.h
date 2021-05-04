@@ -70,7 +70,6 @@ class cache {
 			int req_port = 0;
 			int rd_port = 0;
 			int wr_port = 0;
-			bool first_iteration = true;
 
 			// invalidate all cache lines
 			for (int line = 0; line < N_LINES; line++)
@@ -90,10 +89,8 @@ RUN_LOOP:		while (1) {
 				_request[req_port].read(req);
 				
 				// stop if request is "end-of-request"
-				if ((!first_iteration) && (req.type == STOP_REQ))
+				if (req.type == STOP_REQ)
 					break;
-
-				first_iteration = false;
 #endif /* __SYNTHESIS__ */
 
 				// extract information from address
