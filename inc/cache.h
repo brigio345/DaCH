@@ -85,15 +85,16 @@ class cache {
 				_valid[line] = false;
 
 RUN_LOOP:		while (1) {
-#pragma HLS pipeline
 				bool dep;
+#pragma HLS pipeline
+#ifdef __SYNTHESIS__
+				// make pipeline flushable
+				if (_request[req_port].empty())
+					continue;
+#endif /* __SYNTHESIS__ */
 
 				// get request
-				dep = _request[req_port].read_nb(req);
-
-				// make pipeline flushable
-				if (!dep)
-					continue;
+				dep = _request[req_port].read_dep(req, false);
 
 #ifdef __PROFILE__
 				_n_requests++;
@@ -119,22 +120,19 @@ RUN_LOOP:		while (1) {
 						data = _cache_mem[addr._addr_cache];
 
 						// send read data
-						_rd_data[rd_port].write(data);
+						_rd_data[rd_port].write_dep(data, dep);
 
 						rd_port = (rd_port + 1) % RD_PORTS;
 					} else if (WR_PORTS > 0) {
 						// store received data to cache
-						_wr_data[wr_port].read(data);
+						_wr_data[wr_port].read_dep(data, dep);
 						_cache_mem[addr._addr_cache] = data;
 
 						_dirty[addr._line] = true;
 
 						wr_port = (wr_port + 1) % WR_PORTS;
 					}
-				}
-				ap_wait();
-
-				if (!hit(addr)) {
+				} else {
 					fill(main_mem, addr);
 					if ((WR_PORTS == 0) ||
 							((RD_PORTS > 0) && (req.type == READ_REQ))) {
@@ -142,12 +140,12 @@ RUN_LOOP:		while (1) {
 						data = _cache_mem[addr._addr_cache];
 
 						// send read data
-						_rd_data[rd_port].write(data);
+						_rd_data[rd_port].write_dep(data, dep);
 
 						rd_port = (rd_port + 1) % RD_PORTS;
 					} else if (WR_PORTS > 0) {
 						// store received data to cache
-						_wr_data[wr_port].read(data);
+						_wr_data[wr_port].read_dep(data, dep);
 						_cache_mem[addr._addr_cache] = data;
 
 						_dirty[addr._line] = true;
