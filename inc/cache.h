@@ -51,10 +51,6 @@ class cache {
 		int _client_req_port;
 		int _client_rd_port;
 		int _client_wr_port;
-#ifdef __PROFILE__
-		int _n_requests;
-		int _n_misses;
-#endif /* __PROFILE__ */
 
 	public:
 		cache() {
@@ -76,10 +72,6 @@ class cache {
 			int wr_port = 0;
 			bool first_iteration = true;
 
-#ifdef __PROFILE__
-			_n_requests = 0;
-			_n_misses = 0;
-#endif /* __PROFILE__ */
 			// invalidate all cache lines
 			for (int line = 0; line < N_LINES; line++)
 				_valid[line] = false;
@@ -98,10 +90,6 @@ RUN_LOOP:		while (1) {
 				_request[req_port].read(req);
 #endif /* __SYNTHESIS__ */
 
-#ifdef __PROFILE__
-				_n_requests++;
-#endif /* __PROFILE__ */
-
 #ifndef __SYNTHESIS__
 				// stop if request is "end-of-request"
 				if ((!first_iteration) && (req.type == STOP_REQ))
@@ -115,12 +103,8 @@ RUN_LOOP:		while (1) {
 
 				// prepare the cache for accessing addr
 				// (load the line if not present)
-				if (!hit(addr)) {
+				if (!hit(addr))
 					fill(main_mem, addr);
-#ifdef __PROFILE__
-					_n_misses++;
-#endif /* __PROFILE__ */
-				}
 
 				if ((WR_PORTS == 0) ||
 						((RD_PORTS > 0) && (req.type == READ_REQ))) {
@@ -197,16 +181,6 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 					spill(main_mem, addr_t(_tag[line], line, 0));
 			}
 		}
-
-#ifdef __PROFILE__
-		int get_n_requests() {
-			return _n_requests;
-		}
-
-		int get_n_misses() {
-			return _n_misses;
-		}
-#endif /* __PROFILE__ */
 
 	private:
 		inline bool hit(addr_t addr) {
