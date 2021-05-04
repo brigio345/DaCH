@@ -4,6 +4,7 @@
 #include "address.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
+#include "hls_vector.h"
 #include "ap_int.h"
 #include "ap_utils.h"
 #include "utils.h"
@@ -41,15 +42,13 @@ class cache {
 		} request_t;
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
-
-		//typedef T T_vec __attribute__ ((vector_size(sizeof(T) * N_ENTRIES_PER_LINE)));
-		typedef ap_uint<T_SIZE * N_ENTRIES_PER_LINE> T_vec;
+		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
 
 		hls::stream<T, 128> _rd_data[RD_PORTS];
 		hls::stream<T, WR_PORTS> _wr_data[WR_PORTS];
 		hls::stream<request_t, 128> _request[N_PORTS];
-		hls::stream<T, 128> _fill_data[N_ENTRIES_PER_LINE];
-		hls::stream<T, 128> _spill_data[N_ENTRIES_PER_LINE];
+		hls::stream<line_t, 128> _fill_data;
+		hls::stream<line_t, 128> _spill_data;
 		hls::stream<request_t, 128> _int_request;
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
@@ -139,6 +138,7 @@ RUN_LOOP:		while (1) {
 		void run_mem_man(T *main_mem) {
 			request_t req;
 			T *main_line;
+			line_t line;
 			
 MEM_MAN_LOOP:		while (1) {
 #pragma HLS pipeline
@@ -159,11 +159,15 @@ MEM_MAN_LOOP:		while (1) {
 
 				if (req.type == READ_REQ) {
 					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-						_fill_data[off].write(main_line[off]);
+						line[off] = main_line[off];
 					}
+
+					_fill_data.write(line);
 				} else if (WR_PORTS > 0) {
+					_spill_data.read(line);
+
 					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-						_spill_data[off].read(main_line[off]);
+						main_line[off] = line[off];
 					}
 				}
 			}
@@ -226,9 +230,12 @@ MEM_MAN_LOOP:		while (1) {
 
 			bool dep = _int_request.write_dep({addr._addr_main, READ_REQ}, false);
 			ap_wait();
+
+			line_t line;
+			_fill_data.read_dep(line, dep);
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 #pragma HLS dependence variable=cache_line inter false
-				_fill_data[off].read_dep(cache_line[off], dep);
+				cache_line[off] = line[off];
 			}
 
 			_tag[addr._line] = addr._tag;
@@ -240,10 +247,12 @@ MEM_MAN_LOOP:		while (1) {
 		void spill(addr_t addr) {
 #pragma HLS inline
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
+			line_t line;
 
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				_spill_data[off].write(cache_line[off]);
+				line[off] = cache_line[off];
 			}
+			_spill_data.write(line);
 
 			ap_wait();
 			_int_request.write({addr._addr_main, WRITE_REQ});
