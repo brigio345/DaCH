@@ -107,7 +107,7 @@ class cache {
 
 			dep = _request[_client_req_port].write_dep(
 				(request_t){addr_main, READ_REQ}, false);
-			ap_wait();
+			ap_wait_n(6);
 			_rd_data[_client_rd_port].read_dep(data, dep);
 
 			_client_rd_port = (_client_rd_port + 1) % RD_PORTS;
