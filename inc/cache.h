@@ -191,6 +191,7 @@ CORE_LOOP:		while (1) {
 			if (WR_PORTS > 0)
 				flush();
 
+			ap_wait();
 			_int_request.write((request_t){0, STOP_REQ});
 		}
 
