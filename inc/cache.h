@@ -164,7 +164,7 @@ MEM_MAN_LOOP:		while (1) {
 
 					_fill_data.write(line);
 				} else if (WR_PORTS > 0) {
-					_spill_data.read(line);
+					_spill_data.read_dep(line, dep);
 
 					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 						main_line[off] = line[off];
