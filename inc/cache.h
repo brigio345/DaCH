@@ -8,6 +8,9 @@
 #include "ap_int.h"
 #include "ap_utils.h"
 #include "utils.h"
+#ifndef __SYNTHESIS__
+#include <thread>
+#endif /* __SYNTHESIS__ */
 
 // direct mapping, write back
 template <typename T, size_t RD_PORTS, size_t WR_PORTS, size_t MAIN_SIZE,
@@ -19,7 +22,6 @@ class cache {
 		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
 		static const size_t TAG_SIZE = (ADDR_SIZE - (LINE_SIZE + OFF_SIZE));
 		static const size_t N_PORTS = (RD_PORTS + WR_PORTS);
-		static const size_t T_SIZE = sizeof(T) * 8;
 
 		static_assert((N_PORTS > 0),
 				"RD_PORTS or WR_PORTS must be at least 1");
@@ -69,7 +71,64 @@ class cache {
 			_client_wr_port = 0;
 		}
 
-		void run() {
+		void run(T *main_mem) {
+#pragma HLS inline
+#ifdef __SYNTHESIS__
+			run_core();
+			run_mem_if(main_mem);
+#else
+			std::thread core_thd(&cache::run_core, this);
+			std::thread mem_if_thd(&cache::run_mem_if, this, main_mem);
+
+			core_thd.join();
+			mem_if_thd.join();
+#endif /* __SYNTHESIS__ */
+		}
+
+		void stop() {
+			for (int port = 0; port < N_PORTS; port++) {
+				_request[port].write((request_t){0, STOP_REQ});
+			}
+		}
+
+		T get(ap_uint<ADDR_SIZE> addr_main) {
+#pragma HLS inline
+			if (addr_main >= MAIN_SIZE)
+				return 0;
+
+			T data;
+			bool dep;
+
+			dep = _request[_client_req_port].write_dep(
+				(request_t){addr_main, READ_REQ}, false);
+			ap_wait();
+			_rd_data[_client_rd_port].read_dep(data, dep);
+
+			_client_rd_port = (_client_rd_port + 1) % RD_PORTS;
+			_client_req_port = (_client_req_port + 1) % N_PORTS;
+
+			return data;
+		}
+
+		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
+#pragma HLS inline
+			if (addr_main >= MAIN_SIZE)
+				return;
+
+			bool dep;
+
+			dep = _request[_client_req_port].write_dep(
+				(request_t){addr_main, WRITE_REQ}, false);
+			ap_wait();
+			_wr_data[_client_wr_port].write_dep(data, dep);
+
+			_client_wr_port = (_client_wr_port + 1) % WR_PORTS;
+			_client_req_port = (_client_req_port + 1) % N_PORTS;
+		}
+
+
+	private:
+		void run_core() {
 #pragma HLS inline off
 			request_t req;
 			T data;
@@ -81,7 +140,7 @@ class cache {
 			for (int line = 0; line < N_LINES; line++)
 				_valid[line] = false;
 
-RUN_LOOP:		while (1) {
+CORE_LOOP:		while (1) {
 				bool dep;
 #pragma HLS pipeline
 #ifdef __SYNTHESIS__
@@ -135,12 +194,12 @@ RUN_LOOP:		while (1) {
 			_int_request.write((request_t){0, STOP_REQ});
 		}
 
-		void run_mem_man(T *main_mem) {
+		void run_mem_if(T *main_mem) {
 			request_t req;
 			T *main_line;
 			line_t line;
 			
-MEM_MAN_LOOP:		while (1) {
+MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
 				bool dep;
 #ifdef __SYNTHESIS__
@@ -173,48 +232,6 @@ MEM_MAN_LOOP:		while (1) {
 			}
 		}
 
-		void stop() {
-			for (int port = 0; port < N_PORTS; port++) {
-				_request[port].write((request_t){0, STOP_REQ});
-			}
-		}
-
-		T get(ap_uint<ADDR_SIZE> addr_main) {
-#pragma HLS inline
-			if (addr_main >= MAIN_SIZE)
-				return 0;
-
-			T data;
-			bool dep;
-
-			dep = _request[_client_req_port].write_dep(
-				(request_t){addr_main, READ_REQ}, false);
-			ap_wait();
-			_rd_data[_client_rd_port].read_dep(data, dep);
-
-			_client_rd_port = (_client_rd_port + 1) % RD_PORTS;
-			_client_req_port = (_client_req_port + 1) % N_PORTS;
-
-			return data;
-		}
-
-		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
-#pragma HLS inline
-			if (addr_main >= MAIN_SIZE)
-				return;
-
-			bool dep;
-
-			dep = _request[_client_req_port].write_dep(
-				(request_t){addr_main, WRITE_REQ}, false);
-			ap_wait();
-			_wr_data[_client_wr_port].write_dep(data, dep);
-
-			_client_wr_port = (_client_wr_port + 1) % WR_PORTS;
-			_client_req_port = (_client_req_port + 1) % N_PORTS;
-		}
-
-	private:
 		inline bool hit(addr_t addr) {
 			return (_valid[addr._line] && (addr._tag == _tag[addr._line]));
 		}

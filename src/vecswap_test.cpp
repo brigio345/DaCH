@@ -7,6 +7,8 @@
 
 #define N 512
 
+typedef cache<int, 1, 1, N> cache_t;
+
 void vecswap(int a[N], int b[N]) {
 	int tmp;
 
@@ -17,7 +19,7 @@ void vecswap(int a[N], int b[N]) {
 	}
 }
 
-void vecswap_cache(cache<int, 1, 1, N> &a, cache<int, 1, 1, N> &b) {
+void vecswap_cache(cache_t &a, cache_t &b) {
 	int tmp;
 
 	for (int i = 0; i < N; i++) {
@@ -32,36 +34,70 @@ void vecswap_cache(cache<int, 1, 1, N> &a, cache<int, 1, 1, N> &b) {
 	}
 }
 
-void vecswap_syn(cache<int, 1, 1, N> &a, cache<int, 1, 1, N> &b) {
+void vecshift_cache(cache_t &a) {
+	int tmp;
+
+	for (int i = N - 1; i > 0; i--) {
+		tmp = a.get(i - 1);
+		a.set(i, tmp);
+	}
+}
+
+void vecswap_syn(cache_t &a, cache_t &b) {
 	vecswap_cache(a, b);
 
 	a.stop();
 	b.stop();
 }
 
-extern "C" void vecswap_top(int a[N], int b[N]) {
+void vecshift_syn(cache_t &a) {
+	vecshift_cache(a);
+
+	a.stop();
+}
+
+extern "C" void vecswaap_top(int a[N], int b[N]) {
 #pragma HLS INTERFACE m_axi port=a bundle=gmem0 max_widen_bitwidth=1024
 #pragma HLS INTERFACE m_axi port=b bundle=gmem1 max_widen_bitwidth=1024
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #pragma HLS dataflow disable_start_propagation
-	cache<int, 1, 1, N> a_cache;
-	cache<int, 1, 1, N> b_cache;
+	cache_t a_cache;
+	cache_t b_cache;
+
+	a_cache.run(a);
+	b_cache.run(b);
 
 #ifdef __SYNTHESIS__
 	vecswap_syn(a_cache, b_cache);
-	a_cache.run(a);
-	b_cache.run(b);
 #else
-	std::thread a_thread(&cache<int, 1, 1, N>::run, std::ref(a_cache), std::ref(a));
-	std::thread b_thread(&cache<int, 1, 1, N>::run, std::ref(b_cache), std::ref(b));
 	std::thread vecswap_thread(vecswap_cache, std::ref(a_cache), std::ref(b_cache));
 
 	vecswap_thread.join();
+
 	a_cache.stop();
 	b_cache.stop();
-	a_thread.join();
-	b_thread.join();
+#endif	/* __SYNTHESIS__ */
+}
+
+extern "C" void vecswap_top(int a[N]) {
+#pragma HLS INTERFACE m_axi port=a bundle=gmem0 max_widen_bitwidth=1024
+#pragma HLS INTERFACE ap_ctrl_hs port=return
+
+#pragma HLS dataflow disable_start_propagation
+	cache_t a_cache;
+
+#ifdef __SYNTHESIS__
+	a_cache.run(a);
+	vecshift_syn(a_cache);
+#else
+	std::thread cache_thread(&cache_t::run, std::ref(a_cache), std::ref(a));
+	std::thread vecshift_thread(vecshift_cache, std::ref(a_cache));
+
+	vecshift_thread.join();
+
+	a_cache.stop();
+	cache_thread.join();
 #endif	/* __SYNTHESIS__ */
 }
 
@@ -71,6 +107,7 @@ int main() {
 	int a_ref[N];
 	int b_ref[N];
 
+#if 0
 	matrix::generate_random<int>(a, 1, N);
 	std::cout << "IN: a=";
 	matrix::print(a, 1, N);
@@ -97,6 +134,20 @@ int main() {
 			return 1;
 	}
 
+	return 0;
+#endif
+	for (int i = 0; i < N; i++)
+		a[i] = i;
+
+	vecswap_top(a);
+
+	for (int i = 0; i < N; i++)
+		std::cout << a[i] << " ";
+	std::cout << std::endl;
+
+	for (int i = 1; i < N; i++)
+		if (a[i] != (i - 1))
+			return 1;
 	return 0;
 }
 
