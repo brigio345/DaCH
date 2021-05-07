@@ -14,7 +14,7 @@
 
 // direct mapping, write back
 template <typename T, size_t RD_PORTS, size_t WR_PORTS, size_t MAIN_SIZE,
-	 size_t N_LINES = 4, size_t N_ENTRIES_PER_LINE = 8>
+	 size_t N_LINES = 2, size_t N_ENTRIES_PER_LINE = 2>
 class cache {
 	private:
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
@@ -49,10 +49,9 @@ class cache {
 		hls::stream<T, 128> _rd_data[RD_PORTS];
 		hls::stream<T, WR_PORTS> _wr_data[WR_PORTS];
 		hls::stream<request_t, 128> _request[N_PORTS];
-		hls::stream<request_t, 128> _fill_request[N_PORTS];
 		hls::stream<line_t, 128> _fill_data[N_PORTS];
-		hls::stream<request_t, 128> _spill_request[WR_PORTS];
 		hls::stream<line_t, 128> _spill_data[WR_PORTS];
+		hls::stream<request_t, 128> _if_request[N_PORTS];
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
 		ap_uint<TAG_SIZE> _tag[N_LINES];
@@ -60,6 +59,7 @@ class cache {
 		int _client_req_port;
 		int _client_rd_port;
 		int _client_wr_port;
+		int _if_req_port;
 		int _if_fill_port;
 		int _if_spill_port;
 
@@ -72,6 +72,7 @@ class cache {
 			_client_req_port = 0;
 			_client_rd_port = 0;
 			_client_wr_port = 0;
+			_if_req_port = 0;
 			_if_fill_port = 0;
 			_if_spill_port = 0;
 		}
@@ -80,19 +81,13 @@ class cache {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
 			run_core();
-			run_fill(main_mem);
-			if (WR_PORTS > 0)
-				run_spill(main_mem);
+			run_mem_if(main_mem);
 #else
 			std::thread core_thd(&cache::run_core, this);
-			std::thread fill_thd(&cache::run_fill, this, main_mem);
-			if (WR_PORTS > 0) {
-				std::thread spill_thd(&cache::run_spill, this, main_mem);
-				spill_thd.join();
-			}
+			std::thread mem_if_thd(&cache::run_mem_if, this, main_mem);
 
 			core_thd.join();
-			fill_thd.join();
+			mem_if_thd.join();
 #endif /* __SYNTHESIS__ */
 		}
 
@@ -203,59 +198,28 @@ CORE_LOOP:		while (1) {
 				flush();
 
 			ap_wait();
-			for (int port = 0; port < WR_PORTS; port++)
-				_fill_request[port].write((request_t){0, STOP_REQ});
-			ap_wait();
-			for (int port = 0; port < WR_PORTS; port++)
-				_spill_request[port].write((request_t){0, STOP_REQ});
+			for (int port = 0; port < N_PORTS; port++)
+				_if_request[port].write((request_t){0, STOP_REQ});
 		}
 
-		void run_fill(T *main_mem) {
+		void run_mem_if(T *main_mem) {
 			request_t req;
 			T *main_line;
 			line_t line;
-			int port = 0;
+			int req_port = 0;
+			int fill_port = 0;
+			int spill_port = 0;
 			
-RUN_FILL_LOOP:		while (1) {
-#pragma HLS pipeline
-#ifdef __SYNTHESIS__
-				if (!_fill_request[port].read_nb(req))
-					continue;
-#else
-				_fill_request[port].read(req);
-#endif /* __SYNTHESIS__ */
-
-				if (req.type == STOP_REQ)
-					break;
-
-				main_line = &(main_mem[req.addr_main & (-1u << OFF_SIZE)]);
-
-				for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-					line[off] = main_line[off];
-				}
-
-				_fill_data[port].write(line);
-
-				port = (port + 1) % N_PORTS;
-			}
-		}
-
-		void run_spill(T *main_mem) {
-			request_t req;
-			T *main_line;
-			line_t line;
-			int port = 0;
-			
-RUN_SPILL_LOOP:		while (1) {
+MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
 				bool dep;
 #ifdef __SYNTHESIS__
-				dep = _spill_request[port].read_nb(req);
+				dep = _if_request[req_port].read_nb(req);
 
 				if (!dep)
 					continue;
 #else
-				_spill_request[port].read(req);
+				_if_request[req_port].read(req);
 #endif /* __SYNTHESIS__ */
 
 				if (req.type == STOP_REQ)
@@ -263,13 +227,25 @@ RUN_SPILL_LOOP:		while (1) {
 
 				main_line = &(main_mem[req.addr_main & (-1u << OFF_SIZE)]);
 
-				_spill_data[port].read_dep(line, dep);
+				if (req.type == READ_REQ) {
+					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+						line[off] = main_line[off];
+					}
 
-				for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-					main_line[off] = line[off];
+					_fill_data[fill_port].write(line);
+
+					fill_port = (fill_port + 1) % N_PORTS;
+				} else if (WR_PORTS > 0) {
+					_spill_data[spill_port].read_dep(line, dep);
+
+					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
+						main_line[off] = line[off];
+					}
+
+					spill_port = (spill_port + 1) % WR_PORTS;
 				}
 
-				port = (port + 1) % WR_PORTS;
+				req_port = (req_port + 1) % N_PORTS;
 			}
 		}
 
@@ -281,14 +257,12 @@ RUN_SPILL_LOOP:		while (1) {
 		// (taking care of writing back dirty lines)
 		void fill(addr_t addr) {
 #pragma HLS inline
-			if ((WR_PORTS > 0) && _valid[addr._line] && _dirty[addr._line]) {
+			if ((WR_PORTS > 0) && _valid[addr._line] && _dirty[addr._line])
 				spill(addr_t(_tag[addr._line], addr._line, 0));
-				ap_wait();
-			}
 
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
 
-			bool dep = _fill_request[_if_fill_port].write_dep({addr._addr_main, READ_REQ}, false);
+			bool dep = _if_request[_if_req_port].write_dep({addr._addr_main, READ_REQ}, false);
 			ap_wait();
 
 			line_t line;
@@ -302,6 +276,7 @@ RUN_SPILL_LOOP:		while (1) {
 			_valid[addr._line] = true;
 			_dirty[addr._line] = false;
 
+			_if_req_port = (_if_req_port + 1) % N_PORTS;
 			_if_fill_port = (_if_fill_port + 1) % N_PORTS;
 		}
 
@@ -317,10 +292,11 @@ RUN_SPILL_LOOP:		while (1) {
 			_spill_data[_if_spill_port].write(line);
 
 			ap_wait();
-			_spill_request[_if_spill_port].write({addr._addr_main, WRITE_REQ});
+			_if_request[_if_req_port].write({addr._addr_main, WRITE_REQ});
 
 			_dirty[addr._line] = false;
 
+			_if_req_port = (_if_req_port + 1) % N_PORTS;
 			_if_spill_port = (_if_spill_port + 1) % WR_PORTS;
 		}
 
