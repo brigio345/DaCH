@@ -47,11 +47,18 @@ class cache {
 			T data;
 		} request_t;
 
+		typedef struct {
+			bool fill;
+			bool spill;
+			ap_uint<ADDR_SIZE> fill_addr;
+			ap_uint<ADDR_SIZE> spill_addr;
+			line_t line;
+		} mem_req_t;
+
 		hls::stream<T, 128> _rd_data[RD_PORTS];
 		hls::stream<request_t, 128> _request[N_PORTS];
 		hls::stream<line_t, 128> _fill_data[N_PORTS];
-		hls::stream<line_t, 128> _spill_data[WR_PORTS];
-		hls::stream<request_t, 128> _if_request[N_PORTS];
+		hls::stream<mem_req_t, 128> _if_request[N_PORTS];
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
 		ap_uint<TAG_SIZE> _tag[N_LINES];
@@ -60,7 +67,6 @@ class cache {
 		int _client_rd_port;
 		int _if_req_port;
 		int _if_fill_port;
-		int _if_spill_port;
 
 	public:
 		cache() {
@@ -72,7 +78,6 @@ class cache {
 			_client_rd_port = 0;
 			_if_req_port = 0;
 			_if_fill_port = 0;
-			_if_spill_port = 0;
 		}
 
 		void run(T *main_mem) {
@@ -187,35 +192,30 @@ CORE_LOOP:		while (1) {
 
 			ap_wait();
 			for (int port = 0; port < N_PORTS; port++)
-				_if_request[port].write((request_t){0, STOP_REQ});
+				_if_request[port].write({false, false, 0, 0, 0});
 		}
 
 		void run_mem_if(T *main_mem) {
-			request_t req;
+			mem_req_t req;
 			T *main_line;
 			line_t line;
 			int req_port = 0;
 			int fill_port = 0;
-			int spill_port = 0;
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
-				bool dep;
 #ifdef __SYNTHESIS__
-				dep = _if_request[req_port].read_nb(req);
-
-				if (!dep)
+				if (!_if_request[req_port].read_nb(req))
 					continue;
 #else
 				_if_request[req_port].read(req);
 #endif /* __SYNTHESIS__ */
 
-				if (req.type == STOP_REQ)
+				if (!req.fill && !req.spill)
 					break;
 
-				main_line = &(main_mem[req.addr_main & (-1u << OFF_SIZE)]);
-
-				if (req.type == READ_REQ) {
+				if (req.fill) {
+					main_line = &(main_mem[req.fill_addr & (-1u << OFF_SIZE)]);
 					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 						line[off] = main_line[off];
 					}
@@ -223,14 +223,13 @@ MEM_IF_LOOP:		while (1) {
 					_fill_data[fill_port].write(line);
 
 					fill_port = (fill_port + 1) % N_PORTS;
-				} else if (WR_PORTS > 0) {
-					_spill_data[spill_port].read_dep(line, dep);
-
+				}
+				
+				if ((WR_PORTS > 0) && req.spill) {
+					main_line = &(main_mem[req.spill_addr & (-1u << OFF_SIZE)]);
 					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-						main_line[off] = line[off];
+						main_line[off] = req.line[off];
 					}
-
-					spill_port = (spill_port + 1) % WR_PORTS;
 				}
 
 				req_port = (req_port + 1) % N_PORTS;
@@ -250,7 +249,7 @@ MEM_IF_LOOP:		while (1) {
 
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
 
-			bool dep = _if_request[_if_req_port].write_dep({addr._addr_main, READ_REQ}, false);
+			bool dep = _if_request[_if_req_port].write_dep({true, false, addr._addr_main, 0, 0}, false);
 			ap_wait();
 
 			line_t line;
@@ -277,15 +276,12 @@ MEM_IF_LOOP:		while (1) {
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 				line[off] = cache_line[off];
 			}
-			_spill_data[_if_spill_port].write(line);
 
-			ap_wait();
-			_if_request[_if_req_port].write({addr._addr_main, WRITE_REQ});
+			_if_request[_if_req_port].write({false, true, 0, addr._addr_main, line});
 
 			_dirty[addr._line] = false;
 
 			_if_req_port = (_if_req_port + 1) % N_PORTS;
-			_if_spill_port = (_if_spill_port + 1) % WR_PORTS;
 		}
 
 		// store all valid dirty lines from cache to main memory
