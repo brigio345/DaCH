@@ -165,21 +165,27 @@ CORE_LOOP:		while (1) {
 
 				// prepare the cache for accessing addr
 				// (load the line if not present)
-				if (!hit(addr))
-					fill(addr);
 
 				if ((WR_PORTS == 0) ||
 						((RD_PORTS > 0) && (req.type == READ_REQ))) {
-					// read data from cache
-					data = _cache_mem[addr._addr_cache];
+					if (!hit(addr)) {
+						data = fill(addr, false, 0);
+					} else {
+						// read data from cache
+						data = _cache_mem[addr._addr_cache];
+					}
 
 					// send read data
 					_rd_data[rd_port].write(data);
 
 					rd_port = (rd_port + 1) % RD_PORTS;
 				} else if (WR_PORTS > 0) {
-					// store received data to cache
-					_cache_mem[addr._addr_cache] = req.data;
+					if (!hit(addr)) {
+						fill(addr, true, req.data);
+					} else {
+						// store received data to cache
+						_cache_mem[addr._addr_cache] = req.data;
+					}
 
 					_dirty[addr._line] = true;
 				}
@@ -242,7 +248,7 @@ MEM_IF_LOOP:		while (1) {
 
 		// load line from main to cache memory
 		// (taking care of writing back dirty lines)
-		void fill(addr_t addr) {
+		T fill(addr_t addr, bool write, T data) {
 #pragma HLS inline
 			line_t line = 0;
 			bool do_spill = false;
@@ -260,6 +266,10 @@ MEM_IF_LOOP:		while (1) {
 			ap_wait();
 
 			_fill_data[_if_fill_port].read_dep(line, dep);
+
+			if (write)
+				line[addr._off] = data;
+
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 #pragma HLS dependence variable=cache_line inter false
 				cache_line[off] = line[off];
@@ -271,6 +281,8 @@ MEM_IF_LOOP:		while (1) {
 
 			_if_req_port = (_if_req_port + 1) % N_PORTS;
 			_if_fill_port = (_if_fill_port + 1) % N_PORTS;
+
+			return line[addr._off];
 		}
 
 		void spill_no_req(addr_t addr, line_t &line) {
