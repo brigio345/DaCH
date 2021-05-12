@@ -271,7 +271,6 @@ MEM_IF_LOOP:		while (1) {
 				line[addr._off] = data;
 
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS dependence variable=cache_line inter false
 				cache_line[off] = line[off];
 			}
 
