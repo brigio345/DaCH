@@ -140,6 +140,10 @@ class cache {
 			T data;
 			int req_port = 0;
 			int rd_port = 0;
+#ifdef __PROFILE__
+			int n_requests = 0;
+			int n_hits = 0;
+#endif /* __PROFILE__ */
 
 			// invalidate all cache lines
 			for (int line = 0; line < N_LINES; line++)
@@ -163,12 +167,20 @@ CORE_LOOP:		while (1) {
 				// extract information from address
 				addr_t addr(req.addr_main);
 
+				bool is_hit = hit(addr);
+
+#ifdef __PROFILE__
+				n_requests++;
+				if (is_hit)
+					n_hits++;
+#endif /* __PROFILE__ */
+
 				// prepare the cache for accessing addr
 				// (load the line if not present)
 
 				if ((WR_PORTS == 0) ||
 						((RD_PORTS > 0) && (req.type == READ_REQ))) {
-					if (!hit(addr)) {
+					if (!is_hit) {
 						data = fill(addr, false, 0);
 					} else {
 						// read data from cache
@@ -180,7 +192,7 @@ CORE_LOOP:		while (1) {
 
 					rd_port = (rd_port + 1) % RD_PORTS;
 				} else if (WR_PORTS > 0) {
-					if (!hit(addr)) {
+					if (!is_hit) {
 						fill(addr, true, req.data);
 					} else {
 						// store received data to cache
@@ -192,6 +204,12 @@ CORE_LOOP:		while (1) {
 
 				req_port = (req_port + 1) % N_PORTS;
 			}
+
+#ifdef __PROFILE__
+			printf("hit ratio = %.3f (%d / %d)\n",
+					(n_hits / ((float) n_requests)),
+					n_hits, n_requests);
+#endif /* __PROFILE__ */
 
 			if (WR_PORTS > 0)
 				flush();
