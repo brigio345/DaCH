@@ -42,12 +42,6 @@ class cache {
 		} request_type_t;
 
 		typedef struct {
-			ap_uint<ADDR_SIZE> addr_main;
-			request_type_t type;
-			T data;
-		} request_t;
-
-		typedef struct {
 			bool fill;
 			bool spill;
 			ap_uint<ADDR_SIZE> fill_addr;
@@ -56,7 +50,9 @@ class cache {
 		} mem_req_t;
 
 		hls::stream<T, 128> _rd_data[RD_PORTS];
-		hls::stream<request_t, 128> _request[N_PORTS];
+		hls::stream<ap_uint<ADDR_SIZE>, 128> _request_addr[N_PORTS];
+		hls::stream<request_type_t, 128> _request_type[N_PORTS];
+		hls::stream<T, 128> _request_wr_data[WR_PORTS];
 		hls::stream<line_t, 128> _fill_data[N_PORTS];
 		hls::stream<mem_req_t, 128> _if_request[N_PORTS];
 		bool _valid[N_LINES];
@@ -65,6 +61,7 @@ class cache {
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		int _client_req_port;
 		int _client_rd_port;
+		int _client_wr_port;
 		int _if_req_port;
 		int _if_fill_port;
 
@@ -76,6 +73,7 @@ class cache {
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 			_client_req_port = 0;
 			_client_rd_port = 0;
+			_client_wr_port = 0;
 			_if_req_port = 0;
 			_if_fill_port = 0;
 		}
@@ -96,7 +94,7 @@ class cache {
 
 		void stop() {
 			for (int port = 0; port < N_PORTS; port++) {
-				_request[port].write({0, STOP_REQ, 0});
+				_request_type[port].write(STOP_REQ);
 			}
 		}
 
@@ -108,8 +106,8 @@ class cache {
 			T data;
 			bool dep;
 
-			dep = _request[_client_req_port].write_dep(
-				{addr_main, READ_REQ, 0}, false);
+			dep = _request_type[_client_req_port].write_dep(READ_REQ, false);
+			dep = _request_addr[_client_req_port].write_dep(addr_main, dep);
 			ap_wait_n(6);
 			_rd_data[_client_rd_port].read_dep(data, dep);
 
@@ -126,20 +124,24 @@ class cache {
 
 			bool dep;
 
-			dep = _request[_client_req_port].write_dep(
-				(request_t){addr_main, WRITE_REQ, data}, false);
+			dep = _request_type[_client_req_port].write_dep(WRITE_REQ, false);
+			dep = _request_addr[_client_req_port].write_dep(addr_main, dep);
+			_request_wr_data[_client_wr_port].write_dep(data, dep);
 
 			_client_req_port = (_client_req_port + 1) % N_PORTS;
+			_client_wr_port = (_client_wr_port + 1) % WR_PORTS;
 		}
 
 
 	private:
 		void run_core() {
 #pragma HLS inline off
-			request_t req;
+			request_type_t type;
+			ap_uint<ADDR_SIZE> addr_main;
 			T data;
 			int req_port = 0;
 			int rd_port = 0;
+			int wr_port = 0;
 
 			// invalidate all cache lines
 			for (int line = 0; line < N_LINES; line++)
@@ -147,27 +149,30 @@ class cache {
 
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline
+				bool dep;
 #ifdef __SYNTHESIS__
+				dep = _request_type[req_port].read_nb(type);
 				// make pipeline flushable
-				if (!_request[req_port].read_nb(req))
+				if (!dep)
 					continue;
 #else
 				// get request
-				_request[req_port].read(req);
+				_request_type[req_port].read_dep(type, dep);
 #endif /* __SYNTHESIS__ */
-
 				// stop if request is "end-of-request"
-				if (req.type == STOP_REQ)
+				if (type == STOP_REQ)
 					break;
 
+				dep = _request_addr[req_port].read_dep(addr_main, dep);
+
 				// extract information from address
-				addr_t addr(req.addr_main);
+				addr_t addr(addr_main);
 
 				// prepare the cache for accessing addr
 				// (load the line if not present)
 
 				if ((WR_PORTS == 0) ||
-						((RD_PORTS > 0) && (req.type == READ_REQ))) {
+						((RD_PORTS > 0) && (type == READ_REQ))) {
 					if (!hit(addr)) {
 						data = fill(addr, false, 0);
 					} else {
@@ -180,14 +185,18 @@ CORE_LOOP:		while (1) {
 
 					rd_port = (rd_port + 1) % RD_PORTS;
 				} else if (WR_PORTS > 0) {
+					_request_wr_data[wr_port].read_dep(data, dep);
+
 					if (!hit(addr)) {
-						fill(addr, true, req.data);
+						fill(addr, true, data);
 					} else {
 						// store received data to cache
-						_cache_mem[addr._addr_cache] = req.data;
+						_cache_mem[addr._addr_cache] = data;
 					}
 
 					_dirty[addr._line] = true;
+
+					wr_port = (wr_port + 1) % WR_PORTS;
 				}
 
 				req_port = (req_port + 1) % N_PORTS;
