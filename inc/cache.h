@@ -106,12 +106,10 @@ class cache {
 				return 0;
 
 			T data;
-			bool dep;
 
-			dep = _request[_client_req_port].write_dep(
-				{addr_main, READ_REQ, 0}, false);
+			_request[_client_req_port].write({addr_main, READ_REQ, 0});
 			ap_wait_n(6);
-			_rd_data[_client_rd_port].read_dep(data, dep);
+			_rd_data[_client_rd_port].read(data);
 
 			_client_rd_port = (_client_rd_port + 1) % RD_PORTS;
 			_client_req_port = (_client_req_port + 1) % N_PORTS;
@@ -124,10 +122,8 @@ class cache {
 			if (addr_main >= MAIN_SIZE)
 				return;
 
-			bool dep;
-
-			dep = _request[_client_req_port].write_dep(
-				(request_t){addr_main, WRITE_REQ, data}, false);
+			_request[_client_req_port].write(
+				(request_t){addr_main, WRITE_REQ, data});
 
 			_client_req_port = (_client_req_port + 1) % N_PORTS;
 		}
@@ -278,12 +274,12 @@ MEM_IF_LOOP:		while (1) {
 
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
 
-			bool dep = _if_request[_if_req_port].write_dep(
+			_if_request[_if_req_port].write(
 					{true, do_spill, addr._addr_main, 
-					spill_addr._addr_main, line}, false);
+					spill_addr._addr_main, line});
 			ap_wait();
 
-			_fill_data[_if_fill_port].read_dep(line, dep);
+			_fill_data[_if_fill_port].read(line);
 
 			if (write)
 				line[addr._off] = data;
