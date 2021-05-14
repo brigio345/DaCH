@@ -7,10 +7,10 @@ template <size_t ADDR_SIZE, size_t TAG_SIZE, size_t LINE_SIZE>
 class address {
 	private:
 		static const size_t OFF_SIZE = (ADDR_SIZE - (TAG_SIZE + LINE_SIZE));
-		static const unsigned int TAG_HIGH = ADDR_SIZE - 1;
-		static const unsigned int TAG_LOW = TAG_HIGH - TAG_SIZE + 1;
-		static const unsigned int LINE_HIGH = TAG_LOW - 1;
+		static const unsigned int LINE_HIGH = ADDR_SIZE - 1;
 		static const unsigned int LINE_LOW = LINE_HIGH - LINE_SIZE + 1;
+		static const unsigned int TAG_HIGH = LINE_LOW - 1;
+		static const unsigned int TAG_LOW = TAG_HIGH - TAG_SIZE + 1;
 		static const unsigned int OFF_HIGH = ((LINE_SIZE > 0) ? (LINE_LOW - 1) : (TAG_LOW - 1));
 		static const unsigned int OFF_LOW = 0;
 
@@ -49,7 +49,7 @@ class address {
 				ap_uint<(OFF_SIZE > 0) ? OFF_SIZE : 1> off):
 				_tag(tag), _line(line), _off(off) {
 			if (OFF_SIZE == 0) {
-				_addr_main = (tag, line);
+				_addr_main = (line, tag);
 				_addr_cache = line;
 				_addr_cache_first_of_line = line;
 			} else if (LINE_SIZE == 0) {
@@ -57,7 +57,7 @@ class address {
 				_addr_cache = off;
 				_addr_cache_first_of_line = 0;
 			} else {
-				_addr_main = (tag, line, off);
+				_addr_main = (line, tag, off);
 				_addr_cache = (line, off);
 				_addr_cache_first_of_line = _addr_cache & (-1u << OFF_SIZE);
 			}
