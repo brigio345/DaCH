@@ -57,16 +57,14 @@ class cache {
 
 		hls::stream<T, 128> _rd_data[RD_PORTS];
 		hls::stream<request_t, 128> _request[N_PORTS];
-		hls::stream<line_t, 128> _fill_data[N_PORTS];
-		hls::stream<mem_req_t, 128> _if_request[N_PORTS];
+		hls::stream<line_t, 128> _fill_data;
+		hls::stream<mem_req_t, 128> _if_request;
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
 		ap_uint<TAG_SIZE> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		int _client_req_port;
 		int _client_rd_port;
-		int _if_req_port;
-		int _if_fill_port;
 
 	public:
 		cache() {
@@ -76,8 +74,6 @@ class cache {
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 			_client_req_port = 0;
 			_client_rd_port = 0;
-			_if_req_port = 0;
-			_if_fill_port = 0;
 		}
 
 		void run(T *main_mem) {
@@ -211,24 +207,21 @@ CORE_LOOP:		while (1) {
 				flush();
 
 			ap_wait();
-			for (int port = 0; port < N_PORTS; port++)
-				_if_request[port].write({false, false, 0, 0, 0});
+			_if_request.write({false, false, 0, 0, 0});
 		}
 
 		void run_mem_if(T *main_mem) {
 			mem_req_t req;
 			T *main_line;
 			line_t line;
-			int req_port = 0;
-			int fill_port = 0;
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
 #ifdef __SYNTHESIS__
-				if (!_if_request[req_port].read_nb(req))
+				if (!_if_request.read_nb(req))
 					continue;
 #else
-				_if_request[req_port].read(req);
+				_if_request.read(req);
 #endif /* __SYNTHESIS__ */
 
 				if (!req.fill && !req.spill)
@@ -240,9 +233,7 @@ MEM_IF_LOOP:		while (1) {
 						line[off] = main_line[off];
 					}
 
-					_fill_data[fill_port].write(line);
-
-					fill_port = (fill_port + 1) % N_PORTS;
+					_fill_data.write(line);
 				}
 				
 				if ((WR_PORTS > 0) && req.spill) {
@@ -251,8 +242,6 @@ MEM_IF_LOOP:		while (1) {
 						main_line[off] = req.line[off];
 					}
 				}
-
-				req_port = (req_port + 1) % N_PORTS;
 			}
 		}
 
@@ -274,12 +263,12 @@ MEM_IF_LOOP:		while (1) {
 
 			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
 
-			_if_request[_if_req_port].write(
+			_if_request.write(
 					{true, do_spill, addr._addr_main, 
 					spill_addr._addr_main, line});
 			ap_wait();
 
-			_fill_data[_if_fill_port].read(line);
+			_fill_data.read(line);
 
 			if (write)
 				line[addr._off] = data;
@@ -291,9 +280,6 @@ MEM_IF_LOOP:		while (1) {
 			_tag[addr._line] = addr._tag;
 			_valid[addr._line] = true;
 			_dirty[addr._line] = false;
-
-			_if_req_port = (_if_req_port + 1) % N_PORTS;
-			_if_fill_port = (_if_fill_port + 1) % N_PORTS;
 
 			return line[addr._off];
 		}
@@ -319,11 +305,9 @@ MEM_IF_LOOP:		while (1) {
 				line[off] = cache_line[off];
 			}
 
-			_if_request[_if_req_port].write({false, true, 0, addr._addr_main, line});
+			_if_request.write({false, true, 0, addr._addr_main, line});
 
 			_dirty[addr._line] = false;
-
-			_if_req_port = (_if_req_port + 1) % N_PORTS;
 		}
 
 		// store all valid dirty lines from cache to main memory
