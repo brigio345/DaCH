@@ -98,8 +98,13 @@ class cache {
 
 		T get(ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
-			if (addr_main >= MAIN_SIZE)
-				return 0;
+#ifndef __SYNTHESIS__
+			if (addr_main >= MAIN_SIZE) {
+				throw std::out_of_range("cache::get: address " +
+						std::to_string(addr_main) +
+						" is out of range");
+			}
+#endif /* __SYNTHESIS__ */
 
 			T data;
 
@@ -115,8 +120,13 @@ class cache {
 
 		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
 #pragma HLS inline
-			if (addr_main >= MAIN_SIZE)
-				return;
+#ifndef __SYNTHESIS__
+			if (addr_main >= MAIN_SIZE) {
+				throw std::out_of_range("cache::set: address " +
+						std::to_string(addr_main) +
+						" is out of range");
+			}
+#endif /* __SYNTHESIS__ */
 
 			_request[_client_req_port].write(
 				(request_t){addr_main, WRITE_REQ, data});
@@ -166,9 +176,6 @@ CORE_LOOP:		while (1) {
 				if (is_hit)
 					n_hits++;
 #endif /* __PROFILE__ */
-
-				// prepare the cache for accessing addr
-				// (load the line if not present)
 
 				if ((WR_PORTS == 0) ||
 						((RD_PORTS > 0) && (req.type == READ_REQ))) {
