@@ -20,7 +20,10 @@ void vecsum(int a[N], int &sum) {
 }
 
 void vecsum_cache(cache_a &a, int &sum) {
+#pragma HLS inline off
 	int tmp = 0;
+
+	a.init();
 
 	for (int i = 0; i < N; i++) {
 		tmp += a.get(i);

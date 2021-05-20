@@ -15,6 +15,11 @@ typedef cache<data_type, 1, 0, M * P> cache_b;
 typedef cache<data_type, 0, 1, N * P> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
+#pragma HLS inline off
+	a_cache.init();
+	b_cache.init();
+	c_cache.init();
+
 	matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P>
 			(a_cache, b_cache, c_cache);
 	a_cache.stop();

@@ -5,7 +5,7 @@
 #include "matrix.h"
 #include "cache.h"
 
-#define N 512
+#define N 64
 
 typedef cache<int, 1, 1, N> cache_t;
 
@@ -20,8 +20,11 @@ void vecswap(int a[N], int b[N]) {
 }
 
 void vecswap_cache(cache_t &a, cache_t &b) {
+#pragma HLS inline off
 	int tmp;
 
+	a.init();
+	b.init();
 	for (int i = 0; i < N; i++) {
 		tmp = a.get(i);
 		a.set(i, b.get(i));

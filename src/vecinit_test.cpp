@@ -16,6 +16,9 @@ void vecinit(int a[N]) {
 }
 
 void vecinit_cache(cache_t &a) {
+#pragma HLS inline off
+	a.init();
+
 	for (int i = 0; i < N; i++) {
 		a.set(i, i);
 	}
