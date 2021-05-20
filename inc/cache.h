@@ -101,7 +101,7 @@ class cache {
 				}
 		};
 
-		hls::stream<T, 128> _rd_data[RD_PORTS];
+		hls::stream<line_t, 128> _rd_data[RD_PORTS];
 		hls::stream<request_t, 128> _request[N_PORTS];
 		hls::stream<line_t, 128> _fill_data;
 		hls::stream<mem_req_t, 128> _if_request;
@@ -146,7 +146,7 @@ class cache {
 			}
 		}
 
-		T get(ap_uint<ADDR_SIZE> addr_main) {
+		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			if (addr_main >= MAIN_SIZE) {
@@ -156,16 +156,20 @@ class cache {
 			}
 #endif /* __SYNTHESIS__ */
 
-			T data;
-
 			_request[_client_req_port].write({addr_main, READ_REQ, 0});
 			ap_wait_n(6);
-			_rd_data[_client_rd_port].read(data);
+			_rd_data[_client_rd_port].read(line);
 
 			_client_rd_port = (_client_rd_port + 1) % RD_PORTS;
 			_client_req_port = (_client_req_port + 1) % N_PORTS;
+		}
 
-			return data;
+		T get(ap_uint<ADDR_SIZE> addr_main) {
+#pragma HLS inline
+			line_t line;
+			get_line(addr_main, line);
+			addr_t addr(addr_main);
+			return line[addr._off];
 		}
 
 		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
@@ -234,21 +238,19 @@ CORE_LOOP:		while (1) {
 				if ((WR_PORTS == 0) ||
 						((RD_PORTS > 0) && (req.type == READ_REQ))) {
 					if (!is_hit) {
-						data = fill(addr, false, 0);
+						fill(addr, false, 0, line);
 					} else {
 						// read data from cache
 						_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
-
-						data = line[addr._off];
 					}
 
 					// send read data
-					_rd_data[rd_port].write(data);
+					_rd_data[rd_port].write(line);
 
 					rd_port = (rd_port + 1) % RD_PORTS;
 				} else if (WR_PORTS > 0) {
 					if (!is_hit) {
-						fill(addr, true, req.data);
+						fill(addr, true, req.data, line);
 					} else {
 						_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
 						line[addr._off] = req.data;
@@ -311,9 +313,8 @@ MEM_IF_LOOP:		while (1) {
 
 		// load line from main to cache memory
 		// (taking care of writing back dirty lines)
-		T fill(addr_t addr, bool write, T data) {
+		void fill(addr_t addr, bool write, T data, line_t &line) {
 #pragma HLS inline
-			line_t line = 0;
 			bool do_spill = false;
 			addr_t spill_addr(_tag[addr._line], addr._line, 0);
 			if ((WR_PORTS > 0) && _valid[addr._line] && _dirty[addr._line]) {
@@ -335,8 +336,6 @@ MEM_IF_LOOP:		while (1) {
 			_tag[addr._line] = addr._tag;
 			_valid[addr._line] = true;
 			_dirty[addr._line] = false;
-
-			return line[addr._off];
 		}
 
 		void spill_core(addr_t addr, line_t &line) {
