@@ -32,7 +32,7 @@ class cache {
 		static_assert((TAG_SIZE > 0),
 				"N_LINES and/or N_ENTRIES_PER_LINE are too big for the specified MAIN_SIZE");
 		static_assert(((MAIN_SIZE % N_ENTRIES_PER_LINE) == 0),
-			"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
+				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
 		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
@@ -54,6 +54,53 @@ class cache {
 			ap_uint<ADDR_SIZE> spill_addr;
 			line_t line;
 		} mem_req_t;
+
+		class raw_cache {
+			private:
+				static const size_t RAW_TAG_SIZE = (TAG_SIZE + LINE_SIZE);
+
+				typedef address<ADDR_SIZE, RAW_TAG_SIZE, 0> raw_addr_t;
+
+				T *_main_mem;
+				bool _valid;
+				line_t _line;
+				ap_uint<RAW_TAG_SIZE> _tag;
+
+			public:
+				raw_cache(T *main_mem): _main_mem(main_mem) {
+					_valid = false;
+				}
+
+				void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+#pragma HLS inline
+					raw_addr_t addr(addr_main);
+
+					if (hit(addr)) {
+						for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
+							line[off] = _line[off];
+					} else {
+						T *main_line = &(_main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
+						for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
+							line[off] = main_line[off];
+					}
+				}
+
+				void set_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+					raw_addr_t addr(addr_main);
+
+					T *main_line = &(_main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
+					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
+						main_line[off] = _line[off] = line[off];
+					
+					_tag = addr._tag;
+					_valid = true;
+				}
+
+			private:
+				inline bool hit(raw_addr_t addr) {
+					return (_valid && (addr._tag == _tag));
+				}
+		};
 
 		hls::stream<T, 128> _rd_data[RD_PORTS];
 		hls::stream<request_t, 128> _request[N_PORTS];
@@ -221,9 +268,11 @@ CORE_LOOP:		while (1) {
 			mem_req_t req;
 			T *main_line;
 			line_t line;
+			raw_cache raw_cache_mem_if(main_mem);
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
+#pragma HLS dependence variable=main_mem distance=1 inter RAW false
 #ifdef __SYNTHESIS__
 				if (!_if_request.read_nb(req))
 					continue;
@@ -235,19 +284,12 @@ MEM_IF_LOOP:		while (1) {
 					break;
 
 				if (req.fill) {
-					main_line = &(main_mem[req.fill_addr & (-1u << OFF_SIZE)]);
-					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-						line[off] = main_line[off];
-					}
-
+					raw_cache_mem_if.get_line(req.fill_addr, line);
 					_fill_data.write(line);
 				}
 				
 				if ((WR_PORTS > 0) && req.spill) {
-					main_line = &(main_mem[req.spill_addr & (-1u << OFF_SIZE)]);
-					for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-						main_line[off] = req.line[off];
-					}
+					raw_cache_mem_if.set_line(req.spill_addr, req.line);
 				}
 			}
 		}
@@ -268,10 +310,7 @@ MEM_IF_LOOP:		while (1) {
 				do_spill = true;
 			}
 
-			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
-
-			_if_request.write(
-					{true, do_spill, addr._addr_main, 
+			_if_request.write({true, do_spill, addr._addr_main, 
 					spill_addr._addr_main, line});
 			ap_wait();
 
@@ -280,6 +319,7 @@ MEM_IF_LOOP:		while (1) {
 			if (write)
 				line[addr._off] = data;
 
+			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
 			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
 				cache_line[off] = line[off];
 			}
