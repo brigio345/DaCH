@@ -66,7 +66,7 @@ class cache {
 				ap_uint<RAW_TAG_SIZE> _tag;
 
 			public:
-				raw_cache() {
+				void init() {
 					_valid = false;
 				}
 
@@ -119,6 +119,9 @@ class cache {
 #pragma HLS array_partition variable=_dirty complete dim=1
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
+		}
+
+		void init() {
 			_client_req_port = 0;
 			_client_rd_port = 0;
 		}
@@ -199,6 +202,8 @@ class cache {
 			for (int line = 0; line < N_LINES; line++)
 				_valid[line] = false;
 
+			_raw_cache_core.init();
+
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline
 #pragma HLS dependence variable=_cache_mem distance=1 inter RAW false
@@ -274,6 +279,7 @@ CORE_LOOP:		while (1) {
 			T *main_line;
 			line_t line;
 			raw_cache raw_cache_mem_if;
+			raw_cache_mem_if.init();
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
