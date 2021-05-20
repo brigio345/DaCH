@@ -61,17 +61,16 @@ class cache {
 
 				typedef address<ADDR_SIZE, RAW_TAG_SIZE, 0> raw_addr_t;
 
-				T *_main_mem;
 				bool _valid;
 				line_t _line;
 				ap_uint<RAW_TAG_SIZE> _tag;
 
 			public:
-				raw_cache(T *main_mem): _main_mem(main_mem) {
+				raw_cache() {
 					_valid = false;
 				}
 
-				void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+				void get_line(T *main_mem, ap_uint<ADDR_SIZE> addr_main, line_t &line) {
 #pragma HLS inline
 					raw_addr_t addr(addr_main);
 
@@ -79,16 +78,16 @@ class cache {
 						for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
 							line[off] = _line[off];
 					} else {
-						T *main_line = &(_main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
+						T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
 						for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
 							line[off] = main_line[off];
 					}
 				}
 
-				void set_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+				void set_line(T *main_mem, ap_uint<ADDR_SIZE> addr_main, line_t &line) {
 					raw_addr_t addr(addr_main);
 
-					T *main_line = &(_main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
+					T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
 					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
 						main_line[off] = _line[off] = line[off];
 					
@@ -112,6 +111,7 @@ class cache {
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		int _client_req_port;
 		int _client_rd_port;
+		raw_cache _raw_cache_core;
 
 	public:
 		cache() {
@@ -186,6 +186,7 @@ class cache {
 		void run_core() {
 #pragma HLS inline off
 			request_t req;
+			line_t line;
 			T data;
 			int req_port = 0;
 			int rd_port = 0;
@@ -200,6 +201,7 @@ class cache {
 
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline
+#pragma HLS dependence variable=_cache_mem distance=1 inter RAW false
 #ifdef __SYNTHESIS__
 				// make pipeline flushable
 				if (!_request[req_port].read_nb(req))
@@ -230,7 +232,9 @@ CORE_LOOP:		while (1) {
 						data = fill(addr, false, 0);
 					} else {
 						// read data from cache
-						data = _cache_mem[addr._addr_cache];
+						_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
+
+						data = line[addr._off];
 					}
 
 					// send read data
@@ -241,8 +245,9 @@ CORE_LOOP:		while (1) {
 					if (!is_hit) {
 						fill(addr, true, req.data);
 					} else {
-						// store received data to cache
-						_cache_mem[addr._addr_cache] = req.data;
+						_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
+						line[addr._off] = req.data;
+						_raw_cache_core.set_line(_cache_mem, addr._addr_cache, line);
 					}
 
 					_dirty[addr._line] = true;
@@ -268,7 +273,7 @@ CORE_LOOP:		while (1) {
 			mem_req_t req;
 			T *main_line;
 			line_t line;
-			raw_cache raw_cache_mem_if(main_mem);
+			raw_cache raw_cache_mem_if;
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
@@ -284,12 +289,12 @@ MEM_IF_LOOP:		while (1) {
 					break;
 
 				if (req.fill) {
-					raw_cache_mem_if.get_line(req.fill_addr, line);
+					raw_cache_mem_if.get_line(main_mem, req.fill_addr, line);
 					_fill_data.write(line);
 				}
 				
 				if ((WR_PORTS > 0) && req.spill) {
-					raw_cache_mem_if.set_line(req.spill_addr, req.line);
+					raw_cache_mem_if.set_line(main_mem, req.spill_addr, req.line);
 				}
 			}
 		}
@@ -306,7 +311,7 @@ MEM_IF_LOOP:		while (1) {
 			bool do_spill = false;
 			addr_t spill_addr(_tag[addr._line], addr._line, 0);
 			if ((WR_PORTS > 0) && _valid[addr._line] && _dirty[addr._line]) {
-				spill_no_req(spill_addr, line);
+				spill_core(spill_addr, line);
 				do_spill = true;
 			}
 
@@ -319,10 +324,7 @@ MEM_IF_LOOP:		while (1) {
 			if (write)
 				line[addr._off] = data;
 
-			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
-			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				cache_line[off] = line[off];
-			}
+			_raw_cache_core.set_line(_cache_mem, addr._addr_cache_first_of_line, line);
 
 			_tag[addr._line] = addr._tag;
 			_valid[addr._line] = true;
@@ -331,30 +333,20 @@ MEM_IF_LOOP:		while (1) {
 			return line[addr._off];
 		}
 
-		void spill_no_req(addr_t addr, line_t &line) {
+		void spill_core(addr_t addr, line_t &line) {
 #pragma HLS inline
-			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
-
-			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				line[off] = cache_line[off];
-			}
-
+			_raw_cache_core.get_line(_cache_mem, addr._addr_cache_first_of_line, line);
 			_dirty[addr._line] = false;
 		}
 
 		// store line from cache to main memory
 		void spill(addr_t addr) {
 #pragma HLS inline
-			T *cache_line = &(_cache_mem[addr._addr_cache_first_of_line]);
 			line_t line;
 
-			for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-				line[off] = cache_line[off];
-			}
+			spill_core(addr, line);
 
 			_if_request.write({false, true, 0, addr._addr_main, line});
-
-			_dirty[addr._line] = false;
 		}
 
 		// store all valid dirty lines from cache to main memory
