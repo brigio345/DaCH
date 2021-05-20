@@ -55,6 +55,51 @@ class cache {
 			line_t line;
 		} mem_req_t;
 
+		class l1_cache {
+			private:
+				static const size_t L1_TAG_SIZE = (TAG_SIZE + LINE_SIZE);
+
+				typedef address<ADDR_SIZE, L1_TAG_SIZE, 0> l1_addr_t;
+
+				bool _valid;
+				line_t _line;
+				ap_uint<L1_TAG_SIZE> _tag;
+
+			public:
+				void init() {
+					_valid = false;
+				}
+
+				bool get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+					l1_addr_t addr(addr_main);
+
+					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
+						line[off] = _line[off];
+
+					return hit(addr);
+				}
+
+				void fill_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
+						_line[off] = line[off];
+					l1_addr_t addr(addr_main);
+					_valid = true;
+					_tag = addr._tag;
+				}
+
+				void invalidate_line(ap_uint<ADDR_SIZE> addr_main) {
+					l1_addr_t addr(addr_main);
+
+					if (hit(addr))
+						_valid = false;
+				}
+
+			private:
+				inline bool hit(l1_addr_t addr) {
+					return (_valid && (addr._tag == _tag));
+				}
+		};
+
 		class raw_cache {
 			private:
 				static const size_t RAW_TAG_SIZE = (TAG_SIZE + LINE_SIZE);
@@ -111,6 +156,7 @@ class cache {
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		int _client_req_port;
 		int _client_rd_port;
+		l1_cache _l1_cache_get;
 		raw_cache _raw_cache_core;
 
 	public:
@@ -124,6 +170,7 @@ class cache {
 		void init() {
 			_client_req_port = 0;
 			_client_rd_port = 0;
+			_l1_cache_get.init();
 		}
 
 		void run(T *main_mem) {
@@ -156,12 +203,16 @@ class cache {
 			}
 #endif /* __SYNTHESIS__ */
 
-			_request[_client_req_port].write({addr_main, READ_REQ, 0});
-			ap_wait_n(6);
-			_rd_data[_client_rd_port].read(line);
+			if (!_l1_cache_get.get_line(addr_main, line)) {
+				_request[_client_req_port].write({addr_main, READ_REQ, 0});
+				ap_wait_n(6);
+				_rd_data[_client_rd_port].read(line);
 
-			_client_rd_port = (_client_rd_port + 1) % RD_PORTS;
-			_client_req_port = (_client_req_port + 1) % N_PORTS;
+				_l1_cache_get.fill_line(addr_main, line);
+
+				_client_rd_port = (_client_rd_port + 1) % RD_PORTS;
+				_client_req_port = (_client_req_port + 1) % N_PORTS;
+			}
 		}
 
 		T get(ap_uint<ADDR_SIZE> addr_main) {
@@ -181,6 +232,8 @@ class cache {
 						" is out of range");
 			}
 #endif /* __SYNTHESIS__ */
+
+			_l1_cache_get.invalidate_line(addr_main);
 
 			_request[_client_req_port].write(
 				(request_t){addr_main, WRITE_REQ, data});
