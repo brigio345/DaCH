@@ -287,30 +287,23 @@ CORE_LOOP:		while (1) {
 				if (is_hit)
 					n_hits++;
 #endif /* __PROFILE__ */
+				bool write = ((WR_PORTS > 0) && (req.type == WRITE_REQ));
 
-				if ((WR_PORTS == 0) ||
-						((RD_PORTS > 0) && (req.type == READ_REQ))) {
-					if (!is_hit) {
-						fill(addr, false, 0, line);
-					} else {
-						// read data from cache
-						_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
-					}
+				if (is_hit)
+					_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
+				else
+					fill(addr, write, req.data, line);
 
-					// send read data
-					_rd_data[rd_port].write(line);
-
-					rd_port = (rd_port + 1) % RD_PORTS;
-				} else if (WR_PORTS > 0) {
-					if (!is_hit) {
-						fill(addr, true, req.data, line);
-					} else {
-						_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
+				if (write) {
+					if (is_hit) {
 						line[addr._off] = req.data;
 						_raw_cache_core.set_line(_cache_mem, addr._addr_cache, line);
 					}
-
 					_dirty[addr._line] = true;
+				} else {
+					_rd_data[rd_port].write(line);
+
+					rd_port = (rd_port + 1) % RD_PORTS;
 				}
 
 				req_port = (req_port + 1) % N_PORTS;
