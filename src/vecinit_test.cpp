@@ -41,6 +41,8 @@ extern "C" void vecinit_top(int a[N]) {
 	a_cache.run(a);
 	vecinit_syn(a_cache);
 #else
+	a_cache.init();
+
 	std::thread cache_thread(&cache_t::run, std::ref(a_cache), std::ref(a));
 	std::thread vecinit_thread(vecinit_cache, std::ref(a_cache));
 

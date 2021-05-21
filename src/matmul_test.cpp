@@ -47,6 +47,10 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	c_cache.run(c_arr);
 	multiply_syn(a_cache, b_cache, c_cache);
 #else
+	a_cache.init();
+	b_cache.init();
+	c_cache.init();
+
 	std::thread a_thd(&cache_a::run, std::ref(a_cache), std::ref(a_arr));
 	std::thread b_thd(&cache_b::run, std::ref(b_cache), std::ref(b_arr));
 	std::thread c_thd(&cache_c::run, std::ref(c_cache), std::ref(c_arr));

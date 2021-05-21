@@ -53,6 +53,9 @@ extern "C" void vecswap_top(int a[N], int b[N]) {
 	b_cache.run(b);
 	vecswap_syn(a_cache, b_cache);
 #else
+	a_cache.init();
+	b_cache.init();
+
 	std::thread a_cache_thd(&cache_t::run, std::ref(a_cache), std::ref(a));
 	std::thread b_cache_thd(&cache_t::run, std::ref(b_cache), std::ref(b));
 	std::thread vecswap_thread(vecswap_cache, std::ref(a_cache), std::ref(b_cache));

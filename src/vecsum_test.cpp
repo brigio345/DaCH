@@ -49,6 +49,8 @@ extern "C" void vecsum_top(int a[N], int &sum) {
 	a_cache.run(a);
 	vecsum_syn(a_cache, sum);
 #else
+	a_cache.init();
+
 	std::thread cache_thread(&cache_a::run, std::ref(a_cache), std::ref(a));
 	std::thread vecsum_thread(vecsum_cache, std::ref(a_cache), std::ref(sum));
 
