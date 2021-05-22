@@ -2,6 +2,7 @@
 #define CACHE_H
 
 #include "address.h"
+#include "l1_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 #include "hls_vector.h"
@@ -36,6 +37,8 @@ class cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
 		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
+		typedef l1_cache<line_t, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
+				N_ENTRIES_PER_LINE> l1_cache_t;
 
 		typedef enum {
 			READ_REQ, WRITE_REQ, STOP_REQ
@@ -54,51 +57,6 @@ class cache {
 			ap_uint<ADDR_SIZE> spill_addr;
 			line_t line;
 		} mem_req_t;
-
-		class l1_cache {
-			private:
-				static const size_t L1_TAG_SIZE = (TAG_SIZE + LINE_SIZE);
-
-				typedef address<ADDR_SIZE, L1_TAG_SIZE, 0> l1_addr_t;
-
-				bool _valid;
-				line_t _line;
-				ap_uint<L1_TAG_SIZE> _tag;
-
-			public:
-				void init() {
-					_valid = false;
-				}
-
-				bool get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
-					l1_addr_t addr(addr_main);
-
-					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-						line[off] = _line[off];
-
-					return hit(addr);
-				}
-
-				void fill_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
-					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-						_line[off] = line[off];
-					l1_addr_t addr(addr_main);
-					_valid = true;
-					_tag = addr._tag;
-				}
-
-				void invalidate_line(ap_uint<ADDR_SIZE> addr_main) {
-					l1_addr_t addr(addr_main);
-
-					if (hit(addr))
-						_valid = false;
-				}
-
-			private:
-				inline bool hit(l1_addr_t addr) {
-					return (_valid && (addr._tag == _tag));
-				}
-		};
 
 		class raw_cache {
 			private:
@@ -156,7 +114,7 @@ class cache {
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		int _client_req_port;
 		int _client_rd_port;
-		l1_cache _l1_cache_get;
+		l1_cache_t _l1_cache_get;
 		raw_cache _raw_cache_core;
 
 	public:
