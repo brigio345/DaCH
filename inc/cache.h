@@ -27,7 +27,7 @@ class cache {
 				"N_LINES must be a power of 2");
 		static_assert(((1 << OFF_SIZE) == N_ENTRIES_PER_LINE),
 				"N_ENTRIES_PER_LINE must be a power of 2");
-		static_assert((TAG_SIZE > 0),
+		static_assert(((MAIN_SIZE > (N_LINES * N_ENTRIES_PER_LINE)) && (TAG_SIZE > 0)),
 				"N_LINES and/or N_ENTRIES_PER_LINE are too big for the specified MAIN_SIZE");
 		static_assert(((MAIN_SIZE % N_ENTRIES_PER_LINE) == 0),
 				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
