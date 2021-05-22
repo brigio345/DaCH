@@ -3,6 +3,7 @@
 
 #include "address.h"
 #include "l1_cache.h"
+#include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 #include "hls_vector.h"
@@ -39,6 +40,8 @@ class cache {
 		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
 		typedef l1_cache<line_t, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
 				N_ENTRIES_PER_LINE> l1_cache_t;
+		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
+				N_ENTRIES_PER_LINE> raw_cache_t;
 
 		typedef enum {
 			READ_REQ, WRITE_REQ, STOP_REQ
@@ -58,52 +61,6 @@ class cache {
 			line_t line;
 		} mem_req_t;
 
-		class raw_cache {
-			private:
-				static const size_t RAW_TAG_SIZE = (TAG_SIZE + LINE_SIZE);
-
-				typedef address<ADDR_SIZE, RAW_TAG_SIZE, 0> raw_addr_t;
-
-				bool _valid;
-				line_t _line;
-				ap_uint<RAW_TAG_SIZE> _tag;
-
-			public:
-				void init() {
-					_valid = false;
-				}
-
-				void get_line(T *main_mem, ap_uint<ADDR_SIZE> addr_main, line_t &line) {
-#pragma HLS inline
-					raw_addr_t addr(addr_main);
-
-					if (hit(addr)) {
-						for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-							line[off] = _line[off];
-					} else {
-						T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
-						for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-							line[off] = main_line[off];
-					}
-				}
-
-				void set_line(T *main_mem, ap_uint<ADDR_SIZE> addr_main, line_t &line) {
-					raw_addr_t addr(addr_main);
-
-					T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
-					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-						main_line[off] = _line[off] = line[off];
-					
-					_tag = addr._tag;
-					_valid = true;
-				}
-
-			private:
-				inline bool hit(raw_addr_t addr) {
-					return (_valid && (addr._tag == _tag));
-				}
-		};
-
 		hls::stream<line_t, 128> _rd_data[RD_PORTS];
 		hls::stream<request_t, 128> _request[N_PORTS];
 		hls::stream<line_t, 128> _fill_data;
@@ -115,7 +72,7 @@ class cache {
 		int _client_req_port;
 		int _client_rd_port;
 		l1_cache_t _l1_cache_get;
-		raw_cache _raw_cache_core;
+		raw_cache_t _raw_cache_core;
 
 	public:
 		cache() {
@@ -284,7 +241,7 @@ CORE_LOOP:		while (1) {
 			mem_req_t req;
 			T *main_line;
 			line_t line;
-			raw_cache raw_cache_mem_if;
+			raw_cache_t raw_cache_mem_if;
 			raw_cache_mem_if.init();
 			
 MEM_IF_LOOP:		while (1) {
