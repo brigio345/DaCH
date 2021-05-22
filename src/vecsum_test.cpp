@@ -7,7 +7,7 @@
 
 #define N 128
 
-typedef cache<int, 1, 0, N> cache_a;
+typedef cache<int, true, false, N, 2, 8> cache_a;
 
 void vecsum(int a[N], int &sum) {
 	int tmp = 0;

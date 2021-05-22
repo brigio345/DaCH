@@ -1,5 +1,6 @@
 #include <iostream>
 #ifndef __SYNTHESIS__
+#define __PROFILE__
 #include <thread>
 #endif	/* __SYNTHESIS__ */
 #include "matrix.h"
@@ -7,12 +8,12 @@
 
 #define N 4
 #define M 4
-#define P 4
+#define P 8
 
 typedef int data_type;
-typedef cache<data_type, 1, 0, N * M> cache_a;
-typedef cache<data_type, 1, 0, M * P> cache_b;
-typedef cache<data_type, 0, 1, N * P> cache_c;
+typedef cache<data_type, true, false, N * M, 2, M> cache_a;
+typedef cache<data_type, true, false, M * P, M, 4> cache_b;
+typedef cache<data_type, false, true, N * P, 2, M> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 #pragma HLS inline off

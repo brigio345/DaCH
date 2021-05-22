@@ -7,7 +7,7 @@
 
 #define N 64
 
-typedef cache<int, 1, 1, N> cache_t;
+typedef cache<int, true, true, N, 2, 8> cache_t;
 
 void vecswap(int a[N], int b[N]) {
 	int tmp;
