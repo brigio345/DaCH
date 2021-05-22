@@ -15,7 +15,8 @@
 #endif /* __SYNTHESIS__ */
 
 // direct mapping, write back
-template <typename T, bool WR_ENABLED, size_t MAIN_SIZE, size_t N_LINES, size_t N_ENTRIES_PER_LINE>
+template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t MAIN_SIZE,
+	 size_t N_LINES, size_t N_ENTRIES_PER_LINE>
 class cache {
 	private:
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
@@ -184,7 +185,8 @@ CORE_LOOP:		while (1) {
 				if (is_hit)
 					n_hits++;
 #endif /* __PROFILE__ */
-				bool write = (WR_ENABLED && (req.type == WRITE_REQ));
+				bool write = ((WR_ENABLED && (req.type == WRITE_REQ)) ||
+							(!RD_ENABLED));
 
 				if (is_hit)
 					_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
