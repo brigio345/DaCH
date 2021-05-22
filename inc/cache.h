@@ -15,8 +15,7 @@
 #endif /* __SYNTHESIS__ */
 
 // direct mapping, write back
-template <typename T, bool WR_ENABLED, size_t MAIN_SIZE,
-	 size_t N_LINES = 2, size_t N_ENTRIES_PER_LINE = 2>
+template <typename T, bool WR_ENABLED, size_t MAIN_SIZE, size_t N_LINES, size_t N_ENTRIES_PER_LINE>
 class cache {
 	private:
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
