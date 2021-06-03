@@ -1,9 +1,11 @@
-\documentclass{beamer}
+\documentclass[handout]{beamer}
 \useoutertheme{split}
 \useinnertheme{circles}
 \usecolortheme{custom}
 \setbeamertemplate{navigation symbols}{}
 \graphicspath{{graphics/}}
+
+\usepackage{mathtools}
 
 \newcommand*\oldmacro{}%
 \let\oldmacro\insertshorttitle%
@@ -36,14 +38,14 @@
 \begin{frame}{Motivation}
 	\begin{itemize}
 		\item \textbf{Problem}:\\
-			big arrays are mapped to \underline{DRAM} $\Rightarrow$
-			performance \underline{bottlenecks}
+			big arrays mapped to \highlight{DRAM} $\Rightarrow$
+			performance \highlight{bottlenecks}
 		\item \textbf{Proposed solution}:\\
-			cache module which should:
+			cache module designed to:
 			\begin{itemize}
-				\item store data to \underline{BRAMs}
-				\item require \underline{minimal effort} to be
-					integrated into any HLS design
+				\item exploit \highlight{BRAMs}
+				\item \highlight{easily integrable} into any
+					\emph{Vitis HLS} design
 			\end{itemize}
 	\end{itemize}
 \end{frame}
@@ -66,7 +68,7 @@
 	\end{minipage}
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{liang_arch.pdf}
+			\includegraphics[width=.9\textwidth]{liang_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
@@ -84,7 +86,7 @@
 	\end{minipage}
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{complete_arch.pdf}
+			\includegraphics[width=.9\textwidth]{complete_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
@@ -92,7 +94,7 @@
 \section{Implementation}
 \subsection{Tools}
 \begin{frame}{Tools}
-	\texttt{C++} code compatible with \emph{Vitis HLS} (2020.2).
+	\texttt{C++} code coupled with \emph{Vitis HLS} (2020.2) allow:
 	\pause
 	\begin{itemize}[<+->]
 		\item \textbf{Multiple processes modeling}:\\
@@ -119,9 +121,10 @@
 \begin{frame}{Internal architecture}
 	\begin{minipage}{.7\textwidth}
 		\begin{itemize}[<+->]
-		\item \textbf{Problem}: persuade HLS to schedule response writing
-			to FIFO in case of HIT early in the pipeline
-		\item \textbf{Proposed solution}: split the cache into two processes:
+			\item \textbf{Problem}: persuade HLS to \highlight{schedule
+				cache HIT response early} in the pipeline
+			\item \textbf{Proposed solution}: split the cache into
+				\highlight{two processes}:
 			\begin{enumerate}[<.->]
 				\item \texttt{core}:
 					\begin{itemize}
@@ -133,14 +136,17 @@
 						\item manage DRAM accesses
 					\end{itemize}
 			\end{enumerate}
-		$\Rightarrow$ synthesizer job is simplified:\\
-		if HIT, request is managed in 1 cycle
+			\pause[\thebeamerpauses]
+				\begin{center}
+					$\Rightarrow$ \highlight{synthesizer job} is \highlight{simplified}:\\
+					HIT response scheduled earlier
+				\end{center}
 	\end{itemize}
 	\end{minipage}
 	\onslide<1->
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
+			\includegraphics[width=.9\textwidth]{internal_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
@@ -157,7 +163,7 @@
 	\end{minipage}
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
+			\includegraphics[width=.9\textwidth]{internal_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
@@ -166,7 +172,7 @@
 	\begin{minipage}{.7\textwidth}
 		\begin{enumerate}[<+->]
 			\item read request from \texttt{application}
-			\item check if it is an HIT or a MISS
+			\item<.-> check if it is an HIT or a MISS
 			\item if MISS: 
 				\begin{itemize}
 					\item if the cache line to be overwritten $\text{\texttt{line}}_{\text{old}}$
@@ -174,40 +180,40 @@
 						request of $\text{\texttt{line}}_{\text{old}}$ to \texttt{mem\_if}
 					\item issue a \texttt{read} request of the
 						requested line to \texttt{mem\_if}
-					\item read \texttt{mem\_if} response and
+					\item<.-> read \texttt{mem\_if} response and
 						update BRAM
 
 				\end{itemize}
 			\item access BRAM
-			\item write response to \texttt{application}
+			\item<.-> write response to \texttt{application}
 				(if \texttt{read})
 		\end{enumerate}
 	\end{minipage}
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
+			\includegraphics[width=.9\textwidth]{internal_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
 \subsection{Problems and solutions}
-\begin{frame}{BRAM dependencies~-~RAW \texttt{fill}}
+\begin{frame}{BRAM dependencies~-~Line loading}
 	\framesubtitle{}
 	\begin{minipage}{.7\textwidth}
 		\begin{itemize}[<+->]
 			\item \textbf{Problem}:
-				reading BRAM immediately after it is written
-				by the \texttt{fill} process causes an increase
-				of II
+				\highlight{reading BRAM} line immediately
+				\highlight{after it has been loaded} from DRAM
+				causes a \emph{Read-After-Write} dependency
 			\item \textbf{Proposed solution}:
-				store the \texttt{mem\_if} response in a buffer
-				which can be immediately accessed and update BRAM
-				afterwards
+				store the \texttt{mem\_if} response in a
+				\highlight{buffer} which can be immediately
+				accessed and update BRAM afterwards
 		\end{itemize}
 	\end{minipage}
 	\onslide<1->
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
+			\includegraphics[width=.9\textwidth]{internal_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
@@ -215,24 +221,25 @@
 	\begin{minipage}{.7\textwidth}
 		\begin{itemize}[<+->]
 			\item \textbf{Problem}:
-				reading BRAM immediately after it is written by
-				a previous \texttt{write} request causes an
-				increase of II
+				a \highlight{\texttt{write request}} immediately
+				followed by a \highlight{\texttt{read request}}
+				to the same element causes a \emph{Read-After-Write}
+				dependency on BRAM
 			\item \textbf{Proposed solution}:
 				\texttt{raw\_cache} inside \texttt{cache}:
 				\begin{itemize}[<.->]
 					\item \texttt{write} request: store the
 						written line to a buffer
 					\item subsequent \texttt{read} request to
-						the same line: access the buffer
-						instead of BRAM
+						the same line: \highlight{access
+						the buffer instead of BRAM}
 				\end{itemize}
 		\end{itemize}
 	\end{minipage}
 	\onslide<1->
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
+			\includegraphics[width=.9\textwidth]{internal_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
@@ -241,7 +248,8 @@
 		\begin{itemize}[<+->]
 			\item \textbf{Problem}:
 				\begin{itemize}[<.->]
-					\item each FIFO access costs 1 cycle
+					\item each \highlight{FIFO access} costs
+						\highlight{1 cycle}
 					\item accesses to arrays are often sequential
 				\end{itemize}
 			\item \textbf{Proposed solution}:
@@ -249,18 +257,19 @@
 				side):
 				\begin{itemize}[<.->]
 					\item \texttt{read} request:
-						get the whole cache line, store it
-						in a buffer and return the requested element
+						\highlight{get the whole cache line},
+						store it in a buffer and return
+						the requested element
 					\item subsequent \texttt{read} request to the same
-						line: access the buffer
+						line: access the \highlight{buffer}
 				\end{itemize}
-			$\Rightarrow$ avoid passing through FIFOs
+				$\Rightarrow$ \highlight{avoid passing through FIFOs}
 		\end{itemize}
 	\end{minipage}
 	\onslide<1->
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{l1_arch.pdf}
+			\includegraphics[width=.9\textwidth]{l1_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
@@ -268,30 +277,108 @@
 \subsection{Performance}
 \begin{frame}{Performance}
 	\begin{itemize}
-		\item \textbf{Loop pipelining}:\\ both \texttt{core} and
-			\texttt{mem\_if} loops pipelined with \texttt{II=1}
+		\item \textbf{Loop pipelining}:
+			\begin{itemize}
+				\item \texttt{core}: \texttt{II=1}
+				\item \texttt{mem\_if}: \texttt{II=1} when cache
+					line (in bits) is smaller or equal than
+					the maximum AXI interface bitwidth (512 bits),
+					\texttt{II=2} otherwise
+			\end{itemize}
 		\item \textbf{L1 HIT}: latency of 1 cycle
 		\item \textbf{HIT}: latency of 6 cycles
 	\end{itemize}
 \end{frame}
+\subsection{Matrix Multiplication}
+\begin{frame}{Matrix Multiplication}
+	\begin{minipage}{.75\textwidth}
+		Row-by-column product:
+		\begin{itemize}[<+->]
+			\item $A$ and $C$ matrices
+				accessed by rows:
+				$hit\_ratio = \frac{line\_size - 1}{line\_size}, \forall n\_lines > 0$
+			\item $B$ matrix accessed by columns:\\
+				modified \emph{direct mapped}
+				address mapping:
+
+				\begin{center}
+					\includegraphics[width=.3\textwidth]{mmul_addr.pdf}
+				\end{center}
+
+				$\Rightarrow hit\_ratio = \frac{line\_size - 1}{line\_size} \Leftrightarrow n\_lines = m$
+		\end{itemize}
+	\end{minipage}
+	\onslide<1->
+	\begin{minipage}{.23\textwidth}
+		\begin{center}
+			\includegraphics[width=.9\textwidth]{matmul.png}
+		\end{center}
+	\end{minipage}
+\end{frame}
+\begin{frame}{Matrix Multiplication}
+	\framesubtitle{Practical example}
+	\begin{minipage}{.75\textwidth}
+		\begin{itemize}
+			\item \textbf{Problem size}:\\
+				\[\begin{cases}
+					l &= 16 \\
+					m &= 32 \\
+					n &= 64 \\
+				\end{cases}\]
+			\item \textbf{Caches size}:\\
+				\[\begin{rcases}
+					line\_size_i &=  32, \forall i \\
+					n\_lines_A &= n\_lines_C = 2 \\
+					n\_lines_B &= m = 32\\
+				\end{rcases}
+				\Rightarrow
+				hit\_ratio_i = 96.9\%, \forall i\]
+		\end{itemize}
+	\end{minipage}
+	\onslide<1->
+	\begin{minipage}{.23\textwidth}
+		\begin{center}
+			\includegraphics[width=.9\textwidth]{matmul.png}
+		\end{center}
+	\end{minipage}
+\end{frame}
+\begin{frame}{Matrix Multiplication}
+	\framesubtitle{Practical example}
+	\begin{minipage}{.75\textwidth}
+		\begin{itemize}
+			\item \textbf{Execution time without caches}:\\ $2,428,745 \mu s$
+			\item \textbf{Execution time with caches}:\\ $1,160,105 \mu s$
+		\end{itemize}
+		\begin{center}
+			$\Rightarrow$ performance improved by $52\%$
+		\end{center}
+	\end{minipage}
+	\onslide<1->
+	\begin{minipage}{.23\textwidth}
+		\begin{center}
+			\includegraphics[width=.9\textwidth]{matmul.png}
+		\end{center}
+	\end{minipage}
+\end{frame}
+
 \section{Future work}
 \subsection{Multi-port cache}
 \begin{frame}{Multi-port cache}
 	\begin{itemize}[<+->]
 		\item \textbf{Problem}: cache manages one request per cycle
-			$\Rightarrow$ unrolling a loop which uses the cache is not
+			$\Rightarrow$ \highlight{unrolling} a loop which uses the cache is not
 			trivial
 		\item \textbf{Possible workarounds}:
-			get multiple data elements for each request and do all
-			the unroll in \texttt{application}; two possible ways:
+			access \highlight{multiple data elements for each request}
+			and do all the unroll in \texttt{application}; two possible ways:
 			\begin{itemize}[<.->]
 				\item \texttt{get\_line}: return a whole cache
 					line
 				\item pack multiple data elements in a single
 					cache element (e.g. \texttt{hls::vector})
 			\end{itemize}
-		\item \textbf{Proposed solution}: provide $N$ ports, where $N$ is
-			the unroll factor
+		\item \textbf{Proposed solution}: provide \highlight{$N$ ports},
+			where $N$ is the unroll factor
 	\end{itemize}
 \end{frame}
 \begin{frame}{Multi-port cache}
@@ -301,9 +388,11 @@
 			\item \textbf{Straightforward implementation}:
 				\begin{itemize}[<.->]
 					\item provide $N$ FIFOs on the interface
-					\item unroll \texttt{core} loop by a factor $N$
+					\item \highlight{unroll \texttt{core}}
+						loop by a factor $N$
 				\end{itemize}
-			\item \textbf{Problem}: all the $N$ requests may refer to the same line
+			\item \textbf{Problem}: all the $N$ requests may
+				\highlight{refer to the same line}
 				$\rightarrow$ each iteration must wait completion of
 				previous one
 		\end{itemize}
@@ -311,7 +400,7 @@
 	\onslide<1->
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{multiport_arch.pdf}
+			\includegraphics[width=.9\textwidth]{multiport_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
@@ -328,7 +417,7 @@
 					\item access BRAM
 					\item write all the responses
 				\end{enumerate}
-				\pause
+				\pause[\thebeamerpauses]
 				\begin{itemize}
 					\item cache addressing mode converted to an
 						associative one
@@ -341,7 +430,7 @@
 	\onslide<1->
 	\begin{minipage}{.28\textwidth}
 		\begin{center}
-			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{multiport_arch.pdf}
+			\includegraphics[width=.9\textwidth]{multiport_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
