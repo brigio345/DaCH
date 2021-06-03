@@ -1,23 +1,34 @@
 \documentclass{beamer}
-\usetheme{focus}
-\definecolor{main}{RGB}{92, 138, 168}
-\definecolor{background}{RGB}{250, 250, 250}
+\useoutertheme{split}
+\useinnertheme{circles}
+\usecolortheme{custom}
+\setbeamertemplate{navigation symbols}{}
 \graphicspath{{graphics/}}
+
+\newcommand*\oldmacro{}%
+\let\oldmacro\insertshorttitle%
+\renewcommand*\insertshorttitle{%
+	\oldmacro\hspace{3.6cm}%
+	    \insertframenumber\,/\,\inserttotalframenumber}
 
 \title{Cache for HLS}
 \subtitle{A multi-process architecture}
 \author{Brignone Giovanni}
 \titlegraphic{\includegraphics[width=.4\textwidth]{polito_logo.png}}
-\institute{Politecnico di Torino}
+%\institute{Politecnico di Torino}
 \date{June 7, 2021}
+
+\AtBeginSection[] {
+	\tableofcontents[
+		currentsection,
+		sectionstyle=show/shaded,
+		subsectionstyle=show/show/hide
+	]
+}
 
 \begin{document}
 \begin{frame}
 	\maketitle
-\end{frame}
-
-\begin{frame}{Outline}
-	\tableofcontents
 \end{frame}
 
 \section{Introduction}
@@ -25,36 +36,53 @@
 \begin{frame}{Motivation}
 	\begin{itemize}
 		\item \textbf{Problem}:\\
-			big arrays are mapped to \underline{DRAM}, therefore they can be
+			big arrays are mapped to \underline{DRAM} $\Rightarrow$
 			performance \underline{bottlenecks}
 		\item \textbf{Proposed solution}:\\
-			cache module storing data to fast \underline{BRAMs} to
-			be integrated into any design with \underline{minimal effort}
+			cache module which should:
+			\begin{itemize}
+				\item store data to \underline{BRAMs}
+				\item require \underline{minimal effort} to be
+					integrated into any HLS design
+			\end{itemize}
 	\end{itemize}
 \end{frame}
 
 \section{Architecture}
 \subsection{Inlined architecture}
 \begin{frame}{Inlined architecture (Ma Liang)}
-	Accesses to cached array replaced with whole cache logic:
-	\begin{itemize}
-		\item straightforward implementation
-		\item cache logic mixed with application logic
-		\item single-port only
-	\end{itemize}
+	\begin{minipage}{.7\textwidth}
+		\begin{center}
+			Array access $\rightarrow$ Inlined cache logic
+		\end{center}
+
+		\bigskip
+
+		\begin{itemize}
+			\item straightforward architecture
+			\item cache logic mixed with application logic
+			\item single-port only
+		\end{itemize}
+	\end{minipage}
+	\begin{minipage}{.28\textwidth}
+		\begin{center}
+			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{liang_arch.pdf}
+		\end{center}
+	\end{minipage}
 \end{frame}
 \subsection{Multi-process architecture}
 \begin{frame}{Multi-process architecture}
 	\begin{minipage}{.7\textwidth}
-		Accesses to cached array replaced with request sending
-		and response reception:
+		\begin{center}
+			Array access $\rightarrow$ Request to separate module
+		\end{center}
 		\begin{itemize}
 			\item decoupling between application and cache logic
-				(communication through FIFOs only)
+				(communication through FIFOs)
 			\item may support multiple ports (work in progress)
 		\end{itemize}
 	\end{minipage}
-	\begin{minipage}{.29\textwidth}
+	\begin{minipage}{.28\textwidth}
 		\begin{center}
 			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{complete_arch.pdf}
 		\end{center}
@@ -62,46 +90,39 @@
 \end{frame}
 
 \section{Implementation}
-\subsection{Vitis HLS}
-\begin{frame}{Vitis HLS (2020.2)}
-	\begin{minipage}{.89\textwidth}
-		\begin{itemize}
-			\item \textbf{Relevant features}:
-				\begin{itemize}
-					\item multiple processes modeling:
-						\begin{itemize}
-							\item \underline{SW:} \texttt{std::thread}
-							\item \underline{HW:} \texttt{DATAFLOW} with
-								\textit{start propagation} disabled
-						\end{itemize}
-					\item \texttt{hls::stream} as FIFO implementation
-					\item loop pipelining
-					\item automatic port widening
-				\end{itemize}
-			\item \textbf{Limitations}:
-				\begin{itemize}
-					\item automatic \texttt{class} disaggregation
-						prevents ``\texttt{[]}~operator''
-						override for \texttt{set} operation\\
-						(pointer to \texttt{class} is required)
-				\end{itemize}
-		\end{itemize}
-	\end{minipage}
-	\begin{minipage}{.1\textwidth}
-		\begin{center}
-			\includegraphics[width=.9\textwidth]{vitislogo.png}
-		\end{center}
-	\end{minipage}
+\subsection{Tools}
+\begin{frame}{Tools}
+	\texttt{C++} code compatible with \emph{Vitis HLS} (2020.2).
+	\pause
+	\begin{itemize}[<+->]
+		\item \textbf{Multiple processes modeling}:\\
+			infinite loops parallelized by:
+			\begin{itemize}
+				\item<.-> \underline{SW simulation:} \texttt{std::thread}
+				\item<.-> \underline{Synthesis:} \texttt{DATAFLOW} with
+					\textit{start propagation} disabled
+			\end{itemize}
+		\item \textbf{Inter-process communication}: \texttt{hls::stream} FIFOs
+		\item \textbf{Performance optimization}:
+			\begin{itemize}
+				\item<.-> loop pipelining: new request each cycle
+				\item<.-> automatic port widening: access one line at a time in DRAM
+			\end{itemize}
+		\item \textbf{Customization:} cache characteristics set through
+			\texttt{template}
+		\item \textbf{Limitations}: cannot override ``\texttt{[]~operator}''
+			for \texttt{set} due to automatic \texttt{class} disaggregation
+	\end{itemize}
 \end{frame}
 
 \subsection{Internal architecture}
 \begin{frame}{Internal architecture}
 	\begin{minipage}{.7\textwidth}
-	\begin{itemize}
-		\item \textbf{Issue}: persuade HLS to schedule response writing
+		\begin{itemize}[<+->]
+		\item \textbf{Problem}: persuade HLS to schedule response writing
 			to FIFO in case of HIT early in the pipeline
-		\item \textbf{Solution}: split the cache into two processes:
-			\begin{enumerate}
+		\item \textbf{Proposed solution}: split the cache into two processes:
+			\begin{enumerate}[<.->]
 				\item \texttt{core}:
 					\begin{itemize}
 						\item manage requests from \texttt{application}
@@ -112,17 +133,19 @@
 						\item manage DRAM accesses
 					\end{itemize}
 			\end{enumerate}
-			$\Rightarrow$ synthesizer job is simplified:\\
-			if HIT, response is written in 1 cycle
+		$\Rightarrow$ synthesizer job is simplified:\\
+		if HIT, request is managed in 1 cycle
 	\end{itemize}
 	\end{minipage}
-	\begin{minipage}{.29\textwidth}
+	\onslide<1->
+	\begin{minipage}{.28\textwidth}
 		\begin{center}
 			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
 \begin{frame}{\texttt{mem\_if} implementation}
+	\framesubtitle{Functionality}
 	\begin{minipage}{.7\textwidth}
 		Manage DRAM accesses:
 		\begin{enumerate}
@@ -132,16 +155,16 @@
 				(if \texttt{read} request)
 		\end{enumerate}
 	\end{minipage}
-	\begin{minipage}{.29\textwidth}
+	\begin{minipage}{.28\textwidth}
 		\begin{center}
 			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
 \begin{frame}{\texttt{core} implementation}
+	\framesubtitle{Functionality}
 	\begin{minipage}{.7\textwidth}
-		Infinite pipelined loop performing following steps:
-		\begin{enumerate}
+		\begin{enumerate}[<+->]
 			\item read request from \texttt{application}
 			\item check if it is an HIT or a MISS
 			\item if MISS: 
@@ -157,50 +180,57 @@
 				\end{itemize}
 			\item access BRAM
 			\item write response to \texttt{application}
-				(if \texttt{read} request)
+				(if \texttt{read})
 		\end{enumerate}
 	\end{minipage}
-	\begin{minipage}{.29\textwidth}
+	\begin{minipage}{.28\textwidth}
 		\begin{center}
 			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
-\begin{frame}{\texttt{core} implementation}
+\subsection{Problems and solutions}
+\begin{frame}{BRAM dependencies~-~RAW \texttt{fill}}
+	\framesubtitle{}
 	\begin{minipage}{.7\textwidth}
-		\begin{itemize}
+		\begin{itemize}[<+->]
 			\item \textbf{Problem}:
 				reading BRAM immediately after it is written
 				by the \texttt{fill} process causes an increase
 				of II
-			\item \textbf{Solution}:
+			\item \textbf{Proposed solution}:
 				store the \texttt{mem\_if} response in a buffer
 				which can be immediately accessed and update BRAM
 				afterwards
 		\end{itemize}
 	\end{minipage}
-	\begin{minipage}{.29\textwidth}
+	\onslide<1->
+	\begin{minipage}{.28\textwidth}
 		\begin{center}
 			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
-\begin{frame}{\texttt{core} implementation}
+\begin{frame}{BRAM dependencies~-~RAW \texttt{request}}
 	\begin{minipage}{.7\textwidth}
-		\begin{itemize}
+		\begin{itemize}[<+->]
 			\item \textbf{Problem}:
 				reading BRAM immediately after it is written by
 				a previous \texttt{write} request causes an
 				increase of II
-			\item \textbf{Solution}:
-				insert a \texttt{raw\_cache} (single-line
-				cache storing last written line): in case of a
-				\texttt{read} request right after a \texttt{write}
-				request to the same line, the access is performed
-				to the \texttt{raw\_cache} instead of BRAM
+			\item \textbf{Proposed solution}:
+				\texttt{raw\_cache} inside \texttt{cache}:
+				\begin{itemize}[<.->]
+					\item \texttt{write} request: store the
+						written line to a buffer
+					\item subsequent \texttt{read} request to
+						the same line: access the buffer
+						instead of BRAM
+				\end{itemize}
 		\end{itemize}
 	\end{minipage}
-	\begin{minipage}{.29\textwidth}
+	\onslide<1->
+	\begin{minipage}{.28\textwidth}
 		\begin{center}
 			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{internal_arch.pdf}
 		\end{center}
@@ -208,30 +238,113 @@
 \end{frame}
 \begin{frame}{Request optimization}
 	\begin{minipage}{.7\textwidth}
-		\begin{itemize}
-			\item \textbf{Scenario}:
-				\begin{itemize}
+		\begin{itemize}[<+->]
+			\item \textbf{Problem}:
+				\begin{itemize}[<.->]
 					\item each FIFO access costs 1 cycle
 					\item accesses to arrays are often sequential
 				\end{itemize}
-			\item \textbf{Proposed solution}:\\
-				insert a \texttt{l1\_cache} in the interface,
-				on \texttt{application} side: a \texttt{read} request
-				gets the whole cache line, stores it and returns the
-				required element; if subsequent requests read the same
-				line, the interface can immediately return data, avoiding
-				sending any request and waiting for response
+			\item \textbf{Proposed solution}:
+				\texttt{l1\_cache} in the interface (\texttt{application}
+				side):
+				\begin{itemize}[<.->]
+					\item \texttt{read} request:
+						get the whole cache line, store it
+						in a buffer and return the requested element
+					\item subsequent \texttt{read} request to the same
+						line: access the buffer
+				\end{itemize}
+			$\Rightarrow$ avoid passing through FIFOs
 		\end{itemize}
 	\end{minipage}
-	\begin{minipage}{.29\textwidth}
+	\onslide<1->
+	\begin{minipage}{.28\textwidth}
 		\begin{center}
 			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{l1_arch.pdf}
 		\end{center}
 	\end{minipage}
 \end{frame}
-
+\section{Results}
+\subsection{Performance}
+\begin{frame}{Performance}
+	\begin{itemize}
+		\item \textbf{Loop pipelining}:\\ both \texttt{core} and
+			\texttt{mem\_if} loops pipelined with \texttt{II=1}
+		\item \textbf{L1 HIT}: latency of 1 cycle
+		\item \textbf{HIT}: latency of 6 cycles
+	\end{itemize}
+\end{frame}
 \section{Future work}
-% multi-ports (possibly in RTL)
+\subsection{Multi-port cache}
+\begin{frame}{Multi-port cache}
+	\begin{itemize}[<+->]
+		\item \textbf{Problem}: cache manages one request per cycle
+			$\Rightarrow$ unrolling a loop which uses the cache is not
+			trivial
+		\item \textbf{Possible workarounds}:
+			get multiple data elements for each request and do all
+			the unroll in \texttt{application}; two possible ways:
+			\begin{itemize}[<.->]
+				\item \texttt{get\_line}: return a whole cache
+					line
+				\item pack multiple data elements in a single
+					cache element (e.g. \texttt{hls::vector})
+			\end{itemize}
+		\item \textbf{Proposed solution}: provide $N$ ports, where $N$ is
+			the unroll factor
+	\end{itemize}
+\end{frame}
+\begin{frame}{Multi-port cache}
+	\framesubtitle{Implementation}
+	\begin{minipage}{.7\textwidth}
+		\begin{itemize}[<+->]
+			\item \textbf{Straightforward implementation}:
+				\begin{itemize}[<.->]
+					\item provide $N$ FIFOs on the interface
+					\item unroll \texttt{core} loop by a factor $N$
+				\end{itemize}
+			\item \textbf{Problem}: all the $N$ requests may refer to the same line
+				$\rightarrow$ each iteration must wait completion of
+				previous one
+		\end{itemize}
+	\end{minipage}
+	\onslide<1->
+	\begin{minipage}{.28\textwidth}
+		\begin{center}
+			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{multiport_arch.pdf}
+		\end{center}
+	\end{minipage}
+\end{frame}
+\begin{frame}{Multi-port cache}
+	\framesubtitle{Implementation}
+	\begin{minipage}{.7\textwidth}
+		\begin{itemize}[<+->]
+			\item \textbf{Proposed solution}:
+				\begin{enumerate}[<.->]
+					\item read all the $N$ requests
+					\item check if they are all HIT
+					\item if at least one MISS issue all the requests
+						to \texttt{mem\_if}
+					\item access BRAM
+					\item write all the responses
+				\end{enumerate}
+				\pause
+				\begin{itemize}
+					\item cache addressing mode converted to an
+						associative one
+					\item possibly implement \texttt{core}
+						at RTL to have full control
+						on scheduling
+				\end{itemize}
+		\end{itemize}
+	\end{minipage}
+	\onslide<1->
+	\begin{minipage}{.28\textwidth}
+		\begin{center}
+			\includegraphics[width=.9\textwidth,height=.9\textheight,keepaspectratio]{multiport_arch.pdf}
+		\end{center}
+	\end{minipage}
+\end{frame}
 
 \end{document}
 
