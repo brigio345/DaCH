@@ -36,16 +36,17 @@
 \section{Introduction}
 \subsection{Motivation}
 \begin{frame}{Motivation}
-	\begin{itemize}
+	\begin{itemize}[<+->]
 		\item \textbf{Problem}:\\
 			big arrays mapped to \highlight{DRAM} $\Rightarrow$
 			performance \highlight{bottlenecks}
 		\item \textbf{Proposed solution}:\\
 			cache module designed to:
-			\begin{itemize}
+			\begin{itemize}[<.->]
 				\item exploit \highlight{BRAMs}
 				\item \highlight{easily integrable} into any
 					\emph{Vitis HLS} design
+				\item have an \highlight{hit ratio}
 			\end{itemize}
 	\end{itemize}
 \end{frame}
@@ -62,6 +63,7 @@
 
 		\begin{itemize}
 			\item straightforward architecture
+			\item one cache per array
 			\item cache logic mixed with application logic
 			\item single-port only
 		\end{itemize}
@@ -79,6 +81,7 @@
 			Array access $\rightarrow$ Request to separate module
 		\end{center}
 		\begin{itemize}
+			\item one cache per array
 			\item decoupling between application and cache logic
 				(communication through FIFOs)
 			\item may support multiple ports (work in progress)
@@ -281,8 +284,7 @@
 			\begin{itemize}
 				\item \texttt{core}: \texttt{II=1}
 				\item \texttt{mem\_if}: \texttt{II=1} when cache
-					line (in bits) is smaller or equal than
-					the maximum AXI interface bitwidth (512 bits),
+					line fits in a single AXI request (maximum 512 bits),
 					\texttt{II=2} otherwise
 			\end{itemize}
 		\item \textbf{L1 HIT}: latency of 1 cycle
