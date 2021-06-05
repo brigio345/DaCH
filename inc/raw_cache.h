@@ -2,6 +2,7 @@
 #define RAW_CACHE_H
 
 #include "ap_int.h"
+#include "ap_utils.h"
 #include "hls_vector.h"
 #include "address.h"
 
@@ -26,10 +27,16 @@ class raw_cache {
 #pragma HLS inline
 			raw_addr_t addr(addr_main);
 
-			if (hit(addr)) {
+			bool is_hit = hit(addr);
+
+			if (is_hit) {
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
 					line[off] = _line[off];
-			} else {
+			}
+
+			ap_wait();	
+
+			if (!is_hit) {
 				T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
 					line[off] = main_line[off];
