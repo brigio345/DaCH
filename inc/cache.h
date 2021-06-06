@@ -27,7 +27,7 @@ class cache {
 				"N_LINES must be a power of 2");
 		static_assert(((1 << OFF_SIZE) == N_ENTRIES_PER_LINE),
 				"N_ENTRIES_PER_LINE must be a power of 2");
-		static_assert(((MAIN_SIZE > (N_LINES * N_ENTRIES_PER_LINE)) && (TAG_SIZE > 0)),
+		static_assert((MAIN_SIZE >= (N_LINES * N_ENTRIES_PER_LINE)),
 				"N_LINES and/or N_ENTRIES_PER_LINE are too big for the specified MAIN_SIZE");
 		static_assert(((MAIN_SIZE % N_ENTRIES_PER_LINE) == 0),
 				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
@@ -78,7 +78,7 @@ class cache {
 		hls::stream<mem_req_t, 128> _if_request;
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
-		ap_uint<TAG_SIZE> _tag[N_LINES];
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		l1_cache_t _l1_cache_get;
 		raw_cache_t _raw_cache_core;
