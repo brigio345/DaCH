@@ -3,14 +3,16 @@
 
 #include "ap_int.h"
 #include "ap_utils.h"
+#include "hls_vector.h"
 #include "address.h"
 
-template <typename T, typename line_t, size_t ADDR_SIZE, size_t TAG_SIZE, size_t N_ENTRIES_PER_LINE>
+template <typename T, size_t ADDR_SIZE, size_t TAG_SIZE, size_t N_ENTRIES_PER_LINE>
 class raw_cache {
 	private:
 		static const size_t OFF_SIZE = (ADDR_SIZE - TAG_SIZE);
 
 		typedef address<ADDR_SIZE, TAG_SIZE, 0> raw_addr_t;
+		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
 
 		bool _valid;
 		line_t _line;
@@ -29,7 +31,7 @@ class raw_cache {
 
 			if (is_hit) {
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-					line.v[off] = _line.v[off];
+					line[off] = _line[off];
 			}
 
 			ap_wait();	
@@ -37,7 +39,7 @@ class raw_cache {
 			if (!is_hit) {
 				T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-					line.v[off] = main_line[off];
+					line[off] = main_line[off];
 			}
 		}
 
@@ -47,7 +49,7 @@ class raw_cache {
 
 			T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-				main_line[off] = _line.v[off] = line.v[off];
+				main_line[off] = _line[off] = line[off];
 			
 			_tag = addr._tag;
 			_valid = true;
