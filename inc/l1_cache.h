@@ -22,14 +22,14 @@ class l1_cache {
 			l1_addr_t addr(addr_main);
 
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-				line[off] = _line[off];
+				line.v[off] = _line.v[off];
 
 			return hit(addr);
 		}
 
 		void fill_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-				_line[off] = line[off];
+				_line.v[off] = line.v[off];
 			l1_addr_t addr(addr_main);
 			_valid = true;
 			_tag = addr._tag;

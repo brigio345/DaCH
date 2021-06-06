@@ -6,7 +6,6 @@
 #include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
-#include "hls_vector.h"
 #include "ap_int.h"
 #include "ap_utils.h"
 #include "utils.h"
@@ -34,10 +33,12 @@ class cache {
 				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
-		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
+		typedef struct {
+			T v[N_ENTRIES_PER_LINE];
+		} line_t;
 		typedef l1_cache<line_t, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
 				N_ENTRIES_PER_LINE> l1_cache_t;
-		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
+		typedef raw_cache<T, line_t, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
 				N_ENTRIES_PER_LINE> raw_cache_t;
 
 		typedef enum {
@@ -159,7 +160,7 @@ class cache {
 			get_line(addr_main, line);
 #endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
 			addr_t addr(addr_main);
-			return line[addr._off];
+			return line.v[addr._off];
 		}
 
 #if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
@@ -230,7 +231,7 @@ CORE_LOOP:		while (1) {
 
 				if (write) {
 					if (is_hit) {
-						line[addr._off] = req.data;
+						line.v[addr._off] = req.data;
 						_raw_cache_core.set_line(_cache_mem, addr._addr_cache, line);
 					}
 					_dirty[addr._line] = true;
@@ -303,7 +304,7 @@ MEM_IF_LOOP:		while (1) {
 			_fill_data.read(line);
 
 			if (write)
-				line[addr._off] = data;
+				line.v[addr._off] = data;
 
 			_raw_cache_core.set_line(_cache_mem, addr._addr_cache_first_of_line, line);
 
