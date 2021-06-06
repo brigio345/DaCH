@@ -6,13 +6,15 @@
 #include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
-#include "hls_vector.h"
 #include "ap_int.h"
 #include "ap_utils.h"
 #include "utils.h"
-#ifndef __SYNTHESIS__
+#if (defined(__SYNTHESIS__))
+#include "hls_vector.h"
+#else
 #include <thread>
-#endif /* __SYNTHESIS__ */
+#include <array>
+#endif /* (defined(__SYNTHESIS__)) */
 
 // direct mapping, write back
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t MAIN_SIZE,
@@ -34,7 +36,11 @@ class cache {
 				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
+#if (defined(__SYNTHESIS__))
 		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
+#else
+		typedef std::array<T, N_ENTRIES_PER_LINE> line_t;
+#endif /* (defined(__SYNTHESIS__)) */
 		typedef l1_cache<line_t, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
 				N_ENTRIES_PER_LINE> l1_cache_t;
 		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
@@ -247,7 +253,7 @@ CORE_LOOP:		while (1) {
 				flush();
 
 			ap_wait();
-			_if_request.write({false, false, 0, 0, 0});
+			_if_request.write({false, false, 0, 0, line});
 		}
 
 		void run_mem_if(T *main_mem) {
