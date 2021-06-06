@@ -44,6 +44,16 @@ class cache {
 			READ_REQ, WRITE_REQ, STOP_REQ
 		} request_type_t;
 
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+	public:
+		typedef int hit_status_t;
+#define MISS 0
+#define HIT 1
+#define L1_HIT 2
+
+	private:
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+
 		typedef struct {
 			ap_uint<ADDR_SIZE> addr_main;
 			request_type_t type;
@@ -60,6 +70,9 @@ class cache {
 
 		hls::stream<line_t, 128> _rd_data;
 		hls::stream<request_t, 128> _request;
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+		hls::stream<hit_status_t, 128> _hit_status;
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
 		hls::stream<line_t, 128> _fill_data;
 		hls::stream<mem_req_t, 128> _if_request;
 		bool _valid[N_LINES];
@@ -99,7 +112,13 @@ class cache {
 			_request.write({0, STOP_REQ, 0});
 		}
 
-		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line,
+				hit_status_t &hit_status)
+#else
+		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line)
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+		{
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			if (addr_main >= MAIN_SIZE) {
@@ -113,20 +132,43 @@ class cache {
 				_request.write({addr_main, READ_REQ, 0});
 				ap_wait_n(6);
 				_rd_data.read(line);
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+				_hit_status.read(hit_status);
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
 
 				_l1_cache_get.fill_line(addr_main, line);
 			}
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+			else {
+				hit_status = L1_HIT;
+			}
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
 		}
 
-		T get(ap_uint<ADDR_SIZE> addr_main) {
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+		T get(ap_uint<ADDR_SIZE> addr_main, hit_status_t &hit_status)
+#else
+		T get(ap_uint<ADDR_SIZE> addr_main)
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+		{
 #pragma HLS inline
 			line_t line;
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+			get_line(addr_main, line, hit_status);
+#else
 			get_line(addr_main, line);
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
 			addr_t addr(addr_main);
 			return line[addr._off];
 		}
 
-		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+		void set(ap_uint<ADDR_SIZE> addr_main, T data,
+				hit_status_t &hit_status)
+#else
+		void set(ap_uint<ADDR_SIZE> addr_main, T data)
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+		{
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			if (addr_main >= MAIN_SIZE) {
@@ -139,6 +181,9 @@ class cache {
 			_l1_cache_get.invalidate_line(addr_main);
 
 			_request.write({addr_main, WRITE_REQ, data});
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+			_hit_status.read(hit_status);
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
 		}
 
 
@@ -148,10 +193,6 @@ class cache {
 			request_t req;
 			line_t line;
 			T data;
-#ifdef __PROFILE__
-			int n_requests = 0;
-			int n_hits = 0;
-#endif /* __PROFILE__ */
 
 			// invalidate all cache lines
 			for (int line = 0; line < N_LINES; line++)
@@ -179,12 +220,6 @@ CORE_LOOP:		while (1) {
 				addr_t addr(req.addr_main);
 
 				bool is_hit = hit(addr);
-
-#ifdef __PROFILE__
-				n_requests++;
-				if (is_hit)
-					n_hits++;
-#endif /* __PROFILE__ */
 				bool write = ((WR_ENABLED && (req.type == WRITE_REQ)) ||
 							(!RD_ENABLED));
 
@@ -202,13 +237,11 @@ CORE_LOOP:		while (1) {
 				} else {
 					_rd_data.write(line);
 				}
-			}
 
-#ifdef __PROFILE__
-			printf("hit ratio = %.3f (%d / %d)\n",
-					(n_hits / ((float) n_requests)),
-					n_hits, n_requests);
-#endif /* __PROFILE__ */
+#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+				_hit_status.write(is_hit ? HIT : MISS);
+#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+			}
 
 			if (WR_ENABLED)
 				flush();
