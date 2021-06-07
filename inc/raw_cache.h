@@ -4,11 +4,11 @@
 #include "ap_int.h"
 #include "ap_utils.h"
 #include "address.h"
-#if (defined(__SYNTHESIS__))
+#ifdef __SYNTHESIS__
 #include "hls_vector.h"
 #else
 #include <array>
-#endif /* (defined(__SYNTHESIS__)) */
+#endif /* __SYNTHESIS__ */
 
 template <typename T, size_t ADDR_SIZE, size_t TAG_SIZE, size_t N_ENTRIES_PER_LINE>
 class raw_cache {
@@ -16,11 +16,11 @@ class raw_cache {
 		static const size_t OFF_SIZE = (ADDR_SIZE - TAG_SIZE);
 
 		typedef address<ADDR_SIZE, TAG_SIZE, 0> raw_addr_t;
-#if (defined(__SYNTHESIS__))
+#ifdef __SYNTHESIS__
 		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
 #else
 		typedef std::array<T, N_ENTRIES_PER_LINE> line_t;
-#endif /* (defined(__SYNTHESIS__)) */
+#endif /* __SYNTHESIS__ */
 
 		bool _valid;
 		line_t _line;

@@ -9,12 +9,12 @@
 #include "ap_int.h"
 #include "ap_utils.h"
 #include "utils.h"
-#if (defined(__SYNTHESIS__))
+#ifdef __SYNTHESIS__
 #include "hls_vector.h"
 #else
 #include <thread>
 #include <array>
-#endif /* (defined(__SYNTHESIS__)) */
+#endif /* __SYNTHESIS__ */
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 #define __PROFILE__
