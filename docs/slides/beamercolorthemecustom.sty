@@ -1,0 +1,71 @@
+% Copyright 2007 by Till Tantau
+% Copyright 2012,2015 by Vedran Mileti\'c, Joseph Wright
+%
+% This file may be distributed and/or modified
+%
+% 1. under the LaTeX Project Public License and/or
+% 2. under the GNU Public License.
+%
+% See the file doc/licenses/LICENSE for more details.
+
+\mode<presentation>
+
+\definecolor{main}{RGB}{92, 138, 168}
+\definecolor{background}{RGB}{250, 250, 250}
+\definecolor{highlight}{RGB}{180, 0, 0}
+
+\newcommand{\highlight}[1]{\textcolor{highlight}{#1}}
+
+\setbeamercolor*{normal text}{fg=main,bg=background}
+\setbeamercolor{titlelike}{fg=main, bg=background}
+\setbeamercolor{frametitle}{parent={titlelike}}
+\setbeamercolor{itemize item}{fg=main}
+\setbeamercolor{itemize subitem}{fg=main}
+\setbeamercolor{itemize subsubitem}{fg=main}
+\setbeamercolor*{alerted text}{fg=alert}
+\setbeamercolor*{example text}{fg=black}
+\setbeamercolor*{structure}{fg=black}
+
+\providecommand*{\beamer@bftext@only}{%
+  \relax
+  \ifmmode
+    \expandafter\beamer@bftext@warning
+  \else
+    \expandafter\bfseries
+  \fi
+}
+\providecommand*{\beamer@bftext@warning}{%
+  \ClassWarning{beamer}
+    {Cannot use bold for alerted text in math mode}%
+}
+
+\setbeamerfont{alerted text}{series=\beamer@bftext@only}
+
+\setbeamercolor*{palette primary}{fg=black,bg=main!60}
+\setbeamercolor*{palette secondary}{fg=black,bg=main!70}
+\setbeamercolor*{palette tertiary}{fg=black,bg=main!80}
+\setbeamercolor*{palette quaternary}{fg=black,bg=main!90}
+
+\setbeamercolor{sidebar}{bg=black!20}
+
+\setbeamercolor*{palette sidebar primary}{fg=black}
+\setbeamercolor*{palette sidebar secondary}{fg=black}
+\setbeamercolor*{palette sidebar tertiary}{fg=black}
+\setbeamercolor*{palette sidebar quaternary}{fg=black}
+
+\setbeamercolor*{item projected}{fg=background,bg=main}
+
+\setbeamercolor*{block title}{fg=black,bg=black!20}
+\setbeamercolor*{block title alerted}{fg=black,bg=black!20}
+\setbeamercolor*{block title example}{fg=black,bg=black!20}
+
+\setbeamercolor*{block body}{fg=black,bg=black!10}
+\setbeamercolor*{block body alerted}{fg=black,bg=black!10}
+\setbeamercolor*{block body example}{fg=black,bg=black!10}
+
+
+\setbeamercolor*{separation line}{}
+\setbeamercolor*{fine separation line}{}
+
+\mode
+<all>

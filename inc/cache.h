@@ -1,217 +1,350 @@
 #ifndef CACHE_H
 #define CACHE_H
 
-#include "stream_dep.h"
+#include "address.h"
+#include "l1_cache.h"
+#include "raw_cache.h"
+#define HLS_STREAM_THREAD_SAFE
+#include "hls_stream.h"
 #include "ap_int.h"
+#include "ap_utils.h"
+#include "utils.h"
+#ifdef __SYNTHESIS__
+#include "hls_vector.h"
+#else
+#include <thread>
+#include <array>
+#endif /* __SYNTHESIS__ */
+
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#define __PROFILE__
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 // direct mapping, write back
-// TODO: support different policies through virtual functions
-// TODO: use more friendly template parameters:
-// 	LINE_SIZE -> N_LINES; TAG_SIZE -> CACHE_LINE_SIZE
-template <typename T, size_t ADDR_SIZE = 32, size_t TAG_SIZE = 28, size_t LINE_SIZE = 2,
-		size_t RD_PORTS = 1, size_t WR_PORTS = 1>
+template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t MAIN_SIZE,
+	 size_t N_LINES, size_t N_ENTRIES_PER_LINE>
 class cache {
 	private:
+		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
+		static const size_t LINE_SIZE = utils::log2_ceil(N_LINES);
+		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
+		static const size_t TAG_SIZE = (ADDR_SIZE - (LINE_SIZE + OFF_SIZE));
+
+		static_assert(((1 << LINE_SIZE) == N_LINES),
+				"N_LINES must be a power of 2");
+		static_assert(((1 << OFF_SIZE) == N_ENTRIES_PER_LINE),
+				"N_ENTRIES_PER_LINE must be a power of 2");
+		static_assert((MAIN_SIZE >= (N_LINES * N_ENTRIES_PER_LINE)),
+				"N_LINES and/or N_ENTRIES_PER_LINE are too big for the specified MAIN_SIZE");
+		static_assert(((MAIN_SIZE % N_ENTRIES_PER_LINE) == 0),
+				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
+
+		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
+#ifdef __SYNTHESIS__
+		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
+#else
+		typedef std::array<T, N_ENTRIES_PER_LINE> line_t;
+#endif /* __SYNTHESIS__ */
+		typedef l1_cache<line_t, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
+				N_ENTRIES_PER_LINE> l1_cache_t;
+		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
+				N_ENTRIES_PER_LINE> raw_cache_t;
+
 		typedef enum {
-			READ_E, WRITE_E, EOR_E
+			READ_REQ, WRITE_REQ, STOP_REQ
 		} request_type_t;
 
+	public:
+		typedef int hit_status_t;
+#define MISS 0
+#define HIT 1
+#define L1_HIT 2
+
+	private:
 		typedef struct {
 			ap_uint<ADDR_SIZE> addr_main;
 			request_type_t type;
+			T data;
 		} request_t;
 
-		static const size_t N_PORTS = RD_PORTS + WR_PORTS;
-		static const size_t OFF_SIZE = ADDR_SIZE - (TAG_SIZE + LINE_SIZE);
-		static const size_t N_LINES = 1 << LINE_SIZE;
-		static const size_t N_ENTRIES_PER_LINE = 1 << OFF_SIZE;
+		typedef struct {
+			bool fill;
+			bool spill;
+			ap_uint<ADDR_SIZE> fill_addr;
+			ap_uint<ADDR_SIZE> spill_addr;
+			line_t line;
+		} mem_req_t;
 
-		stream_dep<T> _rd_data[RD_PORTS];
-		stream_dep<T> _wr_data[WR_PORTS];
-		stream_dep<request_t> _request[N_PORTS];
-		ap_uint<N_LINES> _valid;
-		ap_uint<N_LINES> _dirty;
-		ap_uint<TAG_SIZE> _tag[N_LINES];
+		hls::stream<line_t, 128> _rd_data;
+		hls::stream<request_t, 128> _request;
+#ifdef __PROFILE__
+		hls::stream<hit_status_t, 128> _hit_status;
+#endif /* __PROFILE__ */
+		hls::stream<line_t, 128> _fill_data;
+		hls::stream<mem_req_t, 128> _if_request;
+		bool _valid[N_LINES];
+		bool _dirty[N_LINES];
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> _tag[N_LINES];
 		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
-		T * const _main_mem;
-		bool _dep;
-		int _req_port;
+		l1_cache_t _l1_cache_get;
+		raw_cache_t _raw_cache_core;
 
 	public:
-		cache(T * const main_mem): _main_mem(main_mem) {
+		cache() {
+#pragma HLS array_partition variable=_valid complete dim=1
+#pragma HLS array_partition variable=_dirty complete dim=1
 #pragma HLS array_partition variable=_tag complete dim=1
-#pragma HLS array_partition variable=_cache_mem complete dim=1
-#pragma HLS stream depth=RD_PORTS variable=_rd_data
-#pragma HLS stream depth=WR_PORTS variable=_wr_data
-#pragma HLS stream depth=N_PORTS variable=_request
-			// invalidate all cache lines
-			_valid = 0;
-			_req_port = 0;
+#pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 		}
 
-		~cache() {
-			flush();
+		void init() {
+			_l1_cache_get.init();
 		}
 
-		void operate() {
+		void run(T *main_mem) {
 #pragma HLS inline
-			int req_port = 0;
-			int rd_port = 0;
-			int wr_port = 0;
-			request_t req;
-			T data;
+#ifdef __SYNTHESIS__
+			run_core();
+			run_mem_if(main_mem);
+#else
+			std::thread core_thd(&cache::run_core, this);
+			std::thread mem_if_thd(&cache::run_mem_if, this, main_mem);
 
-OPERATE_LOOP:		while (1) {
-#pragma HLS pipeline
-				// get request
-				_request[req_port].read(req);
-				// stop if request is "end-of-request"
-				if (req.type == EOR_E)
-					break;
-
-				// extract information from address
-				address addr(req.addr_main);
-
-				// prepare the cache for accessing addr
-				// (load the line if not present)
-				if (!hit(addr))
-					fill(addr);
-
-				if (req.type == READ_E) {
-					// read data from cache
-					data = _cache_mem[addr._addr_cache];
-
-					// send read data
-					_rd_data[rd_port].write(data);
-
-					rd_port = (rd_port + 1) % RD_PORTS;
-				} else {
-					// store received data to cache
-					_wr_data[wr_port].read(data);
-					_cache_mem[addr._addr_cache] = data;
-
-					_dirty[addr._line] = true;
-
-					wr_port = (wr_port + 1) % WR_PORTS;
-				}
-
-				req_port = (req_port + 1) % N_PORTS;
-			}
+			core_thd.join();
+			mem_if_thd.join();
+#endif /* __SYNTHESIS__ */
 		}
 
-		void stop_operation() {
-			for (int port = 0; port < N_PORTS; port++) {
-#pragma HLS unroll
-				_request[port].write((request_t){0, EOR_E});
+		void stop() {
+			_request.write({0, STOP_REQ, 0});
+		}
+
+		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line,
+				hit_status_t &hit_status) {
+#pragma HLS inline
+#ifndef __SYNTHESIS__
+			if (addr_main >= MAIN_SIZE) {
+				throw std::out_of_range("cache::get: address " +
+						std::to_string(addr_main) +
+						" is out of range");
 			}
+#endif /* __SYNTHESIS__ */
+
+			if (!_l1_cache_get.get_line(addr_main, line)) {
+				_request.write({addr_main, READ_REQ, 0});
+				ap_wait_n(6);
+				_rd_data.read(line);
+#ifdef __PROFILE__
+				_hit_status.read(hit_status);
+#endif /* __PROFILE__ */
+
+				_l1_cache_get.fill_line(addr_main, line);
+			}
+#ifdef __PROFILE__
+			else {
+				hit_status = L1_HIT;
+			}
+#endif /* __PROFILE__ */
+		}
+
+		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+			hit_status_t dummy;
+
+			get_line(addr_main, line, dummy);
+		}
+
+		T get(ap_uint<ADDR_SIZE> addr_main, hit_status_t &hit_status) {
+#pragma HLS inline
+			line_t line;
+			get_line(addr_main, line, hit_status);
+			addr_t addr(addr_main);
+
+			return line[addr._off];
+		}
+
+		T get(ap_uint<ADDR_SIZE> addr_main) {
+#pragma HLS inline
+			hit_status_t dummy;
+
+			return get(addr_main, dummy);
+		}
+
+		void set(ap_uint<ADDR_SIZE> addr_main, T data,
+				hit_status_t &hit_status) {
+#pragma HLS inline
+#ifndef __SYNTHESIS__
+			if (addr_main >= MAIN_SIZE) {
+				throw std::out_of_range("cache::set: address " +
+						std::to_string(addr_main) +
+						" is out of range");
+			}
+#endif /* __SYNTHESIS__ */
+
+			_l1_cache_get.invalidate_line(addr_main);
+
+			_request.write({addr_main, WRITE_REQ, data});
+#ifdef __PROFILE__
+			_hit_status.read(hit_status);
+#endif /* __PROFILE__ */
+		}
+
+		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
+			hit_status_t dummy;
+
+			set(addr_main, data, dummy);
 		}
 
 	private:
-		class address {
-			private:
-				static const unsigned int TAG_HIGH = ADDR_SIZE - 1;
-				static const unsigned int TAG_LOW = TAG_HIGH - TAG_SIZE + 1;
-				static const unsigned int LINE_HIGH = TAG_LOW - 1;
-				static const unsigned int LINE_LOW = LINE_HIGH - LINE_SIZE + 1;
-				static const unsigned int OFF_HIGH = LINE_LOW - 1;
-				static const unsigned int OFF_LOW = 0;
+		void run_core() {
+#pragma HLS inline off
+			request_t req;
+			line_t line;
+			T data;
 
-			public:
-				ap_uint<ADDR_SIZE> _addr_main;
-				ap_uint<ADDR_SIZE> _addr_main_first_of_line;
-				ap_uint<ADDR_SIZE> _addr_cache;
-				ap_uint<ADDR_SIZE> _addr_cache_first_of_line;
-				ap_uint<TAG_SIZE> _tag;
-				ap_uint<LINE_SIZE> _line;
-				ap_uint<OFF_SIZE> _off;
+			// invalidate all cache lines
+			for (int line = 0; line < N_LINES; line++)
+				_valid[line] = false;
 
-				address(ap_uint<ADDR_SIZE> addr_main): _addr_main(addr_main) {
-					_tag = addr_main.range(TAG_HIGH, TAG_LOW);
-					_line = addr_main.range(LINE_HIGH, LINE_LOW);
-					_off = addr_main.range(OFF_HIGH, OFF_LOW);
-					_addr_cache = _line * N_ENTRIES_PER_LINE + _off;
-					_addr_cache_first_of_line = _addr_cache - _off;
-					_addr_main_first_of_line = addr_main - _off;
+			_raw_cache_core.init();
+
+CORE_LOOP:		while (1) {
+#pragma HLS pipeline
+#pragma HLS dependence variable=_cache_mem distance=1 inter RAW false
+#ifdef __SYNTHESIS__
+				// make pipeline flushable
+				if (!_request.read_nb(req))
+					continue;
+#else
+				// get request
+				_request.read(req);
+#endif /* __SYNTHESIS__ */
+
+				// stop if request is "end-of-request"
+				if (req.type == STOP_REQ)
+					break;
+
+				// extract information from address
+				addr_t addr(req.addr_main);
+
+				bool is_hit = hit(addr);
+				bool write = ((WR_ENABLED && (req.type == WRITE_REQ)) ||
+							(!RD_ENABLED));
+
+				if (is_hit)
+					_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
+				else
+					fill(addr, write, req.data, line);
+
+				if (write) {
+					if (is_hit) {
+						line[addr._off] = req.data;
+						_raw_cache_core.set_line(_cache_mem, addr._addr_cache, line);
+					}
+					_dirty[addr._line] = true;
+				} else {
+					_rd_data.write(line);
 				}
 
-				static address build(ap_uint<TAG_SIZE> tag,
-						ap_uint<LINE_SIZE> line,
-						ap_uint<OFF_SIZE> off = 0) {
-					return address((tag, line, off));
-				}
-		};
+#ifdef __PROFILE__
+				_hit_status.write(is_hit ? HIT : MISS);
+#endif /* __PROFILE__ */
+			}
 
-		inline bool hit(address addr) {
+			if (WR_ENABLED)
+				flush();
+
+			ap_wait();
+			_if_request.write({false, false, 0, 0, line});
+		}
+
+		void run_mem_if(T *main_mem) {
+			mem_req_t req;
+			T *main_line;
+			line_t line;
+			raw_cache_t raw_cache_mem_if;
+			raw_cache_mem_if.init();
+			
+MEM_IF_LOOP:		while (1) {
+#pragma HLS pipeline
+#pragma HLS dependence variable=main_mem distance=1 inter RAW false
+#ifdef __SYNTHESIS__
+				if (!_if_request.read_nb(req))
+					continue;
+#else
+				_if_request.read(req);
+#endif /* __SYNTHESIS__ */
+
+				if (!req.fill && !req.spill)
+					break;
+
+				if (req.fill) {
+					raw_cache_mem_if.get_line(main_mem, req.fill_addr, line);
+					_fill_data.write(line);
+				}
+				
+				if (WR_ENABLED && req.spill) {
+					raw_cache_mem_if.set_line(main_mem, req.spill_addr, req.line);
+				}
+			}
+		}
+
+		inline bool hit(addr_t addr) {
 			return (_valid[addr._line] && (addr._tag == _tag[addr._line]));
 		}
 
 		// load line from main to cache memory
 		// (taking care of writing back dirty lines)
-		void fill(address addr) {
+		void fill(addr_t addr, bool write, T data, line_t &line) {
 #pragma HLS inline
-			if (_valid[addr._line] && _dirty[addr._line])
-				spill(address::build(_tag[addr._line], addr._line));
-
-FILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS unroll
-				_cache_mem[addr._addr_cache_first_of_line + off] =
-					_main_mem[addr._addr_main_first_of_line + off];
+			bool do_spill = false;
+			addr_t spill_addr(_tag[addr._line], addr._line, 0);
+			if (WR_ENABLED && _valid[addr._line] && _dirty[addr._line]) {
+				spill_core(spill_addr, line);
+				do_spill = true;
 			}
+
+			_if_request.write({true, do_spill, addr._addr_main, 
+					spill_addr._addr_main, line});
+			ap_wait();
+
+			_fill_data.read(line);
+
+			if (write)
+				line[addr._off] = data;
+
+			_raw_cache_core.set_line(_cache_mem, addr._addr_cache_first_of_line, line);
 
 			_tag[addr._line] = addr._tag;
 			_valid[addr._line] = true;
 			_dirty[addr._line] = false;
 		}
 
-		// store line from cache to main memory
-		void spill(address addr) {
+		void spill_core(addr_t addr, line_t &line) {
 #pragma HLS inline
-SPILL_LOOP:		for (int off = 0; off < N_ENTRIES_PER_LINE; off++) {
-#pragma HLS unroll
-				_main_mem[addr._addr_main_first_of_line + off] =
-					_cache_mem[addr._addr_cache_first_of_line + off];
-			}
-
+			_raw_cache_core.get_line(_cache_mem, addr._addr_cache_first_of_line, line);
 			_dirty[addr._line] = false;
+		}
+
+		// store line from cache to main memory
+		void spill(addr_t addr) {
+#pragma HLS inline
+			line_t line;
+
+			spill_core(addr, line);
+
+			_if_request.write({false, true, 0, addr._addr_main, line});
 		}
 
 		// store all valid dirty lines from cache to main memory
 		void flush() {
 #pragma HLS inline
 FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
-#pragma HLS pipeline
 				if (_valid[line] && _dirty[line])
-					spill(address::build(_tag[line], line, 0));
+					spill(addr_t(_tag[line], line, 0));
 			}
 		}
 
-		T get(ap_uint<ADDR_SIZE> addr_main) {
-#pragma HLS inline
-			static int rd_port = 0;
-			T data;
-
-			_dep = _request[_req_port].write_dep(
-				(request_t){addr_main, READ_E}, _dep);
-			_dep = _rd_data[rd_port].read_dep(data, _dep);
-
-			rd_port = (rd_port + 1) % RD_PORTS;
-			_req_port = (_req_port + 1) % N_PORTS;
-
-			return data;
-		}
-
-		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
-#pragma HLS inline
-			static int wr_port = 0;
-
-			_dep = _request[_req_port].write_dep(
-				(request_t){addr_main, WRITE_E}, _dep);
-			_dep = _wr_data[wr_port].write_dep(data, _dep);
-
-			wr_port = (wr_port + 1) % WR_PORTS;
-			_req_port = (_req_port + 1) % N_PORTS;
-		}
-
+#ifndef __SYNTHESIS__
 		class inner {
 			private:
 				cache *_cache;
@@ -236,6 +369,7 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 #pragma HLS inline
 			return inner(this, addr_main);
 		}
+#endif /* __SYNTHESIS__ */
 };
 
 #endif /* CACHE_H */

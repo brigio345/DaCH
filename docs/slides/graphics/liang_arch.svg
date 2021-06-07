@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="50.02187mm"
+   height="61.928123mm"
+   viewBox="0 0 50.02187 61.928123"
+   version="1.1"
+   id="svg8"
+   inkscape:version="1.0.2 (e86c870879, 2021-01-15, custom)"
+   sodipodi:docname="liang_arch.svg">
+  <defs
+     id="defs2">
+    <marker
+       style="overflow:visible"
+       id="marker2197"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="TriangleOutL"
+       inkscape:isstock="true">
+      <path
+         transform="scale(0.8)"
+         style="fill:#5c8aa8;fill-opacity:1;fill-rule:evenodd;stroke:#5c8aa8;stroke-width:1pt;stroke-opacity:1"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path2195" />
+    </marker>
+    <inkscape:path-effect
+       effect="fillet_chamfer"
+       id="path-effect1224"
+       is_visible="true"
+       lpeversion="1"
+       satellites_param="F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1"
+       unit="px"
+       method="auto"
+       mode="F"
+       radius="10"
+       chamfer_steps="1"
+       flexible="false"
+       use_knot_distance="true"
+       apply_no_radius="true"
+       apply_with_radius="true"
+       only_selected="false"
+       hide_knots="false" />
+    <inkscape:path-effect
+       effect="fillet_chamfer"
+       id="path-effect1156"
+       is_visible="true"
+       lpeversion="1"
+       satellites_param="F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1"
+       unit="px"
+       method="auto"
+       mode="F"
+       radius="10"
+       chamfer_steps="1"
+       flexible="false"
+       use_knot_distance="true"
+       apply_no_radius="true"
+       apply_with_radius="true"
+       only_selected="false"
+       hide_knots="false" />
+    <inkscape:path-effect
+       effect="fillet_chamfer"
+       id="path-effect934"
+       is_visible="true"
+       lpeversion="1"
+       satellites_param="F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1"
+       unit="px"
+       method="auto"
+       mode="F"
+       radius="10"
+       chamfer_steps="1"
+       flexible="false"
+       use_knot_distance="true"
+       apply_no_radius="true"
+       apply_with_radius="true"
+       only_selected="false"
+       hide_knots="false" />
+    <inkscape:path-effect
+       effect="fillet_chamfer"
+       id="path-effect1425"
+       is_visible="true"
+       lpeversion="1"
+       satellites_param="F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1"
+       unit="px"
+       method="auto"
+       mode="F"
+       radius="10"
+       chamfer_steps="1"
+       flexible="false"
+       use_knot_distance="true"
+       apply_no_radius="true"
+       apply_with_radius="true"
+       only_selected="false"
+       hide_knots="false" />
+    <inkscape:path-effect
+       effect="fillet_chamfer"
+       id="path-effect1423"
+       is_visible="true"
+       lpeversion="1"
+       satellites_param="F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1"
+       unit="px"
+       method="auto"
+       mode="F"
+       radius="10"
+       chamfer_steps="1"
+       flexible="false"
+       use_knot_distance="true"
+       apply_no_radius="true"
+       apply_with_radius="true"
+       only_selected="false"
+       hide_knots="false" />
+    <inkscape:path-effect
+       effect="fillet_chamfer"
+       id="path-effect1421"
+       is_visible="true"
+       lpeversion="1"
+       satellites_param="F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1 @ F,0,0,1,0,2.6458333,0,1"
+       unit="px"
+       method="auto"
+       mode="F"
+       radius="10"
+       chamfer_steps="1"
+       flexible="false"
+       use_knot_distance="true"
+       apply_no_radius="true"
+       apply_with_radius="true"
+       only_selected="false"
+       hide_knots="false" />
+    <marker
+       style="overflow:visible"
+       id="TriangleInL"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="TriangleInL"
+       inkscape:isstock="true">
+      <path
+         transform="scale(-0.8)"
+         style="fill:#5c8aa8;fill-opacity:1;fill-rule:evenodd;stroke:#5c8aa8;stroke-width:1pt;stroke-opacity:1"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path1022" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="TriangleInL-1"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="TriangleInL"
+       inkscape:isstock="true">
+      <path
+         transform="scale(-0.8)"
+         style="fill:#5c8aa8;fill-opacity:1;fill-rule:evenodd;stroke:#5c8aa8;stroke-width:1pt;stroke-opacity:1"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path1022-7" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="TriangleOutL-8"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="TriangleOutL"
+       inkscape:isstock="true">
+      <path
+         transform="scale(0.8)"
+         style="fill:#5c8aa8;fill-opacity:1;fill-rule:evenodd;stroke:#5c8aa8;stroke-width:1pt;stroke-opacity:1"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path1031-5" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="TriangleInL-1-2"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="TriangleInL"
+       inkscape:isstock="true">
+      <path
+         transform="scale(-0.8)"
+         style="fill:#5c8aa8;fill-opacity:1;fill-rule:evenodd;stroke:#5c8aa8;stroke-width:1pt;stroke-opacity:1"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path1022-7-9" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="TriangleOutL-8-1"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="TriangleOutL"
+       inkscape:isstock="true">
+      <path
+         transform="scale(0.8)"
+         style="fill:#5c8aa8;fill-opacity:1;fill-rule:evenodd;stroke:#5c8aa8;stroke-width:1pt;stroke-opacity:1"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path1031-5-2" />
+    </marker>
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.979899"
+     inkscape:cx="36.885014"
+     inkscape:cy="126.69906"
+     inkscape:document-units="mm"
+     inkscape:current-layer="layer1"
+     inkscape:document-rotation="0"
+     showgrid="true"
+     lock-margins="true"
+     fit-margin-top="1"
+     fit-margin-left="1"
+     fit-margin-right="1"
+     fit-margin-bottom="1"
+     inkscape:window-width="1366"
+     inkscape:window-height="744"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0">
+    <inkscape:grid
+       type="xygrid"
+       id="grid833"
+       originx="-43.78073"
+       originy="-14.676563" />
+  </sodipodi:namedview>
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-43.780734,-14.676563)">
+    <path
+       style="opacity:0.99;mix-blend-mode:normal;fill:none;fill-opacity:1;stroke:#5c8aa8;stroke-width:0.396875;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:0.996078"
+       id="rect841"
+       width="47.624996"
+       height="42.333332"
+       x="44.979172"
+       y="15.875001"
+       inkscape:path-effect="#path-effect1423"
+       d="m 47.625005,15.875001 42.33333,0 a 2.6458333,2.6458333 45 0 1 2.645833,2.645833 V 55.5625 a 2.6458333,2.6458333 135 0 1 -2.645833,2.645833 H 47.625005 A 2.6458333,2.6458333 45 0 1 44.979172,55.5625 V 18.520834 a 2.6458333,2.6458333 135 0 1 2.645833,-2.645833 z"
+       sodipodi:type="rect" />
+    <text
+       xml:space="preserve"
+       style="font-size:4.23333px;line-height:0.85;font-family:monospace;-inkscape-font-specification:monospace;opacity:0.99;fill:#5c8aa8;fill-opacity:1;stroke-width:0.264583"
+       x="68.842316"
+       y="35.032902"
+       id="text845"><tspan
+         sodipodi:role="line"
+         id="tspan843"
+         x="68.842316"
+         y="35.032902"
+         style="text-align:center;text-anchor:middle;fill:#5c8aa8;fill-opacity:1;stroke-width:0.264583">application</tspan><tspan
+         sodipodi:role="line"
+         x="68.842316"
+         y="38.631233"
+         style="text-align:center;text-anchor:middle;fill:#5c8aa8;fill-opacity:1;stroke-width:0.264583"
+         id="tspan1279">+</tspan><tspan
+         sodipodi:role="line"
+         x="68.842316"
+         y="42.229561"
+         style="text-align:center;text-anchor:middle;fill:#5c8aa8;fill-opacity:1;stroke-width:0.264583"
+         id="tspan1277">cache</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:4.23333px;line-height:0.85;font-family:monospace;-inkscape-font-specification:monospace;fill:#5c8aa8;fill-opacity:1;stroke-width:0.264583"
+       x="63.643669"
+       y="71.657639"
+       id="text851"><tspan
+         sodipodi:role="line"
+         id="tspan849"
+         x="63.643669"
+         y="71.657639"
+         style="fill:#5c8aa8;fill-opacity:1;stroke-width:0.264583">DRAM</tspan></text>
+    <path
+       style="fill:none;stroke:#5c8aa8;stroke-width:0.264583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-start:url(#TriangleInL-1);marker-end:url(#marker2197)"
+       d="M 68.791672,59.266666 V 63.5"
+       id="path887-7" />
+    <text
+       xml:space="preserve"
+       style="font-size:2.82222px;line-height:0.85;font-family:monospace;-inkscape-font-specification:monospace;fill:#5c8aa8;fill-opacity:1;stroke-width:0.264583"
+       x="70.796501"
+       y="62.412037"
+       id="text1377"><tspan
+         sodipodi:role="line"
+         id="tspan1375"
+         x="70.796501"
+         y="62.412037"
+         style="font-size:2.82222px;fill:#5c8aa8;fill-opacity:1;stroke-width:0.264583">AXI</tspan></text>
+    <path
+       style="opacity:1;fill:none;fill-opacity:0.2;stroke:#5c8aa8;stroke-width:0.396875;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:0.996078"
+       id="rect835-3"
+       width="31.749998"
+       height="10.583334"
+       x="52.916672"
+       y="64.822914"
+       inkscape:path-effect="#path-effect934"
+       sodipodi:type="rect"
+       d="m 55.562505,64.822914 h 26.458332 a 2.6458333,2.6458333 45 0 1 2.645833,2.645833 v 5.291668 a 2.6458333,2.6458333 135 0 1 -2.645833,2.645833 H 55.562505 a 2.6458333,2.6458333 45 0 1 -2.645833,-2.645833 l 0,-5.291668 a 2.6458333,2.6458333 135 0 1 2.645833,-2.645833 z" />
+  </g>
+</svg>

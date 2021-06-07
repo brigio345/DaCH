@@ -1,50 +1,71 @@
 #include <iostream>
 #ifndef __SYNTHESIS__
+#define __PROFILE__
 #include <thread>
 #endif	/* __SYNTHESIS__ */
 #include "matrix.h"
 #include "cache.h"
 
-typedef int data_type;
-
-#define N 5
+#define N 4
 #define M 4
-#define P 3
-#define N_PORTS 4
+#define P 8
+
+typedef int data_type;
+typedef cache<data_type, true, false, N * M, 2, M> cache_a;
+typedef cache<data_type, true, false, M * P, M, 4> cache_b;
+typedef cache<data_type, false, true, N * P, 2, M> cache_c;
+
+void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
+#pragma HLS inline off
+	a_cache.init();
+	b_cache.init();
+	c_cache.init();
+
+	matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P>
+			(a_cache, b_cache, c_cache);
+	a_cache.stop();
+	b_cache.stop();
+	c_cache.stop();
+}
 
 extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
 #pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0
 #pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1
 #pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2
-#pragma HLS INTERFACE s_axilite port=a_arr bundle=control
-#pragma HLS INTERFACE s_axilite port=b_arr bundle=control
-#pragma HLS INTERFACE s_axilite port=c_arr bundle=control
-#pragma HLS INTERFACE s_axilite port=return bundle=control
+#pragma HLS stable variable=a_arr
+#pragma HLS stable variable=b_arr
+#pragma HLS stable variable=c_arr
+#pragma HLS INTERFACE ap_ctrl_hs port=return
 
-	cache<data_type> a_cache(a_arr);
-	cache<data_type> b_cache(b_arr);
-	cache<data_type> c_cache(c_arr);
+#pragma HLS dataflow disable_start_propagation
+	cache_a a_cache;
+	cache_b b_cache;
+	cache_c c_cache;
+
 #ifdef __SYNTHESIS__
-	matrix::multiply<cache<data_type> &, N, M, P, N_PORTS>(a_cache, b_cache, c_cache);
-	a_cache.operate();
-	b_cache.operate();
-	c_cache.operate();
+	a_cache.run(a_arr);
+	b_cache.run(b_arr);
+	c_cache.run(c_arr);
+	multiply_syn(a_cache, b_cache, c_cache);
 #else
-	std::thread a_thread(&cache<data_type>::operate, std::ref(a_cache));
-	std::thread b_thread(&cache<data_type>::operate, std::ref(b_cache));
-	std::thread c_thread(&cache<data_type>::operate, std::ref(c_cache));
-	std::thread matmul_thread(&matrix::multiply<cache<data_type> &, N, M, P, N_PORTS>,
+	a_cache.init();
+	b_cache.init();
+	c_cache.init();
+
+	std::thread a_thd(&cache_a::run, std::ref(a_cache), std::ref(a_arr));
+	std::thread b_thd(&cache_b::run, std::ref(b_cache), std::ref(b_arr));
+	std::thread c_thd(&cache_c::run, std::ref(c_cache), std::ref(c_arr));
+	std::thread matmul_thread(&matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P>,
 			std::ref(a_cache), std::ref(b_cache), std::ref(c_cache));
 
 	matmul_thread.join();
 
-	a_cache.stop_operation();
-	b_cache.stop_operation();
-	c_cache.stop_operation();
-
-	a_thread.join();
-	b_thread.join();
-	c_thread.join();
+	a_cache.stop();
+	b_cache.stop();
+	c_cache.stop();
+	a_thd.join();
+	b_thd.join();
+	c_thd.join();
 #endif	/* __SYNTHESIS__ */
 }
 
@@ -60,7 +81,7 @@ int main() {
 	// matrix multiplication with caches
 	matmul_top(a_arr, b_arr, c_arr);
 	// standard matrix multiplication
-	matrix::multiply<data_type *, N, M, P, N_PORTS>(a_arr, b_arr, c_arr_ref);
+	matrix::multiply_ref<N, M, P>(a_arr, b_arr, c_arr_ref);
 
 	std::cout << "A = " << std::endl;
 	matrix::print(a_arr, N, M);
