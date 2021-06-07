@@ -16,6 +16,10 @@
 #include <array>
 #endif /* (defined(__SYNTHESIS__)) */
 
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#define __PROFILE__
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+
 // direct mapping, write back
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t MAIN_SIZE,
 	 size_t N_LINES, size_t N_ENTRIES_PER_LINE>
@@ -36,11 +40,11 @@ class cache {
 				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
 
 		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
-#if (defined(__SYNTHESIS__))
+#ifdef __SYNTHESIS__
 		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
 #else
 		typedef std::array<T, N_ENTRIES_PER_LINE> line_t;
-#endif /* (defined(__SYNTHESIS__)) */
+#endif /* __SYNTHESIS__ */
 		typedef l1_cache<line_t, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
 				N_ENTRIES_PER_LINE> l1_cache_t;
 		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
@@ -50,7 +54,6 @@ class cache {
 			READ_REQ, WRITE_REQ, STOP_REQ
 		} request_type_t;
 
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
 	public:
 		typedef int hit_status_t;
 #define MISS 0
@@ -58,8 +61,6 @@ class cache {
 #define L1_HIT 2
 
 	private:
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
-
 		typedef struct {
 			ap_uint<ADDR_SIZE> addr_main;
 			request_type_t type;
@@ -76,9 +77,9 @@ class cache {
 
 		hls::stream<line_t, 128> _rd_data;
 		hls::stream<request_t, 128> _request;
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+#ifdef __PROFILE__
 		hls::stream<hit_status_t, 128> _hit_status;
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+#endif /* __PROFILE__ */
 		hls::stream<line_t, 128> _fill_data;
 		hls::stream<mem_req_t, 128> _if_request;
 		bool _valid[N_LINES];
@@ -118,13 +119,8 @@ class cache {
 			_request.write({0, STOP_REQ, 0});
 		}
 
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
 		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line,
-				hit_status_t &hit_status)
-#else
-		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line)
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
-		{
+				hit_status_t &hit_status) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			if (addr_main >= MAIN_SIZE) {
@@ -138,43 +134,43 @@ class cache {
 				_request.write({addr_main, READ_REQ, 0});
 				ap_wait_n(6);
 				_rd_data.read(line);
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+#ifdef __PROFILE__
 				_hit_status.read(hit_status);
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+#endif /* __PROFILE__ */
 
 				_l1_cache_get.fill_line(addr_main, line);
 			}
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+#ifdef __PROFILE__
 			else {
 				hit_status = L1_HIT;
 			}
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+#endif /* __PROFILE__ */
 		}
 
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
-		T get(ap_uint<ADDR_SIZE> addr_main, hit_status_t &hit_status)
-#else
-		T get(ap_uint<ADDR_SIZE> addr_main)
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
-		{
+		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+			hit_status_t dummy;
+
+			get_line(addr_main, line, dummy);
+		}
+
+		T get(ap_uint<ADDR_SIZE> addr_main, hit_status_t &hit_status) {
 #pragma HLS inline
 			line_t line;
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
 			get_line(addr_main, line, hit_status);
-#else
-			get_line(addr_main, line);
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
 			addr_t addr(addr_main);
+
 			return line[addr._off];
 		}
 
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+		T get(ap_uint<ADDR_SIZE> addr_main) {
+#pragma HLS inline
+			hit_status_t dummy;
+
+			return get(addr_main, dummy);
+		}
+
 		void set(ap_uint<ADDR_SIZE> addr_main, T data,
-				hit_status_t &hit_status)
-#else
-		void set(ap_uint<ADDR_SIZE> addr_main, T data)
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
-		{
+				hit_status_t &hit_status) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			if (addr_main >= MAIN_SIZE) {
@@ -187,11 +183,16 @@ class cache {
 			_l1_cache_get.invalidate_line(addr_main);
 
 			_request.write({addr_main, WRITE_REQ, data});
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+#ifdef __PROFILE__
 			_hit_status.read(hit_status);
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+#endif /* __PROFILE__ */
 		}
 
+		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
+			hit_status_t dummy;
+
+			set(addr_main, data, dummy);
+		}
 
 	private:
 		void run_core() {
@@ -244,9 +245,9 @@ CORE_LOOP:		while (1) {
 					_rd_data.write(line);
 				}
 
-#if (defined(__PROFILE__) && (!defined(__SYNTHESIS__)))
+#ifdef __PROFILE__
 				_hit_status.write(is_hit ? HIT : MISS);
-#endif /* (defined(__PROFILE__) && (!defined(__SYNTHESIS__))) */
+#endif /* __PROFILE__ */
 			}
 
 			if (WR_ENABLED)
