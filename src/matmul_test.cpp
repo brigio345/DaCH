@@ -1,6 +1,6 @@
 #include <iostream>
 #ifndef __SYNTHESIS__
-#define __PROFILE__
+#define PROFILE
 #include <thread>
 #endif	/* __SYNTHESIS__ */
 #include "matrix.h"
