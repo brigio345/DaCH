@@ -59,7 +59,7 @@ class cache {
 			MISS,
 			HIT,
 			L1_HIT
-		}	hit_status_t;
+		} hit_status_t;
 #endif /* __PROFILE__ */
 
 	private:
@@ -176,14 +176,6 @@ class cache {
 		}
 
 #ifdef __PROFILE__
-		void update_profiling(hit_status_t status) {
-			if (status == HIT)
-				n_hits++;
-			else if (status == L1_HIT)
-				n_l1_hits++;
-			n_reqs++;
-		}
-
 		int get_n_reqs() {
 			return n_reqs;
 		}
@@ -350,6 +342,17 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 					spill(addr_t(_tag[line], line, 0));
 			}
 		}
+
+#ifdef __PROFILE__
+		void update_profiling(hit_status_t status) {
+			n_reqs++;
+
+			if (status == HIT)
+				n_hits++;
+			else if (status == L1_HIT)
+				n_l1_hits++;
+		}
+#endif /* __PROFILE__ */
 
 #ifndef __SYNTHESIS__
 		class inner {
