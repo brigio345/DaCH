@@ -191,7 +191,7 @@ class cache {
 				// read response from cache
 				_rd_data.read(line);
 				// store line to L1 cache
-				_l1_cache_get.load_line(addr_main, line);
+				_l1_cache_get.set_line(addr_main, line);
 			}
 
 #ifdef __PROFILE__

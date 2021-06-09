@@ -27,7 +27,7 @@ class l1_cache {
 			return hit(addr);
 		}
 
-		void fill_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+		void set_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
 				_line[off] = line[off];
 			l1_addr_t addr(addr_main);
