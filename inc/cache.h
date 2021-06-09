@@ -308,8 +308,8 @@ CORE_LOOP:		while (1) {
 
 				bool is_hit = hit(addr);
 				// check the request type
-				bool write = ((WR_ENABLED && (req.type == WRITE_REQ)) ||
-							(!RD_ENABLED));
+				bool read = ((RD_ENABLED && (req.type == READ_REQ)) ||
+							(!WR_ENABLED));
 
 				if (is_hit) {
 					// read from cache memory
@@ -320,20 +320,20 @@ CORE_LOOP:		while (1) {
 					load(addr, write, req.data, line);
 				}
 
-				if (write) {
-					// N.B. in case of MISS the write is
-					// already performed during the load
-					if (is_hit) {
-						// modify the line
-						line[addr._off] = req.data;
-						// store the modified line to cache
-						_raw_cache_core.set_line(_cache_mem,
-								addr._addr_cache, line);
-					}
-					_dirty[addr._line] = true;
-				} else {
+				if (read) {
 					// send the response to the read request
 					_rd_data.write(line);
+				} else if (is_hit) {
+					// N.B. in case of MISS the write is
+					// already performed during the load
+
+					// modify the line
+					line[addr._off] = req.data;
+
+					// store the modified line to cache
+					_raw_cache_core.set_line(_cache_mem,
+							addr._addr_cache, line);
+					_dirty[addr._line] = true;
 				}
 
 #ifdef __PROFILE__
@@ -464,7 +464,7 @@ MEM_IF_LOOP:		while (1) {
 
 			_tag[addr._line] = addr._tag;
 			_valid[addr._line] = true;
-			_dirty[addr._line] = false;
+			_dirty[addr._line] = write;
 		}
 
 		/**
