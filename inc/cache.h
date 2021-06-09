@@ -1,3 +1,14 @@
+/**
+ * \file	cache.h
+ *
+ * \brief 	Cache module compatible with Vitis HLS 2020.2.
+ *
+ *		Cache module which uses a modified direct-mapped mapping
+ *		policy (address bits represents, from MSB to LSB: LINE, TAG and
+ *		OFFSET) and write-back write policy.
+ *		Synthesizability is ensured with Vitis HLS 2020.2, with II=1 for
+ *		CORE_LOOP.
+ */
 #ifndef CACHE_H
 #define CACHE_H
 
@@ -20,7 +31,6 @@
 #define __PROFILE__
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
-// direct mapping, write back
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t MAIN_SIZE,
 	 size_t N_LINES, size_t N_ENTRIES_PER_LINE>
 class cache {
@@ -102,10 +112,28 @@ class cache {
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 		}
 
+		/**
+		 * \brief	Initialize the cache.
+		 *
+		 * \note	Must be called before calling \ref run,
+		 * 		if the cache is enabled to read.
+		 */
 		void init() {
 			_l1_cache_get.init();
 		}
 
+		/**
+		 * \brief	Start cache internal processes.
+		 *
+		 * \note	In case of synthesis this must be called in a
+		 * 		dataflow region with disable_start_propagation
+		 * 		option, together with the function in which cache
+		 * 		is accesses.
+		 *
+		 * \note	In case of C simulation this must be executed by
+		 * 		a thread separated from the thread in which
+		 * 		cache is accessed.
+		 */
 		void run(T *main_mem) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
@@ -120,10 +148,23 @@ class cache {
 #endif /* __SYNTHESIS__ */
 		}
 
+		/**
+		 * \brief	Stop cache internal processes.
+		 *
+		 * \note	Must be called after the function in which cache
+		 * 		is accessed has completed.
+		 */
 		void stop() {
 			_request.write({0, STOP_REQ, 0});
 		}
 
+		/**
+		 * \brief		Request to read a whole cache line.
+		 *
+		 * \param addr_main	The address in main memory belonging to
+		 * 			the cache line to be read.
+		 * \param line		The buffer to store the read line.
+		 */
 		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
@@ -134,12 +175,22 @@ class cache {
 			}
 #endif /* __SYNTHESIS__ */
 
+			// try to get line from L1 cache
 			bool l1_hit = _l1_cache_get.get_line(addr_main, line);
 
 			if (!l1_hit) {
+				// send read request to cache
 				_request.write({addr_main, READ_REQ, 0});
+				// force FIFO write and FIFO read to separate
+				// pipeline stages to avoid deadlock due to
+				// the blocking read
+				// 6 is the read latency in case of HIT:
+				// it is put here to inform the scheduler
+				// about the latency
 				ap_wait_n(6);
+				// read response from cache
 				_rd_data.read(line);
+				// store line to L1 cache
 				_l1_cache_get.fill_line(addr_main, line);
 			}
 
@@ -148,15 +199,34 @@ class cache {
 #endif /* __PROFILE__ */
 		}
 
+		/**
+		 * \brief		Request to read a data element.
+		 *
+		 * \param addr_main	The address in main memory referring to
+		 * 			the data element to be read.
+		 *
+		 * \return		The read data element.
+		 */
 		T get(ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
 			line_t line;
+
+			// get the whole cache line
 			get_line(addr_main, line);
+
+			// extract information from address
 			addr_t addr(addr_main);
 
 			return line[addr._off];
 		}
 
+		/**
+		 * \brief		Request to write a data element.
+		 *
+		 * \param addr_main	The address in main memory referring to
+		 * 			the data element to be written.
+		 * \param data		The data to be written.
+		 */
 		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
@@ -167,8 +237,10 @@ class cache {
 			}
 #endif /* __SYNTHESIS__ */
 
+			// inform L1 cache about the writing
 			_l1_cache_get.invalidate_line(addr_main);
 
+			// send write request to cache
 			_request.write({addr_main, WRITE_REQ, data});
 #ifdef __PROFILE__
 			update_profiling(_hit_status.read());
@@ -194,6 +266,14 @@ class cache {
 #endif /* __PROFILE__ */
 
 	private:
+		/**
+		 * \brief	Infinite loop managing the cache access requests
+		 * 		(sent from the outside).
+		 *
+		 * \note	The infinite loop must be stopped by calling
+		 * 		\ref stop at the end of computation (from the
+		 * 		outside).
+		 */
 		void run_core() {
 #pragma HLS inline off
 			request_t req;
@@ -210,7 +290,8 @@ CORE_LOOP:		while (1) {
 #pragma HLS pipeline
 #pragma HLS dependence variable=_cache_mem distance=1 inter RAW false
 #ifdef __SYNTHESIS__
-				// make pipeline flushable
+				// get request and
+				// make pipeline flushable (to avoid deadlock)
 				if (!_request.read_nb(req))
 					continue;
 #else
@@ -218,7 +299,7 @@ CORE_LOOP:		while (1) {
 				_request.read(req);
 #endif /* __SYNTHESIS__ */
 
-				// stop if request is "end-of-request"
+				// exit the loop if request is "end-of-request"
 				if (req.type == STOP_REQ)
 					break;
 
@@ -226,21 +307,32 @@ CORE_LOOP:		while (1) {
 				addr_t addr(req.addr_main);
 
 				bool is_hit = hit(addr);
+				// check the request type
 				bool write = ((WR_ENABLED && (req.type == WRITE_REQ)) ||
 							(!RD_ENABLED));
 
-				if (is_hit)
-					_raw_cache_core.get_line(_cache_mem, addr._addr_cache, line);
-				else
+				if (is_hit) {
+					// read from cache memory
+					_raw_cache_core.get_line(_cache_mem,
+							addr._addr_cache, line);
+				} else {
+					// read from main memory
 					fill(addr, write, req.data, line);
+				}
 
 				if (write) {
+					// N.B. in case of MISS the write is
+					// already performed during the fill
 					if (is_hit) {
+						// modify the line
 						line[addr._off] = req.data;
-						_raw_cache_core.set_line(_cache_mem, addr._addr_cache, line);
+						// store the modified line to cache
+						_raw_cache_core.set_line(_cache_mem,
+								addr._addr_cache, line);
 					}
 					_dirty[addr._line] = true;
 				} else {
+					// send the response to the read request
 					_rd_data.write(line);
 				}
 
@@ -249,97 +341,173 @@ CORE_LOOP:		while (1) {
 #endif /* __PROFILE__ */
 			}
 
+			// synchronize main memory with cache memory
 			if (WR_ENABLED)
 				flush();
 
+			// make sure that flush has completed before stopping
+			// memory interface
 			ap_wait();
+			// stop memory interface
 			_if_request.write({false, false, 0, 0, line});
 		}
 
+		/**
+		 * \brief		Infinite loop managing main memory
+		 * 			access requests (sent from \ref run_core).
+		 *
+		 * \param main_mem	The pointer to the main memory.
+		 *
+		 * \note		\p main_mem should be associated with
+		 * 			a dedicated AXI port in order to get
+		 * 			optimal performance.
+		 *
+		 * \note		The infinite loop is stopped by
+		 * 			\ref run_core when it is in turn stopped
+		 * 			from the outside.
+		 */
 		void run_mem_if(T *main_mem) {
 			mem_req_t req;
 			T *main_line;
 			line_t line;
 			raw_cache_t raw_cache_mem_if;
+
 			raw_cache_mem_if.init();
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
 #pragma HLS dependence variable=main_mem distance=1 inter RAW false
 #ifdef __SYNTHESIS__
+				// get request and
+				// make pipeline flushable (to avoid deadlock)
 				if (!_if_request.read_nb(req))
 					continue;
 #else
+				// get request
 				_if_request.read(req);
 #endif /* __SYNTHESIS__ */
 
+				// exit the loop if request is "end-of-request"
 				if (!req.fill && !req.spill)
 					break;
 
 				if (req.fill) {
-					raw_cache_mem_if.get_line(main_mem, req.fill_addr, line);
+					// read line from main memory
+					raw_cache_mem_if.get_line(main_mem,
+							req.fill_addr, line);
+					// send the response to the read request
 					_fill_data.write(line);
 				}
 				
 				if (WR_ENABLED && req.spill) {
-					raw_cache_mem_if.set_line(main_mem, req.spill_addr, req.line);
+					// write line to main memory
+					raw_cache_mem_if.set_line(main_mem,
+							req.spill_addr, req.line);
 				}
 			}
 		}
 
+		/**
+		 * \brief	Check if \p addr causes an HIT or a MISS.
+		 *
+		 * \param addr	The address to be checked.
+		 *
+		 * \return	\c true on HIT.
+		 * \return	\c false on MISS.
+		 */
 		inline bool hit(addr_t addr) {
 			return (_valid[addr._line] && (addr._tag == _tag[addr._line]));
 		}
 
-		// load line from main to cache memory
-		// (taking care of writing back dirty lines)
+		/**
+		 * \brief	Load line from main to cache memory and write
+		 * 		back the line to be overwritten, if necessary.
+		 *
+		 * \param addr	The address belonging to the line to be loaded.
+		 * \param write	The boolean specifying whether the line element
+		 * 		at \ref addr has to be written with \ref data.
+		 * \param data	The data to be possibly written.
+		 * \param line	The buffer to store the loaded line.
+		 */
 		void fill(addr_t addr, bool write, T data, line_t &line) {
 #pragma HLS inline
 			bool do_spill = false;
+			// build write-back address
 			addr_t spill_addr(_tag[addr._line], addr._line, 0);
+			// check if write back is necessary
 			if (WR_ENABLED && _valid[addr._line] && _dirty[addr._line]) {
+				// get the line to be written back
 				spill_core(spill_addr, line);
 				do_spill = true;
 			}
 
+			// send read request to memory interface and
+			// write request if write-back is necessary
 			_if_request.write({true, do_spill, addr._addr_main, 
 					spill_addr._addr_main, line});
+
+			// force FIFO write and FIFO read to separate pipeline
+			// stages to avoid deadlock due to the blocking read
 			ap_wait();
 
+			// read response from memory interface
 			_fill_data.read(line);
 
-			if (write)
+			if (write) {
+				// update line before storing it to cache memory
 				line[addr._off] = data;
+			}
 
-			_raw_cache_core.set_line(_cache_mem, addr._addr_cache_first_of_line, line);
+			// store line to cache memory
+			_raw_cache_core.set_line(_cache_mem,
+					addr._addr_cache_first_of_line, line);
 
 			_tag[addr._line] = addr._tag;
 			_valid[addr._line] = true;
 			_dirty[addr._line] = false;
 		}
 
+		/**
+		 * \brief	Read a cache line and set it to not dirty.
+		 *
+		 * \param addr	The address belonging to the cache line to be
+		 * 		read.
+		 * \param line	The buffer to store the read line.
+		 */
 		void spill_core(addr_t addr, line_t &line) {
 #pragma HLS inline
 			_raw_cache_core.get_line(_cache_mem, addr._addr_cache_first_of_line, line);
 			_dirty[addr._line] = false;
 		}
 
-		// store line from cache to main memory
+		/**
+		 * \brief	Request to write back a cache line to main memory.
+		 *
+		 * \param addr	The address belonging to the cache line to be
+		 * 		written back.
+		 */
 		void spill(addr_t addr) {
 #pragma HLS inline
 			line_t line;
 
+			// read line and set it to not dirty
 			spill_core(addr, line);
 
+			// send write request to memory interface
 			_if_request.write({false, true, 0, addr._addr_main, line});
 		}
 
-		// store all valid dirty lines from cache to main memory
+		/**
+		 * \brief	Write back all valid dirty cache lines to main memory.
+		 */
 		void flush() {
 #pragma HLS inline
 FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
-				if (_valid[line] && _dirty[line])
+				// check if line has to be written back
+				if (_valid[line] && _dirty[line]) {
+					// write line back
 					spill(addr_t(_tag[line], line, 0));
+				}
 			}
 		}
 
