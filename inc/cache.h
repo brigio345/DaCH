@@ -318,6 +318,14 @@ CORE_LOOP:		while (1) {
 				} else {
 					// read from main memory
 					load(addr, line);
+
+					if (read) {
+						// store loaded line to cache
+						_raw_cache_core.set_line(
+								_cache_mem,
+								addr._addr_cache,
+								line);
+					}
 				}
 
 				if (read) {
@@ -448,10 +456,6 @@ MEM_IF_LOOP:		while (1) {
 
 			// read response from memory interface
 			_load_data.read(line);
-
-			// store line to cache memory
-			_raw_cache_core.set_line(_cache_mem,
-					addr._addr_cache_first_of_line, line);
 
 			_tag[addr._line] = addr._tag;
 			_valid[addr._line] = true;
