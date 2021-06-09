@@ -80,16 +80,16 @@ class cache {
 		} request_t;
 
 		typedef struct {
-			bool fill;
-			bool spill;
-			ap_uint<ADDR_SIZE> fill_addr;
-			ap_uint<ADDR_SIZE> spill_addr;
+			bool load;
+			bool write_back;
+			ap_uint<ADDR_SIZE> load_addr;
+			ap_uint<ADDR_SIZE> write_back_addr;
 			line_t line;
 		} mem_req_t;
 
 		hls::stream<line_t, 128> _rd_data;
 		hls::stream<request_t, 128> _request;
-		hls::stream<line_t, 128> _fill_data;
+		hls::stream<line_t, 128> _load_data;
 		hls::stream<mem_req_t, 128> _if_request;
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
@@ -191,7 +191,7 @@ class cache {
 				// read response from cache
 				_rd_data.read(line);
 				// store line to L1 cache
-				_l1_cache_get.fill_line(addr_main, line);
+				_l1_cache_get.load_line(addr_main, line);
 			}
 
 #ifdef __PROFILE__
@@ -317,12 +317,12 @@ CORE_LOOP:		while (1) {
 							addr._addr_cache, line);
 				} else {
 					// read from main memory
-					fill(addr, write, req.data, line);
+					load(addr, write, req.data, line);
 				}
 
 				if (write) {
 					// N.B. in case of MISS the write is
-					// already performed during the fill
+					// already performed during the load
 					if (is_hit) {
 						// modify the line
 						line[addr._off] = req.data;
@@ -388,21 +388,21 @@ MEM_IF_LOOP:		while (1) {
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
-				if (!req.fill && !req.spill)
+				if (!req.load && !req.write_back)
 					break;
 
-				if (req.fill) {
+				if (req.load) {
 					// read line from main memory
 					raw_cache_mem_if.get_line(main_mem,
-							req.fill_addr, line);
+							req.load_addr, line);
 					// send the response to the read request
-					_fill_data.write(line);
+					_load_data.write(line);
 				}
 				
-				if (WR_ENABLED && req.spill) {
+				if (WR_ENABLED && req.write_back) {
 					// write line to main memory
 					raw_cache_mem_if.set_line(main_mem,
-							req.spill_addr, req.line);
+							req.write_back_addr, req.line);
 				}
 			}
 		}
@@ -429,29 +429,29 @@ MEM_IF_LOOP:		while (1) {
 		 * \param data	The data to be possibly written.
 		 * \param line	The buffer to store the loaded line.
 		 */
-		void fill(addr_t addr, bool write, T data, line_t &line) {
+		void load(addr_t addr, bool write, T data, line_t &line) {
 #pragma HLS inline
-			bool do_spill = false;
+			bool do_write_back = false;
 			// build write-back address
-			addr_t spill_addr(_tag[addr._line], addr._line, 0);
+			addr_t write_back_addr(_tag[addr._line], addr._line, 0);
 			// check if write back is necessary
 			if (WR_ENABLED && _valid[addr._line] && _dirty[addr._line]) {
 				// get the line to be written back
-				spill_core(spill_addr, line);
-				do_spill = true;
+				write_back_core(write_back_addr, line);
+				do_write_back = true;
 			}
 
 			// send read request to memory interface and
 			// write request if write-back is necessary
-			_if_request.write({true, do_spill, addr._addr_main, 
-					spill_addr._addr_main, line});
+			_if_request.write({true, do_write_back, addr._addr_main,
+					write_back_addr._addr_main, line});
 
 			// force FIFO write and FIFO read to separate pipeline
 			// stages to avoid deadlock due to the blocking read
 			ap_wait();
 
 			// read response from memory interface
-			_fill_data.read(line);
+			_load_data.read(line);
 
 			if (write) {
 				// update line before storing it to cache memory
@@ -474,7 +474,7 @@ MEM_IF_LOOP:		while (1) {
 		 * 		read.
 		 * \param line	The buffer to store the read line.
 		 */
-		void spill_core(addr_t addr, line_t &line) {
+		void write_back_core(addr_t addr, line_t &line) {
 #pragma HLS inline
 			_raw_cache_core.get_line(_cache_mem, addr._addr_cache_first_of_line, line);
 			_dirty[addr._line] = false;
@@ -486,12 +486,12 @@ MEM_IF_LOOP:		while (1) {
 		 * \param addr	The address belonging to the cache line to be
 		 * 		written back.
 		 */
-		void spill(addr_t addr) {
+		void write_back(addr_t addr) {
 #pragma HLS inline
 			line_t line;
 
 			// read line and set it to not dirty
-			spill_core(addr, line);
+			write_back_core(addr, line);
 
 			// send write request to memory interface
 			_if_request.write({false, true, 0, addr._addr_main, line});
@@ -506,7 +506,7 @@ FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
 				// check if line has to be written back
 				if (_valid[line] && _dirty[line]) {
 					// write line back
-					spill(addr_t(_tag[line], line, 0));
+					write_back(addr_t(_tag[line], line, 0));
 				}
 			}
 		}
