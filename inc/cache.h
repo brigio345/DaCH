@@ -87,10 +87,10 @@ class cache {
 			line_t line;
 		} mem_req_t;
 
-		hls::stream<line_t, 128> _rd_data;
-		hls::stream<request_t, 128> _request;
-		hls::stream<line_t, 128> _load_data;
-		hls::stream<mem_req_t, 128> _if_request;
+		hls::stream<line_t, 4> _rd_data;
+		hls::stream<request_t, 4> _request;
+		hls::stream<line_t, 2> _load_data;
+		hls::stream<mem_req_t, 2> _if_request;
 		bool _valid[N_LINES];
 		bool _dirty[N_LINES];
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> _tag[N_LINES];
@@ -98,7 +98,7 @@ class cache {
 		l1_cache_t _l1_cache_get;
 		raw_cache_t _raw_cache_core;
 #ifdef __PROFILE__
-		hls::stream<hit_status_t, 128> _hit_status;
+		hls::stream<hit_status_t> _hit_status;
 		int n_reqs = 0;
 		int n_hits = 0;
 		int n_l1_hits = 0;
