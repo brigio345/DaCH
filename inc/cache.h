@@ -317,16 +317,13 @@ CORE_LOOP:		while (1) {
 							addr._addr_cache, line);
 				} else {
 					// read from main memory
-					load(addr, write, req.data, line);
+					load(addr, line);
 				}
 
 				if (read) {
 					// send the response to the read request
 					_rd_data.write(line);
-				} else if (is_hit) {
-					// N.B. in case of MISS the write is
-					// already performed during the load
-
+				} else {
 					// modify the line
 					line[addr._off] = req.data;
 
@@ -424,12 +421,9 @@ MEM_IF_LOOP:		while (1) {
 		 * 		back the line to be overwritten, if necessary.
 		 *
 		 * \param addr	The address belonging to the line to be loaded.
-		 * \param write	The boolean specifying whether the line element
-		 * 		at \ref addr has to be written with \ref data.
-		 * \param data	The data to be possibly written.
 		 * \param line	The buffer to store the loaded line.
 		 */
-		void load(addr_t addr, bool write, T data, line_t &line) {
+		void load(addr_t addr, line_t &line) {
 #pragma HLS inline
 			bool do_write_back = false;
 			// build write-back address
@@ -453,18 +447,13 @@ MEM_IF_LOOP:		while (1) {
 			// read response from memory interface
 			_load_data.read(line);
 
-			if (write) {
-				// update line before storing it to cache memory
-				line[addr._off] = data;
-			}
-
 			// store line to cache memory
 			_raw_cache_core.set_line(_cache_mem,
 					addr._addr_cache_first_of_line, line);
 
 			_tag[addr._line] = addr._tag;
 			_valid[addr._line] = true;
-			_dirty[addr._line] = write;
+			_dirty[addr._line] = false;
 		}
 
 		/**
