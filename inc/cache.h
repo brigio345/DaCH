@@ -431,7 +431,9 @@ MEM_IF_LOOP:		while (1) {
 			// check if write back is necessary
 			if (WR_ENABLED && _valid[addr._line] && _dirty[addr._line]) {
 				// get the line to be written back
-				write_back_core(write_back_addr, line);
+				_raw_cache_core.get_line(_cache_mem,
+						write_back_addr._addr_cache_first_of_line,
+						line);
 				do_write_back = true;
 			}
 
@@ -457,19 +459,6 @@ MEM_IF_LOOP:		while (1) {
 		}
 
 		/**
-		 * \brief	Read a cache line and set it to not dirty.
-		 *
-		 * \param addr	The address belonging to the cache line to be
-		 * 		read.
-		 * \param line	The buffer to store the read line.
-		 */
-		void write_back_core(addr_t addr, line_t &line) {
-#pragma HLS inline
-			_raw_cache_core.get_line(_cache_mem, addr._addr_cache_first_of_line, line);
-			_dirty[addr._line] = false;
-		}
-
-		/**
 		 * \brief	Request to write back a cache line to main memory.
 		 *
 		 * \param addr	The address belonging to the cache line to be
@@ -479,11 +468,14 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			line_t line;
 
-			// read line and set it to not dirty
-			write_back_core(addr, line);
+			// read line
+			_raw_cache_core.get_line(_cache_mem,
+					addr._addr_cache_first_of_line, line);
 
 			// send write request to memory interface
 			_if_request.write({false, true, 0, addr._addr_main, line});
+
+			_dirty[addr._line] = false;
 		}
 
 		/**
