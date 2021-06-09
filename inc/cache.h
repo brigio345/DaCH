@@ -168,11 +168,7 @@ class cache {
 		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
-			if (addr_main >= MAIN_SIZE) {
-				throw std::out_of_range("cache::get: address " +
-						std::to_string(addr_main) +
-						" is out of range");
-			}
+			assert(addr_main < MAIN_SIZE);
 #endif /* __SYNTHESIS__ */
 
 			// try to get line from L1 cache
@@ -230,11 +226,7 @@ class cache {
 		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
-			if (addr_main >= MAIN_SIZE) {
-				throw std::out_of_range("cache::set: address " +
-						std::to_string(addr_main) +
-						" is out of range");
-			}
+			assert(addr_main < MAIN_SIZE);
 #endif /* __SYNTHESIS__ */
 
 			// inform L1 cache about the writing
