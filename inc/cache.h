@@ -330,7 +330,7 @@ CORE_LOOP:		while (1) {
 					// store the modified line to cache
 					_raw_cache_core.set_line(_cache_mem,
 							addr._addr_cache, line);
-					_dirty[addr._line] = true;
+					_dirty[addr._set] = true;
 				}
 
 #ifdef __PROFILE__
@@ -413,7 +413,7 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	\c false on MISS.
 		 */
 		inline bool hit(addr_t addr) {
-			return (_valid[addr._line] && (addr._tag == _tag[addr._line]));
+			return (_valid[addr._set] && (addr._tag == _tag[addr._set]));
 		}
 
 		/**
@@ -427,9 +427,9 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			bool do_write_back = false;
 			// build write-back address
-			addr_t write_back_addr(_tag[addr._line], addr._line, 0);
+			addr_t write_back_addr(_tag[addr._set], addr._set, 0);
 			// check if write back is necessary
-			if (WR_ENABLED && _valid[addr._line] && _dirty[addr._line]) {
+			if (WR_ENABLED && _valid[addr._set] && _dirty[addr._set]) {
 				// get the line to be written back
 				_raw_cache_core.get_line(_cache_mem,
 						write_back_addr._addr_cache_first_of_line,
@@ -449,9 +449,9 @@ MEM_IF_LOOP:		while (1) {
 			// read response from memory interface
 			_load_data.read(line);
 
-			_tag[addr._line] = addr._tag;
-			_valid[addr._line] = true;
-			_dirty[addr._line] = false;
+			_tag[addr._set] = addr._tag;
+			_valid[addr._set] = true;
+			_dirty[addr._set] = false;
 		}
 
 		/**
@@ -471,7 +471,7 @@ MEM_IF_LOOP:		while (1) {
 			// send write request to memory interface
 			_if_request.write({false, true, 0, addr._addr_main, line});
 
-			_dirty[addr._line] = false;
+			_dirty[addr._set] = false;
 		}
 
 		/**
