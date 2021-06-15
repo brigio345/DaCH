@@ -445,6 +445,8 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	The least recently used way.
 		 */
 		int get_way(addr_t addr) {
+			if (WAY_SIZE == 0)
+				return 0;
 			return _least_recently_used[addr._set]++;
 		}
 
