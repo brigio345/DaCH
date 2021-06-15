@@ -35,7 +35,7 @@ class raw_cache {
 #pragma HLS inline
 			raw_addr_t addr(addr_main);
 
-			bool is_hit = hit(addr);
+			auto is_hit = hit(addr);
 
 			if (is_hit) {
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)

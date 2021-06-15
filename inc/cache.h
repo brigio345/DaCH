@@ -179,7 +179,7 @@ class cache {
 #endif /* __SYNTHESIS__ */
 
 			// try to get line from L1 cache
-			bool l1_hit = _l1_cache_get.get_line(addr_main, line);
+			auto l1_hit = _l1_cache_get.get_line(addr_main, line);
 
 			if (!l1_hit) {
 				// send read request to cache
@@ -280,7 +280,7 @@ class cache {
 			T data;
 
 			// invalidate all cache lines
-			for (int line = 0; line < (N_SETS * N_WAYS); line++)
+			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
 				_valid[line] = false;
 
 			// initialize way counters
@@ -309,10 +309,10 @@ CORE_LOOP:		while (1) {
 				// extract information from address
 				addr_t addr(req.addr_main);
 
-				int way = hit(addr);
-				bool is_hit = (way != -1);
+				auto way = hit(addr);
+				auto is_hit = (way != -1);
 				// check the request type
-				bool read = ((RD_ENABLED && (req.type == READ_REQ)) ||
+				auto read = ((RD_ENABLED && (req.type == READ_REQ)) ||
 							(!WR_ENABLED));
 
 				if (is_hit) {
@@ -457,7 +457,7 @@ MEM_IF_LOOP:		while (1) {
 		 */
 		void load(addr_t addr, int way, line_t &line) {
 #pragma HLS inline
-			bool do_write_back = false;
+			auto do_write_back = false;
 			// build write-back address
 			addr_t write_back_addr(_tag[addr.get_addr_line(way)], addr._set, 0);
 			// check if write back is necessary
