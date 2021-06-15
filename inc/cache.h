@@ -428,10 +428,11 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	-1 on MISS.
 		 */
 		inline int hit(addr_t addr) {
-			for (auto way = 0; way < N_WAYS; way++)
+			for (auto way = 0; way < N_WAYS; way++) {
 				if (_valid[addr.get_addr_line(way)] &&
 						(addr._tag == _tag[addr.get_addr_line(way)]))
 					return way;
+			}
 
 			return -1;
 		}
