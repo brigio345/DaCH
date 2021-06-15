@@ -11,9 +11,9 @@
 #define P 8
 
 typedef int data_type;
-typedef cache<data_type, true, false, N * M, 2, M> cache_a;
-typedef cache<data_type, true, false, M * P, M, 4> cache_b;
-typedef cache<data_type, false, true, N * P, 2, M> cache_c;
+typedef cache<data_type, true, false, N * M, 2, 1, M> cache_a;
+typedef cache<data_type, true, false, M * P, M, 1, 4> cache_b;
+typedef cache<data_type, false, true, N * P, 2, 1, M> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 #pragma HLS inline off

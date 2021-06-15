@@ -7,7 +7,7 @@
 
 #define N 128
 
-typedef cache<int, false, true, N, 2, 8> cache_t;
+typedef cache<int, false, true, N, 2, 1, 8> cache_t;
 
 void vecinit(int a[N]) {
 	for (int i = 0; i < N; i++) {
