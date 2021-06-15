@@ -311,19 +311,22 @@ CORE_LOOP:		while (1) {
 
 				auto way = hit(addr);
 				auto is_hit = (way != -1);
+
+				if (!is_hit)
+					way = get_way(addr);
+
+				addr.set_way(way);
+
 				// check the request type
 				auto read = ((RD_ENABLED && (req.type == READ_REQ)) ||
 							(!WR_ENABLED));
 
 				if (is_hit) {
-					addr.set_way(way);
 					// read from cache memory
 					_raw_cache_core.get_line(_cache_mem,
 							addr._addr_cache,
 							line);
 				} else {
-					addr.set_way(get_way(addr));
-
 					// read from main memory
 					load(addr, line);
 
