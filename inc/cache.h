@@ -316,21 +316,22 @@ CORE_LOOP:		while (1) {
 							(!WR_ENABLED));
 
 				if (is_hit) {
+					addr.set_way(way);
 					// read from cache memory
 					_raw_cache_core.get_line(_cache_mem,
-							addr.get_addr_cache(way),
+							addr._addr_cache,
 							line);
 				} else {
-					way = get_way(addr);
+					addr.set_way(get_way(addr));
 
 					// read from main memory
-					load(addr, way, line);
+					load(addr, line);
 
 					if (read) {
 						// store loaded line to cache
 						_raw_cache_core.set_line(
 								_cache_mem,
-								addr.get_addr_cache(way),
+								addr._addr_cache,
 								line);
 					}
 				}
@@ -344,8 +345,8 @@ CORE_LOOP:		while (1) {
 
 					// store the modified line to cache
 					_raw_cache_core.set_line(_cache_mem,
-							addr.get_addr_cache(way), line);
-					_dirty[addr.get_addr_line(way)] = true;
+							addr._addr_cache, line);
+					_dirty[addr._addr_line] = true;
 				}
 
 #ifdef __PROFILE__
@@ -429,8 +430,9 @@ MEM_IF_LOOP:		while (1) {
 		 */
 		inline int hit(addr_t addr) {
 			for (auto way = 0; way < N_WAYS; way++) {
-				if (_valid[addr.get_addr_line(way)] &&
-						(addr._tag == _tag[addr.get_addr_line(way)]))
+				addr.set_way(way);
+				if (_valid[addr._addr_line] &&
+						(addr._tag == _tag[addr._addr_line]))
 					return way;
 			}
 
@@ -458,17 +460,18 @@ MEM_IF_LOOP:		while (1) {
 		 * \param addr	The address belonging to the line to be loaded.
 		 * \param line	The buffer to store the loaded line.
 		 */
-		void load(addr_t addr, int way, line_t &line) {
+		void load(addr_t addr, line_t &line) {
 #pragma HLS inline
 			auto do_write_back = false;
 			// build write-back address
-			addr_t write_back_addr(_tag[addr.get_addr_line(way)], addr._set, 0);
+			addr_t write_back_addr(_tag[addr._addr_line], addr._set, 0);
+			write_back_addr.set_way(addr._way);
 			// check if write back is necessary
-			if (WR_ENABLED && _valid[addr.get_addr_line(way)] &&
-					_dirty[addr.get_addr_line(way)]) {
+			if (WR_ENABLED && _valid[addr._addr_line] &&
+					_dirty[addr._addr_line]) {
 				// get the line to be written back
 				_raw_cache_core.get_line(_cache_mem,
-						write_back_addr.get_addr_cache(way),
+						write_back_addr._addr_cache,
 						line);
 				do_write_back = true;
 			}
@@ -485,9 +488,9 @@ MEM_IF_LOOP:		while (1) {
 			// read response from memory interface
 			_load_data.read(line);
 
-			_tag[addr.get_addr_line(way)] = addr._tag;
-			_valid[addr.get_addr_line(way)] = true;
-			_dirty[addr.get_addr_line(way)] = false;
+			_tag[addr._addr_line] = addr._tag;
+			_valid[addr._addr_line] = true;
+			_dirty[addr._addr_line] = false;
 		}
 
 		/**
@@ -496,18 +499,18 @@ MEM_IF_LOOP:		while (1) {
 		 * \param addr	The address belonging to the cache line to be
 		 * 		written back.
 		 */
-		void write_back(addr_t addr, int way) {
+		void write_back(addr_t addr) {
 #pragma HLS inline
 			line_t line;
 
 			// read line
 			_raw_cache_core.get_line(_cache_mem,
-					addr.get_addr_cache(way), line);
+					addr._addr_cache, line);
 
 			// send write request to memory interface
 			_if_request.write({false, true, 0, addr._addr_main, line});
 
-			_dirty[addr.get_addr_line(way)] = false;
+			_dirty[addr._addr_line] = false;
 		}
 
 		/**
@@ -518,11 +521,12 @@ MEM_IF_LOOP:		while (1) {
 			for (auto set = 0; set < N_SETS; set++) {
 				for (auto way = 0; way < N_WAYS; way++) {
 					addr_t addr(_tag[set * N_WAYS + way], set, 0);
+					addr.set_way(way);
 					// check if line has to be written back
-					if (_valid[addr.get_addr_line(way)] &&
-							_dirty[addr.get_addr_line(way)]) {
+					if (_valid[addr._addr_line] &&
+							_dirty[addr._addr_line]) {
 						// write line back
-						write_back(addr, way);
+						write_back(addr);
 					}
 				}
 			}

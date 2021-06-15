@@ -12,9 +12,12 @@ class address {
 
 	public:
 		ap_uint<ADDR_SIZE> _addr_main;
+		ap_uint<CACHE_ADDR_SIZE> _addr_cache;
+		ap_uint<(LINE_ADDR_SIZE > 0) ? LINE_ADDR_SIZE : 1> _addr_line;
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> _tag;
 		ap_uint<(SET_SIZE > 0) ? SET_SIZE : 1> _set;
 		ap_uint<(OFF_SIZE > 0) ? OFF_SIZE : 1> _off;
+		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> _way;
 
 		address(ap_uint<ADDR_SIZE> addr_main): _addr_main(addr_main) {
 			_off = 0;
@@ -26,6 +29,9 @@ class address {
 			_tag = 0;
 			for (auto i = 0; i < TAG_SIZE; i++)
 				_tag[i] = addr_main[i + OFF_SIZE + SET_SIZE];
+
+			_addr_cache = -1;
+			_addr_line = -1;
 		}
 
 		address(ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> tag,
@@ -42,28 +48,20 @@ class address {
 				_addr_main[i + OFF_SIZE + SET_SIZE] = _tag[i];
 		}
 
-		ap_uint<CACHE_ADDR_SIZE> get_addr_cache(ap_uint<WAY_SIZE> way) {
-			ap_uint<CACHE_ADDR_SIZE> addr_cache = 0;
+		void set_way(ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> way) {
+			_way = way;
 
+			_addr_line = 0;
+			for (auto i = 0; i < WAY_SIZE; i++)
+				_addr_line[i] = _way[i];
+			for (auto i = 0; i < SET_SIZE; i++)
+				_addr_line[i + WAY_SIZE] = _set[i];
+
+			_addr_cache = 0;
 			for (auto i = 0; i < OFF_SIZE; i++)
-				addr_cache[i] = _off[i];
-			for (auto i = 0; i < WAY_SIZE; i++)
-				addr_cache[i + OFF_SIZE] = way[i];
-			for (auto i = 0; i < SET_SIZE; i++)
-				addr_cache[i + OFF_SIZE + WAY_SIZE] = _set[i];
-
-			return addr_cache;
-		}
-
-		ap_uint<LINE_ADDR_SIZE> get_addr_line(ap_uint<WAY_SIZE> way) {
-			ap_uint<CACHE_ADDR_SIZE> addr_line = 0;
-
-			for (auto i = 0; i < WAY_SIZE; i++)
-				addr_line[i] = way[i];
-			for (auto i = 0; i < SET_SIZE; i++)
-				addr_line[i + WAY_SIZE] = _set[i];
-
-			return addr_line;
+				_addr_cache[i] = _off[i];
+			for (auto i = 0; i < LINE_ADDR_SIZE; i++)
+				_addr_cache[i + OFF_SIZE] = _addr_line[i];
 		}
 };
 
