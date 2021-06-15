@@ -15,7 +15,7 @@ class raw_cache {
 	private:
 		static const size_t OFF_SIZE = (ADDR_SIZE - TAG_SIZE);
 
-		typedef address<ADDR_SIZE, TAG_SIZE, 0> raw_addr_t;
+		typedef address<ADDR_SIZE, TAG_SIZE, 0, 0> raw_addr_t;
 #ifdef __SYNTHESIS__
 		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
 #else

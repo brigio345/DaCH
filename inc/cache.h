@@ -3,11 +3,13 @@
  *
  * \brief 	Cache module compatible with Vitis HLS 2020.2.
  *
- *		Cache module which uses a modified direct-mapped mapping
- *		policy (address bits represents, from MSB to LSB: LINE, TAG and
- *		OFFSET) and write-back write policy.
- *		Synthesizability is ensured with Vitis HLS 2020.2, with II=1 for
- *		CORE_LOOP.
+ *		Cache module whose characteristics are:
+ *			- address mapping: set-associative;
+ *			- replacement policy: least recently used;
+ *			- write policy: write-back.
+ *
+ *		Synthesizability is guaranteed with Vitis HLS 2020.2, with II=1
+ *		for CORE_LOOP.
  */
 #ifndef CACHE_H
 #define CACHE_H
@@ -32,32 +34,35 @@
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t MAIN_SIZE,
-	 size_t N_LINES, size_t N_ENTRIES_PER_LINE>
+	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE>
 class cache {
 	private:
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
-		static const size_t LINE_SIZE = utils::log2_ceil(N_LINES);
+		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
 		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
-		static const size_t TAG_SIZE = (ADDR_SIZE - (LINE_SIZE + OFF_SIZE));
+		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
+		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
 
-		static_assert(((1 << LINE_SIZE) == N_LINES),
-				"N_LINES must be a power of 2");
+		static_assert(((1 << SET_SIZE) == N_SETS),
+				"N_SETS must be a power of 2");
 		static_assert(((1 << OFF_SIZE) == N_ENTRIES_PER_LINE),
 				"N_ENTRIES_PER_LINE must be a power of 2");
-		static_assert((MAIN_SIZE >= (N_LINES * N_ENTRIES_PER_LINE)),
-				"N_LINES and/or N_ENTRIES_PER_LINE are too big for the specified MAIN_SIZE");
+		static_assert(((1 << WAY_SIZE) == N_WAYS),
+				"N_WAYS must be a power of 2");
+		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_ENTRIES_PER_LINE)),
+				"N_SETS and/or N_WAYS and/or N_ENTRIES_PER_LINE are too big for the specified MAIN_SIZE");
 		static_assert(((MAIN_SIZE % N_ENTRIES_PER_LINE) == 0),
 				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
 
-		typedef address<ADDR_SIZE, TAG_SIZE, LINE_SIZE> addr_t;
+		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> addr_t;
 #ifdef __SYNTHESIS__
 		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
 #else
 		typedef std::array<T, N_ENTRIES_PER_LINE> line_t;
 #endif /* __SYNTHESIS__ */
-		typedef l1_cache<line_t, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
+		typedef l1_cache<line_t, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
 				N_ENTRIES_PER_LINE> l1_cache_t;
-		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + LINE_SIZE),
+		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
 				N_ENTRIES_PER_LINE> raw_cache_t;
 
 		typedef enum {
@@ -87,14 +92,15 @@ class cache {
 			line_t line;
 		} mem_req_t;
 
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> _tag[N_SETS * N_WAYS];
+		bool _valid[N_SETS * N_WAYS];
+		bool _dirty[N_SETS * N_WAYS];
+		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> _least_recently_used[N_SETS];
+		T _cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
 		hls::stream<line_t, 4> _rd_data;
 		hls::stream<request_t, 4> _request;
 		hls::stream<line_t, 2> _load_data;
 		hls::stream<mem_req_t, 2> _if_request;
-		bool _valid[N_LINES];
-		bool _dirty[N_LINES];
-		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> _tag[N_LINES];
-		T _cache_mem[N_LINES * N_ENTRIES_PER_LINE];
 		l1_cache_t _l1_cache_get;
 		raw_cache_t _raw_cache_core;
 #ifdef __PROFILE__
@@ -106,9 +112,10 @@ class cache {
 
 	public:
 		cache() {
+#pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_valid complete dim=1
 #pragma HLS array_partition variable=_dirty complete dim=1
-#pragma HLS array_partition variable=_tag complete dim=1
+#pragma HLS array_partition variable=_least_recently_used complete dim=1
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 		}
 
@@ -273,8 +280,12 @@ class cache {
 			T data;
 
 			// invalidate all cache lines
-			for (int line = 0; line < N_LINES; line++)
+			for (int line = 0; line < (N_SETS * N_WAYS); line++)
 				_valid[line] = false;
+
+			// initialize way counters
+			for (auto set = 0; set < N_SETS; set++)
+				_least_recently_used[set] = 0;
 
 			_raw_cache_core.init();
 
@@ -298,7 +309,8 @@ CORE_LOOP:		while (1) {
 				// extract information from address
 				addr_t addr(req.addr_main);
 
-				bool is_hit = hit(addr);
+				int way = hit(addr);
+				bool is_hit = (way != -1);
 				// check the request type
 				bool read = ((RD_ENABLED && (req.type == READ_REQ)) ||
 							(!WR_ENABLED));
@@ -306,16 +318,19 @@ CORE_LOOP:		while (1) {
 				if (is_hit) {
 					// read from cache memory
 					_raw_cache_core.get_line(_cache_mem,
-							addr._addr_cache, line);
+							addr.get_addr_cache(way),
+							line);
 				} else {
+					way = get_way(addr);
+
 					// read from main memory
-					load(addr, line);
+					load(addr, way, line);
 
 					if (read) {
 						// store loaded line to cache
 						_raw_cache_core.set_line(
 								_cache_mem,
-								addr._addr_cache,
+								addr.get_addr_cache(way),
 								line);
 					}
 				}
@@ -329,8 +344,8 @@ CORE_LOOP:		while (1) {
 
 					// store the modified line to cache
 					_raw_cache_core.set_line(_cache_mem,
-							addr._addr_cache, line);
-					_dirty[addr._set] = true;
+							addr.get_addr_cache(way), line);
+					_dirty[addr.get_addr_line(way)] = true;
 				}
 
 #ifdef __PROFILE__
@@ -409,11 +424,28 @@ MEM_IF_LOOP:		while (1) {
 		 *
 		 * \param addr	The address to be checked.
 		 *
-		 * \return	\c true on HIT.
-		 * \return	\c false on MISS.
+		 * \return	hitting way on HIT.
+		 * \return	-1 on MISS.
 		 */
-		inline bool hit(addr_t addr) {
-			return (_valid[addr._set] && (addr._tag == _tag[addr._set]));
+		inline int hit(addr_t addr) {
+			for (auto way = 0; way < N_WAYS; way++)
+				if (_valid[addr.get_addr_line(way)] &&
+						(addr._tag == _tag[addr.get_addr_line(way)]))
+					return way;
+
+			return -1;
+		}
+
+		/**
+		 * \brief	Return the least recently used way associable
+		 * 		with \p addr.
+		 *
+		 * \param addr	The address to be associated.
+		 *
+		 * \return	The least recently used way.
+		 */
+		int get_way(addr_t addr) {
+			return _least_recently_used[addr._set]++;
 		}
 
 		/**
@@ -423,16 +455,17 @@ MEM_IF_LOOP:		while (1) {
 		 * \param addr	The address belonging to the line to be loaded.
 		 * \param line	The buffer to store the loaded line.
 		 */
-		void load(addr_t addr, line_t &line) {
+		void load(addr_t addr, int way, line_t &line) {
 #pragma HLS inline
 			bool do_write_back = false;
 			// build write-back address
-			addr_t write_back_addr(_tag[addr._set], addr._set, 0);
+			addr_t write_back_addr(_tag[addr.get_addr_line(way)], addr._set, 0);
 			// check if write back is necessary
-			if (WR_ENABLED && _valid[addr._set] && _dirty[addr._set]) {
+			if (WR_ENABLED && _valid[addr.get_addr_line(way)] &&
+					_dirty[addr.get_addr_line(way)]) {
 				// get the line to be written back
 				_raw_cache_core.get_line(_cache_mem,
-						write_back_addr._addr_cache_first_of_line,
+						write_back_addr.get_addr_cache(way),
 						line);
 				do_write_back = true;
 			}
@@ -449,9 +482,9 @@ MEM_IF_LOOP:		while (1) {
 			// read response from memory interface
 			_load_data.read(line);
 
-			_tag[addr._set] = addr._tag;
-			_valid[addr._set] = true;
-			_dirty[addr._set] = false;
+			_tag[addr.get_addr_line(way)] = addr._tag;
+			_valid[addr.get_addr_line(way)] = true;
+			_dirty[addr.get_addr_line(way)] = false;
 		}
 
 		/**
@@ -460,18 +493,18 @@ MEM_IF_LOOP:		while (1) {
 		 * \param addr	The address belonging to the cache line to be
 		 * 		written back.
 		 */
-		void write_back(addr_t addr) {
+		void write_back(addr_t addr, int way) {
 #pragma HLS inline
 			line_t line;
 
 			// read line
 			_raw_cache_core.get_line(_cache_mem,
-					addr._addr_cache_first_of_line, line);
+					addr.get_addr_cache(way), line);
 
 			// send write request to memory interface
 			_if_request.write({false, true, 0, addr._addr_main, line});
 
-			_dirty[addr._set] = false;
+			_dirty[addr.get_addr_line(way)] = false;
 		}
 
 		/**
@@ -479,11 +512,15 @@ MEM_IF_LOOP:		while (1) {
 		 */
 		void flush() {
 #pragma HLS inline
-FLUSH_LOOP:		for (int line = 0; line < N_LINES; line++) {
-				// check if line has to be written back
-				if (_valid[line] && _dirty[line]) {
-					// write line back
-					write_back(addr_t(_tag[line], line, 0));
+			for (auto set = 0; set < N_SETS; set++) {
+				for (auto way = 0; way < N_WAYS; way++) {
+					addr_t addr(_tag[set * N_WAYS + way], set, 0);
+					// check if line has to be written back
+					if (_valid[addr.get_addr_line(way)] &&
+							_dirty[addr.get_addr_line(way)]) {
+						// write line back
+						write_back(addr, way);
+					}
 				}
 			}
 		}

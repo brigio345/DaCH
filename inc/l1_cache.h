@@ -7,7 +7,7 @@
 template <typename line_t, size_t ADDR_SIZE, size_t TAG_SIZE, size_t N_ENTRIES_PER_LINE>
 class l1_cache {
 	private:
-		typedef address<ADDR_SIZE, TAG_SIZE, 0> l1_addr_t;
+		typedef address<ADDR_SIZE, TAG_SIZE, 0, 0> l1_addr_t;
 
 		bool _valid;
 		line_t _line;
