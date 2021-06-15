@@ -467,8 +467,8 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			auto do_write_back = false;
 			// build write-back address
-			addr_t write_back_addr(_tag[addr._addr_line], addr._set, 0);
-			write_back_addr.set_way(addr._way);
+			addr_t write_back_addr(_tag[addr._addr_line], addr._set,
+					0, addr._way);
 			// check if write back is necessary
 			if (WR_ENABLED && _valid[addr._addr_line] &&
 					_dirty[addr._addr_line]) {
@@ -523,8 +523,8 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			for (auto set = 0; set < N_SETS; set++) {
 				for (auto way = 0; way < N_WAYS; way++) {
-					addr_t addr(_tag[set * N_WAYS + way], set, 0);
-					addr.set_way(way);
+					addr_t addr(_tag[set * N_WAYS + way], set,
+							0, way);
 					// check if line has to be written back
 					if (_valid[addr._addr_line] &&
 							_dirty[addr._addr_line]) {

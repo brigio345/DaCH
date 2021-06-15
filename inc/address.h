@@ -36,7 +36,8 @@ class address {
 
 		address(ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> tag,
 				ap_uint<(SET_SIZE > 0) ? SET_SIZE : 1> set,
-				ap_uint<(OFF_SIZE > 0) ? OFF_SIZE : 1> off):
+				ap_uint<(OFF_SIZE > 0) ? OFF_SIZE : 1> off,
+				ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> way):
 				_tag(tag), _set(set), _off(off) {
 			_addr_main = 0;
 
@@ -46,6 +47,8 @@ class address {
 				_addr_main[i + OFF_SIZE] = set[i];
 			for (auto i = 0; i < TAG_SIZE; i++)
 				_addr_main[i + OFF_SIZE + SET_SIZE] = _tag[i];
+
+			set_way(way);
 		}
 
 		void set_way(ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> way) {
