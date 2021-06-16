@@ -12,7 +12,7 @@ class address {
 
 	public:
 		ap_uint<ADDR_SIZE> _addr_main;
-		ap_uint<CACHE_ADDR_SIZE> _addr_cache;
+		ap_uint<(CACHE_ADDR_SIZE > 0) ? CACHE_ADDR_SIZE : 1> _addr_cache;
 		ap_uint<(LINE_ADDR_SIZE > 0) ? LINE_ADDR_SIZE : 1> _addr_line;
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> _tag;
 		ap_uint<(SET_SIZE > 0) ? SET_SIZE : 1> _set;
