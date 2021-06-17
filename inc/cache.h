@@ -70,7 +70,9 @@ class cache {
 				N_ENTRIES_PER_LINE> raw_cache_t;
 
 		typedef enum {
-			READ_REQ, WRITE_REQ, STOP_REQ
+			READ_REQ,
+			WRITE_REQ,
+			STOP_REQ
 		} request_type_t;
 
 #ifdef __PROFILE__
