@@ -111,9 +111,9 @@ class cache {
 		raw_cache_t _raw_cache_core;
 #ifdef __PROFILE__
 		hls::stream<hit_status_t> _hit_status;
-		int n_reqs = 0;
-		int n_hits = 0;
-		int n_l1_hits = 0;
+		int _n_reqs = 0;
+		int _n_hits = 0;
+		int _n_l1_hits = 0;
 #endif /* __PROFILE__ */
 
 	public:
@@ -255,19 +255,19 @@ class cache {
 
 #ifdef __PROFILE__
 		int get_n_reqs() {
-			return n_reqs;
+			return _n_reqs;
 		}
 
 		int get_n_hits() {
-			return n_hits;
+			return _n_hits;
 		}
 
 		int get_n_l1_hits() {
-			return n_l1_hits;
+			return _n_l1_hits;
 		}
 
 		float get_hit_ratio() {
-			return ((n_hits + n_l1_hits) / ((float) n_reqs));
+			return ((_n_hits + _n_l1_hits) / ((float) _n_reqs));
 		}
 #endif /* __PROFILE__ */
 
@@ -548,12 +548,12 @@ MEM_IF_LOOP:		while (1) {
 
 #ifdef __PROFILE__
 		void update_profiling(hit_status_t status) {
-			n_reqs++;
+			_n_reqs++;
 
 			if (status == HIT)
-				n_hits++;
+				_n_hits++;
 			else if (status == L1_HIT)
-				n_l1_hits++;
+				_n_l1_hits++;
 		}
 #endif /* __PROFILE__ */
 
