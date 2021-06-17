@@ -54,12 +54,16 @@ class cache {
 		static_assert(((MAIN_SIZE % N_ENTRIES_PER_LINE) == 0),
 				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
 
-		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> addr_t;
 #ifdef __SYNTHESIS__
-		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
+		template <typename TYPE, size_t SIZE>
+			using array_t = hls::vector<TYPE, SIZE>;
 #else
-		typedef std::array<T, N_ENTRIES_PER_LINE> line_t;
+		template <typename TYPE, size_t SIZE>
+			using array_t = std::array<TYPE, SIZE>;
 #endif /* __SYNTHESIS__ */
+
+		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> addr_t;
+		typedef array_t<T, N_ENTRIES_PER_LINE> line_t;
 		typedef l1_cache<line_t, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
 				N_ENTRIES_PER_LINE> l1_cache_t;
 		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
