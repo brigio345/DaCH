@@ -83,9 +83,8 @@ class cache {
 
 	private:
 		typedef struct {
-			ap_uint<ADDR_SIZE> addr_main;
 			request_type_t type;
-			T data;
+			ap_uint<ADDR_SIZE> addr_main;
 		} request_t;
 
 		typedef struct {
@@ -102,6 +101,7 @@ class cache {
 		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> _least_recently_used[N_SETS];
 		T _cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
 		hls::stream<line_t, 4> _rd_data;
+		hls::stream<T, 4> _wr_data;
 		hls::stream<request_t, 4> _request;
 		hls::stream<line_t, 2> _load_data;
 		hls::stream<mem_req_t, 2> _if_request;
@@ -166,7 +166,7 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-			_request.write({0, STOP_REQ, 0});
+			_request.write({STOP_REQ, 0});
 		}
 
 		/**
@@ -187,7 +187,7 @@ class cache {
 
 			if (!l1_hit) {
 				// send read request to cache
-				_request.write({addr_main, READ_REQ, 0});
+				_request.write({READ_REQ, addr_main});
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
@@ -244,7 +244,8 @@ class cache {
 			_l1_cache_get.invalidate_line(addr_main);
 
 			// send write request to cache
-			_request.write({addr_main, WRITE_REQ, data});
+			_request.write({WRITE_REQ, addr_main});
+			_wr_data.write(data);
 #ifdef __PROFILE__
 			update_profiling(_hit_status.read());
 #endif /* __PROFILE__ */
@@ -310,6 +311,14 @@ CORE_LOOP:		while (1) {
 				if (req.type == STOP_REQ)
 					break;
 
+				// check the request type
+				auto read = ((RD_ENABLED && (req.type == READ_REQ)) ||
+						(!WR_ENABLED));
+
+				// in case of write request, read data to be written
+				if (!read)
+					_wr_data.read(data);
+
 				// extract information from address
 				addr_t addr(req.addr_main);
 
@@ -320,10 +329,6 @@ CORE_LOOP:		while (1) {
 					way = get_way(addr);
 
 				addr.set_way(way);
-
-				// check the request type
-				auto read = ((RD_ENABLED && (req.type == READ_REQ)) ||
-							(!WR_ENABLED));
 
 				if (is_hit) {
 					// read from cache memory
@@ -348,7 +353,7 @@ CORE_LOOP:		while (1) {
 					_rd_data.write(line);
 				} else {
 					// modify the line
-					line[addr._off] = req.data;
+					line[addr._off] = data;
 
 					// store the modified line to cache
 					_raw_cache_core.set_line(_cache_mem,
