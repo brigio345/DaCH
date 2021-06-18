@@ -19,7 +19,6 @@
 #include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
-#include "ap_int.h"
 #include "ap_utils.h"
 #include "utils.h"
 #ifdef __SYNTHESIS__
@@ -27,6 +26,7 @@
 #else
 #include <thread>
 #include <array>
+#include <cassert>
 #endif /* __SYNTHESIS__ */
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
@@ -42,6 +42,7 @@ class cache {
 		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
 		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
+		static const size_t WAY_MASK = (~(-1U << WAY_SIZE));
 
 		static_assert(((1 << SET_SIZE) == N_SETS),
 				"N_SETS must be a power of 2");
@@ -86,21 +87,21 @@ class cache {
 	private:
 		typedef struct {
 			request_type_t type;
-			ap_uint<ADDR_SIZE> addr_main;
+			unsigned int addr_main;
 		} request_t;
 
 		typedef struct {
 			bool load;
 			bool write_back;
-			ap_uint<ADDR_SIZE> load_addr;
-			ap_uint<ADDR_SIZE> write_back_addr;
+			unsigned int load_addr;
+			unsigned int write_back_addr;
 			line_t line;
 		} mem_req_t;
 
-		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> _tag[N_SETS * N_WAYS];
+		unsigned int _tag[N_SETS * N_WAYS];
 		bool _valid[N_SETS * N_WAYS];
 		bool _dirty[N_SETS * N_WAYS];
-		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> _least_recently_used[N_SETS];
+		unsigned int _least_recently_used[N_SETS];
 		T _cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
 		hls::stream<line_t, 4> _rd_data;
 		hls::stream<T, 4> _wr_data;
@@ -178,7 +179,7 @@ class cache {
 		 * 			the cache line to be read.
 		 * \param line		The buffer to store the read line.
 		 */
-		void get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+		void get_line(unsigned int addr_main, line_t &line) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			assert(addr_main < MAIN_SIZE);
@@ -216,7 +217,7 @@ class cache {
 		 *
 		 * \return		The read data element.
 		 */
-		T get(ap_uint<ADDR_SIZE> addr_main) {
+		T get(unsigned int addr_main) {
 #pragma HLS inline
 			line_t line;
 
@@ -236,7 +237,7 @@ class cache {
 		 * 			the data element to be written.
 		 * \param data		The data to be written.
 		 */
-		void set(ap_uint<ADDR_SIZE> addr_main, T data) {
+		void set(unsigned int addr_main, T data) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			assert(addr_main < MAIN_SIZE);
@@ -462,9 +463,12 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	The least recently used way.
 		 */
 		int get_way(addr_t addr) {
-			if (WAY_SIZE == 0)
-				return 0;
-			return _least_recently_used[addr._set]++;
+			auto way = _least_recently_used[addr._set];
+
+			_least_recently_used[addr._set]++;
+			_least_recently_used[addr._set] &= WAY_MASK;
+
+			return way;
 		}
 
 		/**
@@ -561,9 +565,9 @@ MEM_IF_LOOP:		while (1) {
 		class inner {
 			private:
 				cache *_cache;
-				ap_uint<ADDR_SIZE> _addr_main;
+				unsigned int _addr_main;
 			public:
-				inner(cache *c, ap_uint<ADDR_SIZE> addr_main):
+				inner(cache *c, unsigned int addr_main):
 					_cache(c), _addr_main(addr_main) {}
 
 				operator T() const {

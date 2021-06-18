@@ -1,7 +1,6 @@
 #ifndef L1_CACHE_H
 #define L1_CACHE_H
 
-#include "ap_int.h"
 #include "address.h"
 
 template <typename line_t, size_t ADDR_SIZE, size_t TAG_SIZE, size_t N_ENTRIES_PER_LINE>
@@ -11,14 +10,14 @@ class l1_cache {
 
 		bool _valid;
 		line_t _line;
-		ap_uint<TAG_SIZE> _tag;
+		unsigned int _tag;
 
 	public:
 		void init() {
 			_valid = false;
 		}
 
-		bool get_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+		bool get_line(unsigned int addr_main, line_t &line) {
 			l1_addr_t addr(addr_main);
 
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
@@ -27,7 +26,7 @@ class l1_cache {
 			return hit(addr);
 		}
 
-		void set_line(ap_uint<ADDR_SIZE> addr_main, line_t &line) {
+		void set_line(unsigned int addr_main, line_t &line) {
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
 				_line[off] = line[off];
 			l1_addr_t addr(addr_main);
@@ -35,7 +34,7 @@ class l1_cache {
 			_tag = addr._tag;
 		}
 
-		void invalidate_line(ap_uint<ADDR_SIZE> addr_main) {
+		void invalidate_line(unsigned int addr_main) {
 			l1_addr_t addr(addr_main);
 
 			if (hit(addr))
