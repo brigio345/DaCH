@@ -42,7 +42,6 @@ class cache {
 		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
 		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
-		static const size_t WAY_MASK = (~(-1U << WAY_SIZE));
 
 		static_assert(((1 << SET_SIZE) == N_SETS),
 				"N_SETS must be a power of 2");
@@ -463,10 +462,11 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	The least recently used way.
 		 */
 		int get_way(addr_t addr) {
-			auto way = _least_recently_used[addr._set];
+			unsigned int way = _least_recently_used[addr._set];
+			unsigned int way_mask = (~(-1U << WAY_SIZE));
 
 			_least_recently_used[addr._set]++;
-			_least_recently_used[addr._set] &= WAY_MASK;
+			_least_recently_used[addr._set] &= way_mask;
 
 			return way;
 		}

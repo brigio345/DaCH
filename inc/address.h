@@ -5,9 +5,6 @@ template <size_t ADDR_SIZE, size_t TAG_SIZE, size_t SET_SIZE, size_t WAY_SIZE>
 class address {
 	private:
 		static const size_t OFF_SIZE = (ADDR_SIZE - (TAG_SIZE + SET_SIZE));
-		static const unsigned int OFF_MASK = (~(-1U << OFF_SIZE));
-		static const unsigned int SET_MASK = (~(-1U << SET_SIZE));
-		static const unsigned int TAG_MASK = (~(-1U << TAG_SIZE));
 
 	public:
 		unsigned int _addr_main;
@@ -19,9 +16,13 @@ class address {
 		unsigned int _way;
 
 		address(unsigned int addr_main): _addr_main(addr_main) {
-			_off = (addr_main & OFF_MASK);
-			_set = ((addr_main >> OFF_SIZE) & SET_MASK);
-			_tag = ((addr_main >> (OFF_SIZE + SET_SIZE)) & TAG_MASK);
+			unsigned int off_mask = (~(-1U << OFF_SIZE));
+			unsigned int set_mask = (~(-1U << SET_SIZE));
+			unsigned int tag_mask = (~(-1U << TAG_SIZE));
+
+			_off = (addr_main & off_mask);
+			_set = ((addr_main >> OFF_SIZE) & set_mask);
+			_tag = ((addr_main >> (OFF_SIZE + SET_SIZE)) & tag_mask);
 		}
 
 		address(unsigned int tag, unsigned int set,
