@@ -5,7 +5,7 @@
  *
  *		Cache module whose characteristics are:
  *			- address mapping: set-associative;
- *			- replacement policy: least recently used;
+ *			- replacement policy: last-in first-out;
  *			- write policy: write-back.
  *
  *		Synthesizability is guaranteed with Vitis HLS 2020.2, with II=1
@@ -100,7 +100,7 @@ class cache {
 		unsigned int _tag[N_SETS * N_WAYS];
 		bool _valid[N_SETS * N_WAYS];
 		bool _dirty[N_SETS * N_WAYS];
-		unsigned int _least_recently_used[N_SETS];
+		unsigned int _least_recently_inserted[N_SETS];
 		T _cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
 		hls::stream<line_t, 4> _rd_data;
 		hls::stream<T, 4> _wr_data;
@@ -121,7 +121,7 @@ class cache {
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_valid complete dim=1
 #pragma HLS array_partition variable=_dirty complete dim=1
-#pragma HLS array_partition variable=_least_recently_used complete dim=1
+#pragma HLS array_partition variable=_least_recently_inserted complete dim=1
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 		}
 
@@ -292,7 +292,7 @@ class cache {
 
 			// initialize way counters
 			for (auto set = 0; set < N_SETS; set++)
-				_least_recently_used[set] = 0;
+				_least_recently_inserted[set] = 0;
 
 			_raw_cache_core.init();
 
@@ -454,19 +454,19 @@ MEM_IF_LOOP:		while (1) {
 		}
 
 		/**
-		 * \brief	Return the least recently used way associable
+		 * \brief	Return the least recently inserted way associable
 		 * 		with \p addr.
 		 *
 		 * \param addr	The address to be associated.
 		 *
-		 * \return	The least recently used way.
+		 * \return	The least recently inserted way.
 		 */
 		int get_way(addr_t addr) {
-			unsigned int way = _least_recently_used[addr._set];
+			unsigned int way = _least_recently_inserted[addr._set];
 			unsigned int way_mask = (~(-1U << WAY_SIZE));
 
-			_least_recently_used[addr._set]++;
-			_least_recently_used[addr._set] &= way_mask;
+			_least_recently_inserted[addr._set]++;
+			_least_recently_inserted[addr._set] &= way_mask;
 
 			return way;
 		}
