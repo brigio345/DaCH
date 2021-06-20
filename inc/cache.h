@@ -5,7 +5,7 @@
  *
  *		Cache module whose characteristics are:
  *			- address mapping: set-associative;
- *			- replacement policy: last-in first-out;
+ *			- replacement policy: least recently used;
  *			- write policy: write-back.
  *
  *		Synthesizability is guaranteed with Vitis HLS 2020.2, with II=1
@@ -100,7 +100,7 @@ class cache {
 		unsigned int _tag[N_SETS * N_WAYS];
 		bool _valid[N_SETS * N_WAYS];
 		bool _dirty[N_SETS * N_WAYS];
-		unsigned int _least_recently_inserted[N_SETS];
+		unsigned int _lru[N_SETS][N_WAYS];
 		T _cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
 		hls::stream<line_t, 4> _rd_data;
 		hls::stream<T, 4> _wr_data;
@@ -121,7 +121,7 @@ class cache {
 #pragma HLS array_partition variable=_tag complete dim=1
 #pragma HLS array_partition variable=_valid complete dim=1
 #pragma HLS array_partition variable=_dirty complete dim=1
-#pragma HLS array_partition variable=_least_recently_inserted complete dim=1
+#pragma HLS array_partition variable=_lru complete dim=0
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 		}
 
@@ -291,8 +291,10 @@ class cache {
 				_valid[line] = false;
 
 			// initialize way counters
-			for (auto set = 0; set < N_SETS; set++)
-				_least_recently_inserted[set] = 0;
+			for (auto set = 0; set < N_SETS; set++) {
+				for (auto way = 0; way < N_WAYS; way++)
+					_lru[set][way] = way;
+			}
 
 			_raw_cache_core.init();
 
@@ -443,30 +445,58 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	-1 on MISS.
 		 */
 		inline int hit(addr_t addr) {
+			auto hit_way = -1;
 			for (auto way = 0; way < N_WAYS; way++) {
 				addr.set_way(way);
 				if (_valid[addr._addr_line] &&
-						(addr._tag == _tag[addr._addr_line]))
-					return way;
+						(addr._tag == _tag[addr._addr_line])) {
+					hit_way = way;
+					update_way(addr);
+					break;
+				}
 			}
 
-			return -1;
+			return hit_way;
 		}
 
 		/**
-		 * \brief	Return the least recently inserted way associable
+		 * \brief	Update least-recently-used data structures.
+		 *
+		 * \param addr	The address which has been used.
+		 */
+		void update_way(addr_t addr) {
+			// find the position of the last used way
+			int lru_idx;
+			for (lru_idx = 0; lru_idx < N_WAYS; lru_idx++)
+				if (_lru[addr._set][lru_idx] == addr._way)
+					break;
+
+			// fill the vacant position of the last used way,
+			// by shifting other ways to the left
+			for (auto way = 0; way < (N_WAYS - 1); way++) {
+				if (way >= lru_idx) {
+					_lru[addr._set][way] =
+						_lru[addr._set][way + 1];
+				}
+			}
+
+			// put the last used way to the rightmost position
+			_lru[addr._set][N_WAYS - 1] = addr._way;
+		}
+
+		/**
+		 * \brief	Return the least recently used way associable
 		 * 		with \p addr.
 		 *
 		 * \param addr	The address to be associated.
 		 *
-		 * \return	The least recently inserted way.
+		 * \return	The least recently used way.
 		 */
 		int get_way(addr_t addr) {
-			unsigned int way = _least_recently_inserted[addr._set];
-			unsigned int way_mask = (~(-1U << WAY_SIZE));
+			unsigned int way = _lru[addr._set][0];
 
-			_least_recently_inserted[addr._set]++;
-			_least_recently_inserted[addr._set] &= way_mask;
+			addr.set_way(way);
+			update_way(addr);
 
 			return way;
 		}
