@@ -15,6 +15,7 @@
 #define CACHE_H
 
 #include "address.h"
+#include "arbiter.h"
 #include "l1_cache.h"
 #include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
@@ -33,7 +34,7 @@
 #define __PROFILE__
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
-template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t MAIN_SIZE,
+template <typename T, typename ARBITER_T, bool RD_ENABLED, bool WR_ENABLED, size_t MAIN_SIZE,
 	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE>
 class cache {
 	private:
@@ -97,6 +98,7 @@ class cache {
 			line_t line;
 		} mem_req_t;
 
+		unsigned int _id;
 		unsigned int _tag[N_SETS * N_WAYS];
 		bool _valid[N_SETS * N_WAYS];
 		bool _dirty[N_SETS * N_WAYS];
@@ -125,6 +127,10 @@ class cache {
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 		}
 
+		void set_id(unsigned int id) {
+			_id = id;
+		}
+
 		/**
 		 * \brief	Initialize the cache.
 		 *
@@ -147,14 +153,14 @@ class cache {
 		 * 		a thread separated from the thread in which
 		 * 		cache is accessed.
 		 */
-		void run(T *main_mem) {
+		void run(T *main_mem, ARBITER_T &arbiter) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
 			run_core();
-			run_mem_if(main_mem);
+			run_mem_if(main_mem, arbiter);
 #else
 			std::thread core_thd(&cache::run_core, this);
-			std::thread mem_if_thd(&cache::run_mem_if, this, main_mem);
+			std::thread mem_if_thd(&cache::run_mem_if, this, main_mem, std::ref(arbiter));
 
 			core_thd.join();
 			mem_if_thd.join();
@@ -395,13 +401,10 @@ CORE_LOOP:		while (1) {
 		 * 			\ref run_core when it is in turn stopped
 		 * 			from the outside.
 		 */
-		void run_mem_if(T *main_mem) {
+		void run_mem_if(T *main_mem, ARBITER_T &arbiter) {
 			mem_req_t req;
 			T *main_line;
 			line_t line;
-			raw_cache_t raw_cache_mem_if;
-
-			raw_cache_mem_if.init();
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
@@ -422,18 +425,13 @@ MEM_IF_LOOP:		while (1) {
 
 				if (req.load) {
 					// read line from main memory
-					raw_cache_mem_if.get_line(main_mem,
-							req.load_addr, line);
+					line = arbiter.get(req.load_addr, _id);
 					// send the response to the read request
 					_load_data.write(line);
 				}
-				
-				if (WR_ENABLED && req.write_back) {
-					// write line to main memory
-					raw_cache_mem_if.set_line(main_mem,
-							req.write_back_addr, req.line);
-				}
 			}
+
+			arbiter.stop(_id);
 		}
 
 		/**
