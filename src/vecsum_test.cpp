@@ -2,12 +2,14 @@
 #ifndef __SYNTHESIS__
 #include <thread>
 #endif	/* __SYNTHESIS__ */
-#include "matrix.h"
-#include "cache.h"
+#include "cache_multiport.h"
+#define DEBUG
 
 #define N 128
 
-typedef cache<int, true, false, N, 2, 1, 8> cache_a;
+static const size_t RD_PORTS = 4;
+
+typedef cache_multiport<int, RD_PORTS, N, 2, 1, 8> cache_a;
 
 void vecsum(int a[N], int &sum) {
 	int tmp = 0;
@@ -22,11 +24,16 @@ void vecsum(int a[N], int &sum) {
 void vecsum_cache(cache_a &a, int &sum) {
 #pragma HLS inline off
 	int tmp = 0;
+	int data;
 
 	a.init();
 
 	for (int i = 0; i < N; i++) {
-		tmp += a.get(i);
+		data = a.get(i);
+		tmp += data;
+#ifdef DEBUG
+		std::cout << i << " " << data << std::endl;
+#endif /* DEBUG */
 	}
 
 	sum = tmp;
@@ -66,9 +73,8 @@ int main() {
 	int sum;
 	int sum_ref;
 
-	matrix::generate_random<int>(a, 1, N);
-	std::cout << "a=";
-	matrix::print(a, 1, N);
+	for (auto i = 0; i < N; i++)
+		a[i] = i;
 	vecsum_top(a, sum);
 	vecsum(a, sum_ref);
 	std::cout << "sum=" << sum << std::endl;
