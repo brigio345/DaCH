@@ -20,6 +20,9 @@ class cache_multiport {
 		unsigned int _rd_port;
 
 	public:
+		cache_multiport() {
+#pragma HLS array_partition variable=_caches complete
+		}
 		/**
 		 * \brief	Initialize the cache.
 		 *
