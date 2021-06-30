@@ -29,7 +29,6 @@ class cache_multiport {
 		void init() {
 			for (auto port = 0; port < RD_PORTS; port++) {
 #pragma HLS unroll
-				_caches[port].set_id(port);
 				_caches[port].init();
 			}
 
@@ -55,7 +54,7 @@ class cache_multiport {
 			arbiter.run(main_mem);
 			for (auto port = 0; port < RD_PORTS; port++) {
 #pragma HLS unroll
-				_caches[port].run(main_mem, arbiter);
+				_caches[port].run(main_mem, arbiter, port);
 			}
 #else
 			std::thread arbiter_thd(&arbiter_t::run,
@@ -67,7 +66,8 @@ class cache_multiport {
 				cache_thds[port] = std::thread(&cache_t::run,
 						std::ref(_caches[port]),
 						std::ref(main_mem),
-						std::ref(arbiter));
+						std::ref(arbiter),
+						port);
 			}
 
 			for (auto port = 0; port < RD_PORTS; port++) {

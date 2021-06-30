@@ -98,7 +98,6 @@ class cache {
 			line_t line;
 		} mem_req_t;
 
-		unsigned int _id;
 		unsigned int _tag[N_SETS * N_WAYS];
 		bool _valid[N_SETS * N_WAYS];
 		bool _dirty[N_SETS * N_WAYS];
@@ -127,10 +126,6 @@ class cache {
 #pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 		}
 
-		void set_id(unsigned int id) {
-			_id = id;
-		}
-
 		/**
 		 * \brief	Initialize the cache.
 		 *
@@ -153,14 +148,14 @@ class cache {
 		 * 		a thread separated from the thread in which
 		 * 		cache is accessed.
 		 */
-		void run(T *main_mem, ARBITER_T &arbiter) {
+		void run(T *main_mem, ARBITER_T &arbiter, unsigned int id) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
 			run_core();
-			run_mem_if(main_mem, arbiter);
+			run_mem_if(main_mem, arbiter, id);
 #else
 			std::thread core_thd(&cache::run_core, this);
-			std::thread mem_if_thd(&cache::run_mem_if, this, main_mem, std::ref(arbiter));
+			std::thread mem_if_thd(&cache::run_mem_if, this, main_mem, std::ref(arbiter), id);
 
 			core_thd.join();
 			mem_if_thd.join();
@@ -401,7 +396,8 @@ CORE_LOOP:		while (1) {
 		 * 			\ref run_core when it is in turn stopped
 		 * 			from the outside.
 		 */
-		void run_mem_if(T *main_mem, ARBITER_T &arbiter) {
+		void run_mem_if(T *main_mem, ARBITER_T &arbiter, unsigned int id) {
+#pragma HLS function_instantiate variable=id
 			mem_req_t req;
 			T *main_line;
 			line_t line;
@@ -425,13 +421,13 @@ MEM_IF_LOOP:		while (1) {
 
 				if (req.load) {
 					// read line from main memory
-					line = arbiter.get(req.load_addr, _id);
+					line = arbiter.get(req.load_addr, id);
 					// send the response to the read request
 					_load_data.write(line);
 				}
 			}
 
-			arbiter.stop(_id);
+			arbiter.stop(id);
 		}
 
 		/**
