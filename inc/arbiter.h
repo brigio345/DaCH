@@ -57,9 +57,10 @@ class arbiter {
 		 */
 		void run(T *main_mem) {
 #pragma HLS inline off
-CORE_LOOP:		while (1) {
-				for (auto reader = 0; reader < N_READERS; reader++) {
+ARBITER_LOOP:		while (1) {
 #pragma HLS pipeline
+				for (auto reader = 0; reader < N_READERS; reader++) {
+#pragma HLS unroll
 					request_t req;
 					// get request and
 					// make pipeline flushable (to avoid deadlock)
