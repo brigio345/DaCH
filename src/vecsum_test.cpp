@@ -29,6 +29,8 @@ void vecsum_cache(cache_a &a, int &sum) {
 	a.init();
 
 	for (int i = 0; i < N; i++) {
+#pragma HLS pipeline
+#pragma HLS unroll factor=RD_PORTS
 		data = a.get(i);
 		tmp += data;
 #ifdef DEBUG
