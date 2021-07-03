@@ -13,8 +13,8 @@ template <typename T, size_t RD_PORTS, size_t MAIN_SIZE, size_t N_SETS,
 class cache_multiport {
 	private:
 		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE> arbiter_t;
-		typedef cache<T, arbiter_t, true, false, MAIN_SIZE, N_SETS,
-			N_WAYS, N_ENTRIES_PER_LINE> cache_t;
+		typedef cache<T, RD_PORTS, false, MAIN_SIZE, N_SETS,
+			N_WAYS, N_ENTRIES_PER_LINE, false> cache_t;
 
 		cache_t _caches[RD_PORTS];
 		unsigned int _rd_port;
@@ -23,6 +23,7 @@ class cache_multiport {
 		cache_multiport() {
 #pragma HLS array_partition variable=_caches complete
 		}
+
 		/**
 		 * \brief	Initialize the cache.
 		 *
@@ -57,7 +58,7 @@ class cache_multiport {
 			arbiter.run(main_mem);
 			for (auto port = 0; port < RD_PORTS; port++) {
 #pragma HLS unroll
-				_caches[port].run(main_mem, arbiter, port);
+				_caches[port].run_arbitrated(main_mem, port, &arbiter);
 			}
 #else
 			std::thread arbiter_thd(&arbiter_t::run,
@@ -66,11 +67,11 @@ class cache_multiport {
 			std::thread cache_thds[RD_PORTS];
 			for (auto port = 0; port < RD_PORTS; port++) {
 #pragma HLS unroll
-				cache_thds[port] = std::thread(&cache_t::run,
+				cache_thds[port] = std::thread(&cache_t::run_arbitrated,
 						std::ref(_caches[port]),
 						std::ref(main_mem),
-						std::ref(arbiter),
-						port);
+						port,
+						&arbiter);
 			}
 
 			for (auto port = 0; port < RD_PORTS; port++) {

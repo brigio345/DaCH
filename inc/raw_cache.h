@@ -34,12 +34,16 @@ class raw_cache {
 			raw_addr_t addr(addr_main);
 
 			if (hit(addr)) {
-				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
+				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS unroll
 					line[off] = _line[off];
+				}
 			} else {
 				T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
-				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
+				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS unroll
 					line[off] = main_line[off];
+				}
 			}
 		}
 
@@ -48,8 +52,10 @@ class raw_cache {
 			raw_addr_t addr(addr_main);
 
 			T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
-			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
+			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS unroll
 				main_line[off] = _line[off] = line[off];
+			}
 			
 			_tag = addr._tag;
 			_valid = true;
