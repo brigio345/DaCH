@@ -7,9 +7,9 @@
 
 #define N 128
 
-static const size_t RD_PORTS = 4;
+static const size_t RD_PORTS = 2;
 
-typedef cache_multiport<int, RD_PORTS, N, 2, 1, 8> cache_a;
+typedef cache_multiport<int, RD_PORTS, N, 1, 1, 8> cache_a;
 
 void vecsum(int a[N], int &sum) {
 	int tmp = 0;
@@ -28,7 +28,7 @@ void vecsum_cache(cache_a &a, int &sum) {
 
 	a.init();
 
-	for (int i = 0; i < N; i++) {
+VECSUM_LOOP:	for (int i = 0; i < N; i++) {
 #pragma HLS pipeline
 #pragma HLS unroll factor=RD_PORTS
 		data = a.get(i);
@@ -60,7 +60,7 @@ extern "C" void vecsum_top(int a[N], int &sum) {
 #else
 	a_cache.init();
 
-	std::thread cache_thread(&cache_a::run, std::ref(a_cache), std::ref(a));
+	std::thread cache_thread(&cache_a::run, std::ref(a_cache), a);
 	std::thread vecsum_thread(vecsum_cache, std::ref(a_cache), std::ref(sum));
 
 	vecsum_thread.join();

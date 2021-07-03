@@ -5,15 +5,18 @@
 #endif	/* __SYNTHESIS__ */
 #include "matrix.h"
 #include "cache.h"
+#include "cache_multiport.h"
 
-#define N 4
-#define M 4
+#define N 8
+#define M 8
 #define P 8
 
+static const int RD_PORTS = 2;
+
 typedef int data_type;
-typedef cache<data_type, true, false, N * M, 2, 1, M> cache_a;
-typedef cache<data_type, true, false, M * P, M, 1, 4> cache_b;
-typedef cache<data_type, false, true, N * P, 2, 1, M> cache_c;
+typedef cache_multiport<data_type, RD_PORTS, N * M, 1, 1, M> cache_a;
+typedef cache_multiport<data_type, RD_PORTS, M * P, 1, M, 4> cache_b;
+typedef cache<data_type, false, true, N * P, 2, 1, M, false> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 #pragma HLS inline off
@@ -21,7 +24,7 @@ void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 	b_cache.init();
 	c_cache.init();
 
-	matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P>
+	matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P, RD_PORTS>
 			(a_cache, b_cache, c_cache);
 	a_cache.stop();
 	b_cache.stop();
@@ -32,9 +35,6 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 #pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0
 #pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1
 #pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2
-#pragma HLS stable variable=a_arr
-#pragma HLS stable variable=b_arr
-#pragma HLS stable variable=c_arr
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #pragma HLS dataflow disable_start_propagation
@@ -52,10 +52,10 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	b_cache.init();
 	c_cache.init();
 
-	std::thread a_thd(&cache_a::run, std::ref(a_cache), std::ref(a_arr));
-	std::thread b_thd(&cache_b::run, std::ref(b_cache), std::ref(b_arr));
-	std::thread c_thd(&cache_c::run, std::ref(c_cache), std::ref(c_arr));
-	std::thread matmul_thread(&matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P>,
+	std::thread a_thd(&cache_a::run, std::ref(a_cache), a_arr);
+	std::thread b_thd(&cache_b::run, std::ref(b_cache), b_arr);
+	std::thread c_thd(&cache_c::run, std::ref(c_cache), c_arr);
+	std::thread matmul_thread(&matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P, RD_PORTS>,
 			std::ref(a_cache), std::ref(b_cache), std::ref(c_cache));
 
 	matmul_thread.join();
