@@ -20,6 +20,10 @@ typedef cache<data_type, false, true, N * P, 2, 1, M, false> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 #pragma HLS inline off
+	a_cache.init();
+	b_cache.init();
+	c_cache.init();
+
 	matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P, RD_PORTS>
 			(a_cache, b_cache, c_cache);
 	a_cache.stop();
@@ -44,6 +48,10 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	c_cache.run(c_arr);
 	multiply_syn(a_cache, b_cache, c_cache);
 #else
+	a_cache.init();
+	b_cache.init();
+	c_cache.init();
+
 	std::thread a_thd([&]{a_cache.run(a_arr);});
 	std::thread b_thd([&]{b_cache.run(b_arr);});
 	std::thread c_thd([&]{c_cache.run(c_arr);});

@@ -26,6 +26,8 @@ void vecsum_cache(cache_a &a, int &sum) {
 	int tmp = 0;
 	int data;
 
+	a.init();
+
 VECSUM_LOOP:	for (int i = 0; i < N; i++) {
 #pragma HLS pipeline
 #pragma HLS unroll factor=RD_PORTS
@@ -56,6 +58,8 @@ extern "C" void vecsum_top(int a[N], int &sum) {
 	a_cache.run(a);
 	vecsum_syn(a_cache, sum);
 #else
+	a_cache.init();
+
 	std::thread cache_thread([&]{a_cache.run(a);});
 	std::thread vecsum_thread([&]{vecsum_cache(a_cache, sum);});
 
