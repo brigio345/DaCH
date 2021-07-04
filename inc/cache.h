@@ -134,7 +134,8 @@ class cache {
 		 * 		if the cache is enabled to read.
 		 */
 		void init() {
-			_l1_cache_get.init();
+			if (L1_CACHE)
+				_l1_cache_get.init();
 		}
 
 		/**
@@ -251,8 +252,10 @@ class cache {
 			assert(addr_main < MAIN_SIZE);
 #endif /* __SYNTHESIS__ */
 
-			// inform L1 cache about the writing
-			_l1_cache_get.invalidate_line(addr_main);
+			if (L1_CACHE) {
+				// inform L1 cache about the writing
+				_l1_cache_get.invalidate_line(addr_main);
+			}
 
 			// send write request to cache
 			_request.write({WRITE_REQ, addr_main});
