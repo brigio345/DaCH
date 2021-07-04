@@ -109,6 +109,7 @@ class cache_multiport {
 			return get(addr_main, port);
 		}
 
+	private:
 		/**
 		 * \brief		Request to read a data element.
 		 *

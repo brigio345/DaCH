@@ -86,7 +86,6 @@ class cache {
 		} hit_status_t;
 #endif /* __PROFILE__ */
 
-	private:
 		typedef struct {
 			request_type_t type;
 			unsigned int addr_main;
