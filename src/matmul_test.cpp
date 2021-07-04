@@ -52,11 +52,11 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	b_cache.init();
 	c_cache.init();
 
-	std::thread a_thd(&cache_a::run, std::ref(a_cache), a_arr);
-	std::thread b_thd(&cache_b::run, std::ref(b_cache), b_arr);
-	std::thread c_thd(&cache_c::run, std::ref(c_cache), c_arr);
-	std::thread matmul_thread(&matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P, RD_PORTS>,
-			std::ref(a_cache), std::ref(b_cache), std::ref(c_cache));
+	std::thread a_thd([&]{a_cache.run(a_arr);});
+	std::thread b_thd([&]{b_cache.run(b_arr);});
+	std::thread c_thd([&]{c_cache.run(c_arr);});
+	std::thread matmul_thread([&]{matrix::multiply<cache_a &, cache_b &,
+			cache_c &, N, M, P, RD_PORTS>(a_cache, b_cache, c_cache);});
 
 	matmul_thread.join();
 
