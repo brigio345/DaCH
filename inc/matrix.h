@@ -48,19 +48,17 @@ MULT_K_LOOP:				for (int k = 0; k < M; k += RD_PORTS) {
 				}
 			}
 
-#if 0
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			printf("A hit ratio = %.3f ((%d + %d) / %d)\n",
-					A.get_hit_ratio(), A.get_n_l1_hits(),
-					A.get_n_hits(), A.get_n_reqs());
-			printf("B hit ratio = %.3f ((%d + %d) / %d)\n",
-					B.get_hit_ratio(), B.get_n_l1_hits(),
-					B.get_n_hits(), B.get_n_reqs());
+			printf("A hit ratio = %.3f (%d / %d)\n",
+					A.get_hit_ratio(), A.get_n_hits(),
+					A.get_n_reqs());
+			printf("B hit ratio = %.3f (%d / %d)\n",
+					B.get_hit_ratio(), B.get_n_hits(),
+					B.get_n_reqs());
 			printf("C hit ratio = %.3f ((%d + %d) / %d)\n",
 					C.get_hit_ratio(), C.get_n_l1_hits(),
 					C.get_n_hits(), C.get_n_reqs());
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
-#endif
 		}
 
 	template<typename T>
