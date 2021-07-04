@@ -18,7 +18,6 @@
 #include "arbiter.h"
 #include "l1_cache.h"
 #include "raw_cache.h"
-#define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 #include "ap_utils.h"
 #include "utils.h"

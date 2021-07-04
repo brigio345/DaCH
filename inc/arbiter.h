@@ -3,12 +3,12 @@
 
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
-#include "hls_vector.h"
 #include "ap_utils.h"
 #include "utils.h"
 #ifdef __SYNTHESIS__
+#include "hls_vector.h"
 #else
-#include <thread>
+#include <array>
 #endif /* __SYNTHESIS__ */
 
 template <typename T, size_t N_READERS, size_t N_ENTRIES_PER_LINE>
