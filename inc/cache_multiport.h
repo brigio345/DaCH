@@ -22,21 +22,10 @@ class cache_multiport {
 	public:
 		cache_multiport() {
 #pragma HLS array_partition variable=_caches complete
-		}
-
-		/**
-		 * \brief	Initialize the cache.
-		 *
-		 * \note	Must be called before calling \ref run,
-		 * 		if the cache is enabled to read.
-		 */
-		void init() {
-			for (auto port = 0; port < RD_PORTS; port++) {
-#pragma HLS unroll
-				_caches[port].init();
-			}
-
+#pragma HLS reset variable=_rd_port
+#ifndef __SYNTHESIS__
 			_rd_port = 0;
+#endif /* __SYNTHESIS__ */
 		}
 
 		/**

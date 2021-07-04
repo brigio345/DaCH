@@ -25,8 +25,11 @@ class raw_cache {
 		unsigned int _tag;
 
 	public:
-		void init() {
+		raw_cache() {
+#pragma HLS reset variable=_valid
+#ifndef __SYNTHESIS__
 			_valid = false;
+#endif /* __SYNTHESIS__ */
 		}
 
 		void get_line(T *main_mem, unsigned int addr_main, line_t &line) {
