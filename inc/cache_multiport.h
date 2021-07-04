@@ -5,7 +5,6 @@
 #include "arbiter.h"
 #ifndef __SYNTHESIS__
 #include <thread>
-#include <vector>
 #endif /* __SYNTHESIS__ */
 
 template <typename T, size_t RD_PORTS, size_t MAIN_SIZE, size_t N_SETS,
