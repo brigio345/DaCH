@@ -45,16 +45,17 @@ class cache {
 		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
 
-		static_assert(((1 << SET_SIZE) == N_SETS),
-				"N_SETS must be a power of 2");
-		static_assert(((1 << OFF_SIZE) == N_ENTRIES_PER_LINE),
-				"N_ENTRIES_PER_LINE must be a power of 2");
-		static_assert(((1 << WAY_SIZE) == N_WAYS),
-				"N_WAYS must be a power of 2");
+		static_assert((RD_ENABLED || WR_ENABLED),
+				"Cache must be read-enabled or write-enabled");
+		static_assert(((N_SETS > 0) && ((1 << SET_SIZE) == N_SETS)),
+				"N_SETS must be a power of 2 greater than 0");
+		static_assert(((N_ENTRIES_PER_LINE > 0) &&
+					((1 << OFF_SIZE) == N_ENTRIES_PER_LINE)),
+				"N_ENTRIES_PER_LINE must be a power of 2 greater than 0");
+		static_assert(((N_WAYS > 0) && ((1 << WAY_SIZE) == N_WAYS)),
+				"N_WAYS must be a power of 2 greater than 0");
 		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_ENTRIES_PER_LINE)),
 				"N_SETS and/or N_WAYS and/or N_ENTRIES_PER_LINE are too big for the specified MAIN_SIZE");
-		static_assert(((MAIN_SIZE % N_ENTRIES_PER_LINE) == 0),
-				"MAIN_SIZE must be a multiple of N_ENTRIES_PER_LINE");
 
 #ifdef __SYNTHESIS__
 		template <typename TYPE, size_t SIZE>
