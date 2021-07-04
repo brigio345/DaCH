@@ -150,20 +150,17 @@ class cache {
 		 * 		a thread separated from the thread in which
 		 * 		cache is accessed.
 		 */
-		void run(T *main_mem) {
-#pragma HLS inline
-			run_arbitrated(main_mem, 0, NULL);
-
-		}
-
-		void run_arbitrated(T *main_mem, unsigned int id, arbiter_t *arbiter) {
+		void run(T *main_mem, unsigned int id = 0, arbiter_t *arbiter = NULL) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
 			run_core();
 			run_mem_if(main_mem, arbiter, arbiter != NULL, id);
 #else
-			std::thread core_thd(&cache::run_core, this);
-			std::thread mem_if_thd(&cache::run_mem_if, this, main_mem, std::ref(arbiter), arbiter != NULL, id);
+			std::thread core_thd([&]{run_core();});
+			std::thread mem_if_thd([&]{
+					run_mem_if(main_mem, arbiter,
+							(arbiter != NULL), id);
+					});
 
 			core_thd.join();
 			mem_if_thd.join();
