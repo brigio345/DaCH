@@ -129,6 +129,16 @@ class cache {
 		}
 
 		/**
+		 * \brief	Initialize the cache.
+		 *
+		 * \note	Must be called before calling \ref run,
+		 * 		if the cache is enabled to read.
+		 */
+		void init() {
+			_l1_cache_get.init();
+		}
+
+		/**
 		 * \brief	Start cache internal processes.
 		 *
 		 * \note	In case of synthesis this must be called in a
@@ -296,6 +306,8 @@ class cache {
 					_lru[set][way] = way;
 			}
 
+			_raw_cache_core.init();
+
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline
 #pragma HLS dependence variable=_cache_mem distance=1 inter RAW false
@@ -403,6 +415,8 @@ CORE_LOOP:		while (1) {
 			line_t line;
 			raw_cache_t raw_cache_mem_if;
 
+			raw_cache_mem_if.init();
+			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
 #pragma HLS dependence variable=main_mem distance=1 inter RAW false

@@ -13,11 +13,8 @@ class l1_cache {
 		unsigned int _tag;
 
 	public:
-		l1_cache() {
-#pragma HLS reset variable=_valid
-#ifndef __SYNTHESIS__
+		void init() {
 			_valid = false;
-#endif /* __SYNTHESIS__ */
 		}
 
 		bool get_line(unsigned int addr_main, line_t &line) {
