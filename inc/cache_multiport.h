@@ -1,6 +1,14 @@
 #ifndef CACHE_MULTIPORT_H
 #define CACHE_MULTIPORT_H
 
+/**
+ * \file	cache_multiport.h
+ *
+ * \brief 	Interface module allowing to use multiple instances of
+ * 		\ref cache as a single multi-port read-only cache.
+ * 		This is useful when cache reads are performed in an unrolled loop.
+ */
+
 #include "cache.h"
 #include "arbiter.h"
 #ifndef __SYNTHESIS__
@@ -27,7 +35,7 @@ class cache_multiport {
 		 * \brief	Initialize the cache.
 		 *
 		 * \note	Must be called before calling \ref run,
-		 * 		if the cache is enabled to read.
+		 * 		if \ref L1_CACHE is \c true.
 		 */
 		void init() {
 			for (auto port = 0; port < RD_PORTS; port++) {
@@ -115,6 +123,8 @@ class cache_multiport {
 		 *
 		 * \param addr_main	The address in main memory referring to
 		 * 			the data element to be read.
+		 * \param port		The port index at which the request
+		 *			is issued.
 		 *
 		 * \return		The read data element.
 		 */

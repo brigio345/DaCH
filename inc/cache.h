@@ -1,3 +1,6 @@
+#ifndef CACHE_H
+#define CACHE_H
+
 /**
  * \file	cache.h
  *
@@ -11,8 +14,6 @@
  *		Synthesizability is guaranteed with Vitis HLS 2020.2, with II=1
  *		for CORE_LOOP.
  */
-#ifndef CACHE_H
-#define CACHE_H
 
 #include "address.h"
 #include "arbiter.h"
@@ -131,7 +132,7 @@ class cache {
 		 * \brief	Initialize the cache.
 		 *
 		 * \note	Must be called before calling \ref run,
-		 * 		if the cache is enabled to read.
+		 * 		if \ref L1_CACHE is \c true.
 		 */
 		void init() {
 			if (L1_CACHE)
@@ -140,6 +141,10 @@ class cache {
 
 		/**
 		 * \brief	Start cache internal processes.
+		 *
+		 * \param main_mem	The pointer to the main memory.
+		 * \param id		The identifier for the \ref arbiter.
+		 * \param arbiter	The pointer to the AXI arbiter.
 		 *
 		 * \note	In case of synthesis this must be called in a
 		 * 		dataflow region with disable_start_propagation
@@ -195,7 +200,7 @@ class cache {
 			if (L1_CACHE)
 				l1_hit = _l1_cache_get.get_line(addr_main, line);
 
-			if ((!L1_CACHE) || (!l1_hit)) {
+			if (!l1_hit) {
 				// send read request to cache
 				_request.write({READ_REQ, addr_main});
 				// force FIFO write and FIFO read to separate
@@ -289,8 +294,8 @@ class cache {
 		 * 		(sent from the outside).
 		 *
 		 * \note	The infinite loop must be stopped by calling
-		 * 		\ref stop at the end of computation (from the
-		 * 		outside).
+		 * 		\ref stop (from the outside) when all the
+		 * 		accesses have been completed.
 		 */
 		void run_core() {
 #pragma HLS inline off
@@ -400,10 +405,13 @@ CORE_LOOP:		while (1) {
 		 * 			access requests (sent from \ref run_core).
 		 *
 		 * \param main_mem	The pointer to the main memory.
+		 * \param arbiter	The pointer to the AXI arbiter.
+		 * \param arbitrate	The boolean value set to \c true if the
+		 * 			access to main memory must pass through
+		 * 			\ref arbiter.
 		 *
-		 * \note		\p main_mem should be associated with
-		 * 			a dedicated AXI port in order to get
-		 * 			optimal performance.
+		 * \note		\p main_mem must be associated with
+		 * 			a dedicated AXI port.
 		 *
 		 * \note		The infinite loop is stopped by
 		 * 			\ref run_core when it is in turn stopped
@@ -417,7 +425,8 @@ CORE_LOOP:		while (1) {
 			line_t line;
 			raw_cache_t raw_cache_mem_if;
 
-			raw_cache_mem_if.init();
+			if (arbitrate)
+				raw_cache_mem_if.init();
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
@@ -437,10 +446,16 @@ MEM_IF_LOOP:		while (1) {
 
 				if (req.load) {
 					// read line from main memory
-					if (arbitrate)
-						line = arbiter->get(req.load_addr, id);
-					else
-						raw_cache_mem_if.get_line(main_mem, req.load_addr, line);
+					if (arbitrate) {
+						line = arbiter->get_line(
+								req.load_addr,
+								id);
+					} else {
+						raw_cache_mem_if.get_line(
+								main_mem,
+								req.load_addr,
+								line);
+					}
 					// send the response to the read request
 					_load_data.write(line);
 				}

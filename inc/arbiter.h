@@ -1,6 +1,13 @@
 #ifndef ARBITER_H
 #define ARBITER_H
 
+/**
+ * \file	arbiter.h
+ *
+ * \brief 	Arbitration module aimed at managing read accesses to the same
+ * 		DRAM memory from different processes, through a single AXI port.
+ */
+
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 #include "ap_utils.h"
@@ -36,24 +43,25 @@ class arbiter {
 
 	public:
 		/**
-		 * \brief	Start cache internal processes.
+		 * \brief		Infinite loop managing the DRAM access
+		 * 			requests (sent from the outside).
 		 *
-		 * \note	In case of synthesis this must be called in a
-		 * 		dataflow region with disable_start_propagation
-		 * 		option, together with the function in which cache
-		 * 		is accesses.
+		 * \param main_mem	The pointer to the DRAM memory.
 		 *
-		 * \note	In case of C simulation this must be executed by
-		 * 		a thread separated from the thread in which
-		 * 		cache is accessed.
-		 */
-		/**
-		 * \brief	Infinite loop managing the cache access requests
-		 * 		(sent from the outside).
+		 * \note		In case of synthesis this must be called
+		 * 			in a dataflow region with
+		 * 			disable_start_propagation option,
+		 * 			together with the function in which
+		 * 			cache is accessed.
 		 *
-		 * \note	The infinite loop must be stopped by calling
-		 * 		\ref stop at the end of computation (from the
-		 * 		outside).
+		 * \note		In case of C simulation this must be
+		 * 			executed by a thread separated from the
+		 * 			thread in which cache is accessed.
+		 *
+		 * \note		The infinite loop must be stopped by
+		 * 			calling \ref stop (from the outside)
+		 * 			when all the accesses have been
+		 * 			completed.
 		 */
 		void run(T *main_mem) {
 #pragma HLS inline off
@@ -85,9 +93,9 @@ ARBITER_LOOP:		while (1) {
 		}
 
 		/**
-		 * \brief	Stop cache internal processes.
+		 * \brief	Stop arbiter internal processes.
 		 *
-		 * \note	Must be called after the function in which cache
+		 * \note	Must be called after the function in which DRAM
 		 * 		is accessed has completed.
 		 */
 		void stop(unsigned int reader) {
@@ -96,14 +104,16 @@ ARBITER_LOOP:		while (1) {
 		}
 
 		/**
-		 * \brief		Request to read a data element.
+		 * \brief		Request to read a line from DRAM.
 		 *
 		 * \param addr_main	The address in main memory referring to
 		 * 			the data element to be read.
+		 * \param reader	The identifier of the process issuing
+		 * 			the request.
 		 *
-		 * \return		The read data element.
+		 * \return		The read line.
 		 */
-		line_t get(unsigned int addr_main, unsigned int reader) {
+		line_t get_line(unsigned int addr_main, unsigned int reader) {
 #pragma HLS inline
 #pragma HLS function_instantiate variable=reader
 			_request[reader].write({addr_main, false});
