@@ -16,7 +16,7 @@ static const int RD_PORTS = 2;
 typedef int data_type;
 typedef cache_multiport<data_type, RD_PORTS, N * M, 1, 1, M> cache_a;
 typedef cache_multiport<data_type, RD_PORTS, M * P, 1, M, 4> cache_b;
-typedef cache<data_type, false, true, N * P, 2, 1, M, false> cache_c;
+typedef cache<data_type, false, true, N * P, 2, 1, M, true> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 #pragma HLS inline off
@@ -26,9 +26,22 @@ void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 
 	matrix::multiply<cache_a &, cache_b &, cache_c &, N, M, P, RD_PORTS>
 			(a_cache, b_cache, c_cache);
+
 	a_cache.stop();
 	b_cache.stop();
 	c_cache.stop();
+
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+	printf("A hit ratio = %.3f (%d / %d)\n",
+			a_cache.get_hit_ratio(), a_cache.get_n_hits(),
+			a_cache.get_n_reqs());
+	printf("B hit ratio = %.3f (%d / %d)\n",
+			b_cache.get_hit_ratio(), b_cache.get_n_hits(),
+			b_cache.get_n_reqs());
+	printf("C hit ratio = %.3f ((%d + %d) / %d)\n",
+			c_cache.get_hit_ratio(), c_cache.get_n_l1_hits(),
+			c_cache.get_n_hits(), c_cache.get_n_reqs());
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 }
 
 extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
@@ -81,7 +94,8 @@ int main() {
 	// matrix multiplication with caches
 	matmul_top(a_arr, b_arr, c_arr);
 	// standard matrix multiplication
-	matrix::multiply_ref<N, M, P>(a_arr, b_arr, c_arr_ref);
+	matrix::multiply<data_type *, data_type *, data_type *,
+		N, M, P, RD_PORTS>(a_arr, b_arr, c_arr_ref);
 
 	std::cout << "A = " << std::endl;
 	matrix::print(a_arr, N, M);

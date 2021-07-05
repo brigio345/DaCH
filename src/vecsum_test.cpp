@@ -11,38 +11,30 @@ static const size_t RD_PORTS = 2;
 
 typedef cache_multiport<int, RD_PORTS, N, 1, 1, 8> cache_a;
 
-void vecsum(int a[N], int &sum) {
-	int tmp = 0;
+template <typename T>
+	void vecsum(T a, int &sum) {
+#pragma HLS inline
+		int tmp = 0;
+		int data;
 
-	for (int i = 0; i < N; i++) {
-		tmp += a[i];
-	}
-
-	sum = tmp;
-}
-
-void vecsum_cache(cache_a &a, int &sum) {
-#pragma HLS inline off
-	int tmp = 0;
-	int data;
-
-	a.init();
-
-VECSUM_LOOP:	for (int i = 0; i < N; i++) {
+VECSUM_LOOP:	for (auto i = 0; i < N; i++) {
 #pragma HLS pipeline
 #pragma HLS unroll factor=RD_PORTS
-		data = a.get(i);
-		tmp += data;
+			data = a[i];
+			tmp += data;
 #ifdef DEBUG
-		std::cout << i << " " << data << std::endl;
+			std::cout << i << " " << data << std::endl;
 #endif /* DEBUG */
+		}
+
+		sum = tmp;
 	}
 
-	sum = tmp;
-}
-
 void vecsum_syn(cache_a &a, int &sum) {
-	vecsum_cache(a, sum);
+#pragma HLS inline off
+	a.init();
+
+	vecsum<cache_a &>(a, sum);
 
 	a.stop();
 }
@@ -61,7 +53,7 @@ extern "C" void vecsum_top(int a[N], int &sum) {
 	a_cache.init();
 
 	std::thread cache_thread([&]{a_cache.run(a);});
-	std::thread vecsum_thread([&]{vecsum_cache(a_cache, sum);});
+	std::thread vecsum_thread([&]{vecsum<cache_a &>(a_cache, sum);});
 
 	vecsum_thread.join();
 
@@ -78,7 +70,7 @@ int main() {
 	for (auto i = 0; i < N; i++)
 		a[i] = i;
 	vecsum_top(a, sum);
-	vecsum(a, sum_ref);
+	vecsum<int *>(a, sum_ref);
 	std::cout << "sum=" << sum << std::endl;
 	std::cout << "sum_ref=" << sum_ref << std::endl;
 
