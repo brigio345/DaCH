@@ -425,7 +425,7 @@ CORE_LOOP:		while (1) {
 			line_t line;
 			raw_cache_t raw_cache_mem_if;
 
-			if (arbitrate)
+			if (!arbitrate)
 				raw_cache_mem_if.init();
 			
 MEM_IF_LOOP:		while (1) {
