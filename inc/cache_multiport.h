@@ -104,21 +104,9 @@ class cache_multiport {
 			}
 		}
 
-		/**
-		 * \brief		Request to read a data element.
-		 *
-		 * \param addr_main	The address in main memory referring to
-		 * 			the data element to be read.
-		 *
-		 * \return		The read data element.
-		 */
-		T get(unsigned int addr_main) {
+		T operator[](const int addr_main) {
 #pragma HLS inline
-			auto port = _rd_port;
-
-			_rd_port = (_rd_port + 1) % RD_PORTS;
-
-			return get(addr_main, port);
+			return get(addr_main);
 		}
 
 #ifdef __PROFILE__
@@ -143,8 +131,24 @@ class cache_multiport {
 		}
 #endif /* __PROFILE__ */
 
-
 	private:
+		/**
+		 * \brief		Request to read a data element.
+		 *
+		 * \param addr_main	The address in main memory referring to
+		 * 			the data element to be read.
+		 *
+		 * \return		The read data element.
+		 */
+		T get(unsigned int addr_main) {
+#pragma HLS inline
+			auto port = _rd_port;
+
+			_rd_port = (_rd_port + 1) % RD_PORTS;
+
+			return get(addr_main, port);
+		}
+
 		/**
 		 * \brief		Request to read a data element.
 		 *
@@ -158,7 +162,7 @@ class cache_multiport {
 		T get(unsigned int addr_main, unsigned int port) {
 #pragma HLS inline
 #pragma HLS function_instantiate variable=port
-			return _caches[port].get(addr_main);
+			return _caches[port][addr_main];
 		}
 };
 
