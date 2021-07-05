@@ -420,9 +420,6 @@ CORE_LOOP:		while (1) {
 		void run_mem_if(T *main_mem, arbiter_t *arbiter, bool arbitrate, unsigned int id) {
 #pragma HLS function_instantiate variable=id
 #pragma HLS function_instantiate variable=arbitrate
-			mem_req_t req;
-			T *main_line;
-			line_t line;
 			raw_cache_t raw_cache_mem_if;
 
 			if (!arbitrate)
@@ -431,6 +428,7 @@ CORE_LOOP:		while (1) {
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
 #pragma HLS dependence variable=main_mem distance=1 inter RAW false
+				mem_req_t req;
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
@@ -444,6 +442,7 @@ MEM_IF_LOOP:		while (1) {
 				if (!req.load && !req.write_back)
 					break;
 
+				line_t line;
 				if (req.load) {
 					// read line from main memory
 					if (arbitrate) {
