@@ -628,32 +628,30 @@ MEM_IF_LOOP:		while (1) {
 		}
 #endif /* __PROFILE__ */
 
-#ifndef __SYNTHESIS__
-		class inner {
+		class square_bracket_proxy {
 			private:
-				cache *_cache;
+				void *_cache;
 				unsigned int _addr_main;
 			public:
-				inner(cache *c, unsigned int addr_main):
+				square_bracket_proxy(cache *c, unsigned int addr_main):
 					_cache(c), _addr_main(addr_main) {}
 
 				operator T() const {
 #pragma HLS inline
-					return _cache->get(_addr_main);
+					return ((cache *) _cache)->get(_addr_main);
 				}
 
 				void operator=(T data) {
 #pragma HLS inline
-					_cache->set(_addr_main, data);
+					((cache *) _cache)->set(_addr_main, data);
 				}
 		};
 
 	public:
-		inner operator[](const int addr_main) {
+		square_bracket_proxy operator[](const int addr_main) {
 #pragma HLS inline
-			return inner(this, addr_main);
+			return square_bracket_proxy(this, addr_main);
 		}
-#endif /* __SYNTHESIS__ */
 };
 
 #endif /* CACHE_H */
