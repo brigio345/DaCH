@@ -1,5 +1,5 @@
 proc run_hls {top_name design_files tb_files {parts {xczu3eg-sbva484-1-e}}
-		{inc_dir "inc"} {sol_name "solution1"} {t_clk 10}} {
+		{inc_dir "src"} {sol_name "solution1"} {t_clk 10}} {
 	open_project -reset "proj_$top_name"
 	add_files -cflags "-I $inc_dir" $design_files
 	add_files -tb -cflags "-I $inc_dir" $tb_files
