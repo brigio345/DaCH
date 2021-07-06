@@ -42,7 +42,7 @@ class l1_cache {
 		}
 
 	private:
-		inline bool hit(const addr_type addr) const {
+		inline bool hit(const addr_type &addr) const {
 			return (m_valid && (addr.m_tag == m_tag));
 		}
 };

@@ -482,7 +482,7 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	hitting way on HIT.
 		 * \return	-1 on MISS.
 		 */
-		inline int hit(const address_type addr) const {
+		inline int hit(const address_type &addr) const {
 #pragma HLS inline
 			auto addr_tmp = addr;
 			auto hit_way = -1;
@@ -503,7 +503,7 @@ MEM_IF_LOOP:		while (1) {
 		 *
 		 * \param addr	The address which has been used.
 		 */
-		void notify_use(const address_type addr) {
+		void notify_use(const address_type &addr) {
 #pragma HLS inline
 			// find the position of the last used way
 			int lru_idx;
@@ -532,7 +532,7 @@ MEM_IF_LOOP:		while (1) {
 		 *
 		 * \return	The least recently used way.
 		 */
-		inline int get_way(const address_type addr) const {
+		inline int get_way(const address_type &addr) const {
 #pragma HLS inline
 			return m_lru[addr.m_set][0];
 		}
@@ -544,7 +544,7 @@ MEM_IF_LOOP:		while (1) {
 		 * \param addr	The address belonging to the line to be loaded.
 		 * \param line	The buffer to store the loaded line.
 		 */
-		void load(const address_type addr, line_type &line) {
+		void load(const address_type &addr, line_type &line) {
 #pragma HLS inline
 			auto do_write_back = false;
 			// build write-back address
@@ -583,7 +583,7 @@ MEM_IF_LOOP:		while (1) {
 		 * \param addr	The address belonging to the cache line to be
 		 * 		written back.
 		 */
-		void write_back(const address_type addr) {
+		void write_back(const address_type &addr) {
 #pragma HLS inline
 			line_type line;
 

@@ -63,7 +63,7 @@ class raw_cache {
 		}
 
 	private:
-		inline bool hit(const addr_type addr) {
+		inline bool hit(const addr_type &addr) {
 #pragma HLS inline
 			return (m_valid && (addr.m_tag == m_tag));
 		}
