@@ -35,7 +35,7 @@ MULT_K_LOOP:				for (int k = 0; k < M; k++) {
 	template<typename T>
 		void generate_random(T A[], unsigned short N, unsigned short M) {
 			for (int i = 0; i < N * M; i++)
-				A[i] = (T)(std::rand() % 1000);
+				A[i] = static_cast<T>(std::rand() % 1000);
 		}
 
 	template<typename T>

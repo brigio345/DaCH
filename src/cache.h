@@ -284,7 +284,7 @@ class cache {
 		}
 
 		float get_hit_ratio() {
-			return ((_n_hits + _n_l1_hits) / ((float) _n_reqs));
+			return ((_n_hits + _n_l1_hits) / static_cast<float>(_n_reqs));
 		}
 #endif /* __PROFILE__ */
 
@@ -638,12 +638,12 @@ MEM_IF_LOOP:		while (1) {
 
 				operator T() const {
 #pragma HLS inline
-					return ((cache *) _cache)->get(_addr_main);
+					return (static_cast<cache *>(_cache))->get(_addr_main);
 				}
 
 				void operator=(T data) {
 #pragma HLS inline
-					((cache *) _cache)->set(_addr_main, data);
+					(static_cast<cache *>(_cache))->set(_addr_main, data);
 				}
 		};
 
