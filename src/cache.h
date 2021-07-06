@@ -101,11 +101,11 @@ class cache {
 		bool _dirty[N_SETS * N_WAYS];
 		unsigned int _lru[N_SETS][N_WAYS];
 		T _cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
-		hls::stream<line_t, 4> _rd_data;
-		hls::stream<T, 4> _wr_data;
-		hls::stream<request_t, 4> _request;
-		hls::stream<line_t, 2> _load_data;
-		hls::stream<mem_req_t, 2> _if_request;
+		hls::stream<request_t, 4> _core_req;
+		hls::stream<T, 4> _core_req_data;
+		hls::stream<line_t, 4> _core_resp;
+		hls::stream<mem_req_t, 2> _mem_req;
+		hls::stream<line_t, 2> _mem_resp;
 		l1_cache_t _l1_cache_get;
 		raw_cache_t _raw_cache_core;
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
@@ -175,7 +175,7 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-			_request.write({STOP_REQ, 0});
+			_core_req.write({STOP_REQ, 0});
 		}
 
 		/**
@@ -198,7 +198,7 @@ class cache {
 
 			if (!l1_hit) {
 				// send read request to cache
-				_request.write({READ_REQ, addr_main});
+				_core_req.write({READ_REQ, addr_main});
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
@@ -207,7 +207,7 @@ class cache {
 				// about the latency
 				ap_wait_n(3);
 				// read response from cache
-				_rd_data.read(line);
+				_core_resp.read(line);
 				if (L1_CACHE) {
 					// store line to L1 cache
 					_l1_cache_get.set_line(addr_main, line);
@@ -259,8 +259,8 @@ class cache {
 			}
 
 			// send write request to cache
-			_request.write({WRITE_REQ, addr_main});
-			_wr_data.write(data);
+			_core_req.write({WRITE_REQ, addr_main});
+			_core_req_data.write(data);
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 			update_profiling(_hit_status.read());
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
@@ -317,10 +317,10 @@ CORE_LOOP:		while (1) {
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (_request.read_nb(req)) {
+				if (_core_req.read_nb(req)) {
 #else
 				// get request
-				_request.read(req);
+				_core_req.read(req);
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
@@ -334,7 +334,7 @@ CORE_LOOP:		while (1) {
 				// in case of write request, read data to be written
 				T data;
 				if (!read)
-					_wr_data.read(data);
+					_core_req_data.read(data);
 
 				// extract information from address
 				addr_t addr(req.addr_main);
@@ -368,7 +368,7 @@ CORE_LOOP:		while (1) {
 
 				if (read) {
 					// send the response to the read request
-					_rd_data.write(line);
+					_core_resp.write(line);
 				} else {
 					// modify the line
 					line[addr._off] = data;
@@ -396,7 +396,7 @@ CORE_LOOP:		while (1) {
 			ap_wait();
 			// stop memory interface
 			line_t dummy;
-			_if_request.write({false, false, 0, 0, dummy});
+			_mem_req.write({false, false, 0, 0, dummy});
 		}
 
 		/**
@@ -431,10 +431,10 @@ MEM_IF_LOOP:		while (1) {
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (_if_request.read_nb(req)) {
+				if (_mem_req.read_nb(req)) {
 #else
 				// get request
-				_if_request.read(req);
+				_mem_req.read(req);
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
@@ -455,7 +455,7 @@ MEM_IF_LOOP:		while (1) {
 								line);
 					}
 					// send the response to the read request
-					_load_data.write(line);
+					_mem_resp.write(line);
 				}
 
 				if (WR_ENABLED && req.write_back) {
@@ -562,7 +562,7 @@ MEM_IF_LOOP:		while (1) {
 
 			// send read request to memory interface and
 			// write request if write-back is necessary
-			_if_request.write({true, do_write_back, addr._addr_main,
+			_mem_req.write({true, do_write_back, addr._addr_main,
 					write_back_addr._addr_main, line});
 
 			// force FIFO write and FIFO read to separate pipeline
@@ -570,7 +570,7 @@ MEM_IF_LOOP:		while (1) {
 			ap_wait();
 
 			// read response from memory interface
-			_load_data.read(line);
+			_mem_resp.read(line);
 
 			_tag[addr._addr_line] = addr._tag;
 			_valid[addr._addr_line] = true;
@@ -592,7 +592,7 @@ MEM_IF_LOOP:		while (1) {
 					addr._addr_cache, line);
 
 			// send write request to memory interface
-			_if_request.write({false, true, 0, addr._addr_main, line});
+			_mem_req.write({false, true, 0, addr._addr_main, line});
 
 			_dirty[addr._addr_line] = false;
 		}
