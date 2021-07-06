@@ -347,6 +347,7 @@ CORE_LOOP:		while (1) {
 					way = get_way(addr);
 
 				addr.set_way(way);
+				notify_use(addr);
 
 				line_type line;
 				if (is_hit) {
@@ -481,14 +482,15 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	hitting way on HIT.
 		 * \return	-1 on MISS.
 		 */
-		inline int hit(address_type addr) {
+		inline int hit(const address_type addr) const {
+#pragma HLS inline
+			auto addr_tmp = addr;
 			auto hit_way = -1;
 			for (auto way = 0; way < N_WAYS; way++) {
-				addr.set_way(way);
-				if (m_valid[addr.m_addr_line] &&
-						(addr.m_tag == m_tag[addr.m_addr_line])) {
+				addr_tmp.set_way(way);
+				if (m_valid[addr_tmp.m_addr_line] &&
+						(addr_tmp.m_tag == m_tag[addr_tmp.m_addr_line])) {
 					hit_way = way;
-					update_way(addr);
 					break;
 				}
 			}
@@ -501,7 +503,8 @@ MEM_IF_LOOP:		while (1) {
 		 *
 		 * \param addr	The address which has been used.
 		 */
-		void update_way(const address_type addr) {
+		void notify_use(const address_type addr) {
+#pragma HLS inline
 			// find the position of the last used way
 			int lru_idx;
 			for (lru_idx = 0; lru_idx < N_WAYS; lru_idx++)
@@ -529,13 +532,9 @@ MEM_IF_LOOP:		while (1) {
 		 *
 		 * \return	The least recently used way.
 		 */
-		int get_way(address_type addr) {
-			const unsigned int way = m_lru[addr.m_set][0];
-
-			addr.set_way(way);
-			update_way(addr);
-
-			return way;
+		inline int get_way(const address_type addr) const {
+#pragma HLS inline
+			return m_lru[addr.m_set][0];
 		}
 
 		/**
