@@ -644,9 +644,10 @@ MEM_IF_LOOP:		while (1) {
 					return (static_cast<cache *>(_cache))->get(_addr_main);
 				}
 
-				void operator=(T data) {
+				square_bracket_proxy &operator=(T data) {
 #pragma HLS inline
 					(static_cast<cache *>(_cache))->set(_addr_main, data);
+					return *this;
 				}
 		};
 
