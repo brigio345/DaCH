@@ -128,8 +128,8 @@ class cache_multiport {
 			return n_hits;
 		}
 
-		float get_hit_ratio() {
-			auto n_reqs = static_cast<float>(get_n_reqs());
+		double get_hit_ratio() {
+			auto n_reqs = static_cast<double>(get_n_reqs());
 			if (n_reqs == 0)
 				return 0;
 
