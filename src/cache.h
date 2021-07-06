@@ -299,10 +299,6 @@ class cache {
 		 */
 		void run_core() {
 #pragma HLS inline off
-			request_t req;
-			line_t line;
-			T data;
-
 			// invalidate all cache lines
 			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
 				_valid[line] = false;
@@ -318,6 +314,7 @@ class cache {
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline
 #pragma HLS dependence variable=_cache_mem distance=1 inter RAW false
+				request_t req;
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
@@ -336,6 +333,7 @@ CORE_LOOP:		while (1) {
 						(!WR_ENABLED));
 
 				// in case of write request, read data to be written
+				T data;
 				if (!read)
 					_wr_data.read(data);
 
@@ -350,6 +348,7 @@ CORE_LOOP:		while (1) {
 
 				addr.set_way(way);
 
+				line_t line;
 				if (is_hit) {
 					// read from cache memory
 					_raw_cache_core.get_line(_cache_mem,
@@ -397,7 +396,8 @@ CORE_LOOP:		while (1) {
 			// memory interface
 			ap_wait();
 			// stop memory interface
-			_if_request.write({false, false, 0, 0, line});
+			line_t dummy;
+			_if_request.write({false, false, 0, 0, dummy});
 		}
 
 		/**
