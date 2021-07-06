@@ -151,16 +151,16 @@ class cache {
 		 * 		a thread separated from the thread in which
 		 * 		cache is accessed.
 		 */
-		void run(T *main_mem, unsigned int id = 0, arbiter_t *arbiter = NULL) {
+		void run(T *main_mem, unsigned int id = 0, arbiter_t *arbiter = nullptr) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
 			run_core();
-			run_mem_if(main_mem, arbiter, arbiter != NULL, id);
+			run_mem_if(main_mem, arbiter, arbiter != nullptr, id);
 #else
 			std::thread core_thd([&]{run_core();});
 			std::thread mem_if_thd([&]{
 					run_mem_if(main_mem, arbiter,
-							(arbiter != NULL), id);
+							(arbiter != nullptr), id);
 					});
 
 			core_thd.join();
@@ -468,7 +468,7 @@ MEM_IF_LOOP:		while (1) {
 #endif
 			}
 
-			if (arbiter != NULL)
+			if (arbiter != nullptr)
 				arbiter->stop(id);
 		}
 
