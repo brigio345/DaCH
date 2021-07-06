@@ -29,9 +29,9 @@ class raw_cache {
 			m_valid = false;
 		}
 
-		void get_line(T *main_mem, unsigned int addr_main, line_type &line) {
+		void get_line(const T * const main_mem, const unsigned int addr_main, line_type &line) {
 #pragma HLS inline
-			addr_type addr(addr_main);
+			const addr_type addr(addr_main);
 
 			if (hit(addr)) {
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
@@ -39,7 +39,7 @@ class raw_cache {
 					line[off] = m_line[off];
 				}
 			} else {
-				T *main_line = &(main_mem[addr.m_addr_main & (-1U << OFF_SIZE)]);
+				const T *main_line = &(main_mem[addr.m_addr_main & (-1U << OFF_SIZE)]);
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
 #pragma HLS unroll
 					line[off] = main_line[off];
@@ -47,14 +47,15 @@ class raw_cache {
 			}
 		}
 
-		void set_line(T *main_mem, unsigned int addr_main, line_type &line) {
+		void set_line(T * const main_mem, const unsigned int addr_main, const line_type &line) {
 #pragma HLS inline
-			addr_type addr(addr_main);
+			const addr_type addr(addr_main);
 
-			T *main_line = &(main_mem[addr.m_addr_main & (-1U << OFF_SIZE)]);
+			T * const main_line = &(main_mem[addr.m_addr_main & (-1U << OFF_SIZE)]);
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
 #pragma HLS unroll
-				main_line[off] = m_line[off] = line[off];
+				main_line[off] = line[off];
+				m_line[off] = line[off];
 			}
 			
 			m_tag = addr.m_tag;
@@ -62,7 +63,7 @@ class raw_cache {
 		}
 
 	private:
-		inline bool hit(addr_type addr) {
+		inline bool hit(const addr_type addr) {
 #pragma HLS inline
 			return (m_valid && (addr.m_tag == m_tag));
 		}

@@ -63,7 +63,7 @@ class arbiter {
 		 * 			when all the accesses have been
 		 * 			completed.
 		 */
-		void run(T *main_mem) {
+		void run(const T * const main_mem) {
 #pragma HLS inline off
 ARBITER_LOOP:		while (1) {
 #pragma HLS pipeline II=N_READERS
@@ -81,7 +81,7 @@ ARBITER_LOOP:		while (1) {
 						return;
 
 					line_type line;
-					auto main_line = &(main_mem[req.addr_main & (-1U << OFF_SIZE)]);
+					const auto main_line = &(main_mem[req.addr_main & (-1U << OFF_SIZE)]);
 					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
 #pragma HLS unroll
 						line[off] = main_line[off];
@@ -111,7 +111,7 @@ ARBITER_LOOP:		while (1) {
 		 * 			the request.
 		 * \param line		The buffer to store the loaded line.
 		 */
-		void get_line(unsigned int addr_main, unsigned int reader,
+		void get_line(const unsigned int addr_main, const unsigned int reader,
 				line_type &line) {
 #pragma HLS inline
 #pragma HLS function_instantiate variable=reader

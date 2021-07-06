@@ -17,8 +17,8 @@ class l1_cache {
 			m_valid = false;
 		}
 
-		bool get_line(unsigned int addr_main, line_t &line) {
-			addr_type addr(addr_main);
+		bool get_line(const unsigned int addr_main, line_t &line) {
+			const addr_type addr(addr_main);
 
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
 				line[off] = m_line[off];
@@ -26,23 +26,23 @@ class l1_cache {
 			return hit(addr);
 		}
 
-		void set_line(unsigned int addr_main, line_t &line) {
+		void set_line(const unsigned int addr_main, const line_t &line) {
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
 				m_line[off] = line[off];
-			addr_type addr(addr_main);
+			const addr_type addr(addr_main);
 			m_valid = true;
 			m_tag = addr.m_tag;
 		}
 
-		void invalidate_line(unsigned int addr_main) {
-			addr_type addr(addr_main);
+		void invalidate_line(const unsigned int addr_main) {
+			const addr_type addr(addr_main);
 
 			if (hit(addr))
 				m_valid = false;
 		}
 
 	private:
-		inline bool hit(addr_type addr) {
+		inline bool hit(const addr_type addr) const {
 			return (m_valid && (addr.m_tag == m_tag));
 		}
 };

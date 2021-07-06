@@ -151,7 +151,8 @@ class cache {
 		 * 		a thread separated from the thread in which
 		 * 		cache is accessed.
 		 */
-		void run(T *main_mem, unsigned int id = 0, arbiter_type *arbiter = nullptr) {
+		void run(T * const main_mem, const unsigned int id = 0,
+				arbiter_type * const arbiter = nullptr) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
 			run_core();
@@ -185,7 +186,7 @@ class cache {
 		 * 			the cache line to be read.
 		 * \param line		The buffer to store the read line.
 		 */
-		void get_line(unsigned int addr_main, line_type &line) {
+		void get_line(const unsigned int addr_main, line_type &line) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			assert(addr_main < MAIN_SIZE);
@@ -227,7 +228,7 @@ class cache {
 		 *
 		 * \return		The read data element.
 		 */
-		T get(unsigned int addr_main) {
+		T get(const unsigned int addr_main) {
 #pragma HLS inline
 			line_type line;
 
@@ -247,7 +248,7 @@ class cache {
 		 * 			the data element to be written.
 		 * \param data		The data to be written.
 		 */
-		void set(unsigned int addr_main, T data) {
+		void set(const unsigned int addr_main, const T data) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			assert(addr_main < MAIN_SIZE);
@@ -267,19 +268,19 @@ class cache {
 		}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-		int get_n_reqs() {
+		int get_n_reqs() const {
 			return m_n_reqs;
 		}
 
-		int get_n_hits() {
+		int get_n_hits() const {
 			return m_n_hits;
 		}
 
-		int get_n_l1_hits() {
+		int get_n_l1_hits() const {
 			return m_n_l1_hits;
 		}
 
-		double get_hit_ratio() {
+		double get_hit_ratio() const {
 			if (m_n_reqs > 0)
 				return ((m_n_hits + m_n_l1_hits) / static_cast<double>(m_n_reqs));
 
@@ -328,7 +329,7 @@ CORE_LOOP:		while (1) {
 					break;
 
 				// check the request type
-				auto read = ((RD_ENABLED && (req.op == READ_REQ)) ||
+				const auto read = ((RD_ENABLED && (req.op == READ_REQ)) ||
 						(!WR_ENABLED));
 
 				// in case of write request, read data to be written
@@ -340,7 +341,7 @@ CORE_LOOP:		while (1) {
 				address_type addr(req.addr_main);
 
 				auto way = hit(addr);
-				auto is_hit = (way != -1);
+				const auto is_hit = (way != -1);
 
 				if (!is_hit)
 					way = get_way(addr);
@@ -416,7 +417,8 @@ CORE_LOOP:		while (1) {
 		 * 			\ref run_core when it is in turn stopped
 		 * 			from the outside.
 		 */
-		void run_mem_if(T *main_mem, arbiter_type *arbiter, bool arbitrate, unsigned int id) {
+		void run_mem_if(T * const main_mem, arbiter_type * const arbiter,
+				const bool arbitrate, const unsigned int id) {
 #pragma HLS function_instantiate variable=id
 #pragma HLS function_instantiate variable=arbitrate
 			raw_cache_type raw_cache_mem_if;
@@ -499,7 +501,7 @@ MEM_IF_LOOP:		while (1) {
 		 *
 		 * \param addr	The address which has been used.
 		 */
-		void update_way(address_type addr) {
+		void update_way(const address_type addr) {
 			// find the position of the last used way
 			int lru_idx;
 			for (lru_idx = 0; lru_idx < N_WAYS; lru_idx++)
@@ -528,7 +530,7 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	The least recently used way.
 		 */
 		int get_way(address_type addr) {
-			unsigned int way = m_lru[addr.m_set][0];
+			const unsigned int way = m_lru[addr.m_set][0];
 
 			addr.set_way(way);
 			update_way(addr);
@@ -543,7 +545,7 @@ MEM_IF_LOOP:		while (1) {
 		 * \param addr	The address belonging to the line to be loaded.
 		 * \param line	The buffer to store the loaded line.
 		 */
-		void load(address_type addr, line_type &line) {
+		void load(const address_type addr, line_type &line) {
 #pragma HLS inline
 			auto do_write_back = false;
 			// build write-back address
@@ -582,7 +584,7 @@ MEM_IF_LOOP:		while (1) {
 		 * \param addr	The address belonging to the cache line to be
 		 * 		written back.
 		 */
-		void write_back(address_type addr) {
+		void write_back(const address_type addr) {
 #pragma HLS inline
 			line_type line;
 
@@ -603,8 +605,9 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			for (auto set = 0; set < N_SETS; set++) {
 				for (auto way = 0; way < N_WAYS; way++) {
-					address_type addr(m_tag[set * N_WAYS + way], set,
-							0, way);
+					const address_type addr(
+							m_tag[set * N_WAYS + way],
+							set, 0, way);
 					// check if line has to be written back
 					if (m_valid[addr.m_addr_line] &&
 							m_dirty[addr.m_addr_line]) {
@@ -616,7 +619,7 @@ MEM_IF_LOOP:		while (1) {
 		}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-		void update_profiling(hit_status_type status) {
+		void update_profiling(const hit_status_type status) {
 			m_n_reqs++;
 
 			if (status == HIT)
@@ -629,9 +632,10 @@ MEM_IF_LOOP:		while (1) {
 		class square_bracket_proxy {
 			private:
 				void *m_cache;
-				unsigned int m_addr_main;
+				const unsigned int m_addr_main;
 			public:
-				square_bracket_proxy(cache *c, unsigned int addr_main):
+				square_bracket_proxy(cache *c,
+						const unsigned int addr_main):
 					m_cache(c), m_addr_main(addr_main) {}
 
 				operator T() const {
@@ -639,7 +643,7 @@ MEM_IF_LOOP:		while (1) {
 					return (static_cast<cache *>(m_cache))->get(m_addr_main);
 				}
 
-				square_bracket_proxy &operator=(T data) {
+				square_bracket_proxy &operator=(const T data) {
 #pragma HLS inline
 					(static_cast<cache *>(m_cache))->set(m_addr_main, data);
 					return *this;

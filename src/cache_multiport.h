@@ -60,7 +60,7 @@ class cache_multiport {
 		 * 		a thread separated from the thread in which
 		 * 		cache is accessed.
 		 */
-		void run(T *main_mem) {
+		void run(T * const main_mem) {
 #pragma HLS inline
 			arbiter_type arbiter;
 #ifdef __SYNTHESIS__
@@ -108,7 +108,7 @@ class cache_multiport {
 		}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-		int get_n_reqs() {
+		int get_n_reqs() const {
 			auto n_reqs = 0;
 			for (auto port = 0; port < RD_PORTS; port++)
 				n_reqs += m_caches[port].get_n_reqs();
@@ -116,7 +116,7 @@ class cache_multiport {
 			return n_reqs;
 		}
 
-		int get_n_hits() {
+		int get_n_hits() const {
 			auto n_hits = 0;
 			for (auto port = 0; port < RD_PORTS; port++)
 				n_hits += m_caches[port].get_n_hits();
@@ -124,7 +124,7 @@ class cache_multiport {
 			return n_hits;
 		}
 
-		double get_hit_ratio() {
+		double get_hit_ratio() const {
 			auto n_reqs = static_cast<double>(get_n_reqs());
 
 			if (n_reqs > 0)
@@ -143,9 +143,9 @@ class cache_multiport {
 		 *
 		 * \return		The read data element.
 		 */
-		T get(unsigned int addr_main) {
+		T get(const unsigned int addr_main) {
 #pragma HLS inline
-			auto port = m_rd_port;
+			const auto port = m_rd_port;
 
 			m_rd_port = (m_rd_port + 1) % RD_PORTS;
 
@@ -162,7 +162,7 @@ class cache_multiport {
 		 *
 		 * \return		The read data element.
 		 */
-		T get(unsigned int addr_main, unsigned int port) {
+		T get(const unsigned int addr_main, const unsigned int port) {
 #pragma HLS inline
 #pragma HLS function_instantiate variable=port
 			return m_caches[port][addr_main];
