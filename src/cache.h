@@ -284,6 +284,9 @@ class cache {
 		}
 
 		float get_hit_ratio() {
+			if (_n_reqs == 0)
+				return 0;
+
 			return ((_n_hits + _n_l1_hits) / static_cast<float>(_n_reqs));
 		}
 #endif /* __PROFILE__ */

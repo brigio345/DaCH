@@ -127,7 +127,11 @@ class cache_multiport {
 		}
 
 		float get_hit_ratio() {
-			return (get_n_hits() / static_cast<float>(get_n_reqs()));
+			auto n_reqs = static_cast<float>(get_n_reqs());
+			if (n_reqs == 0)
+				return 0;
+
+			return (get_n_hits() / n_reqs);
 		}
 #endif /* __PROFILE__ */
 
