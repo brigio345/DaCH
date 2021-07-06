@@ -16,9 +16,9 @@ MULT_K_LOOP:				for (int k = 0; k < M; k++) {
 #pragma HLS pipeline
 #pragma HLS unroll factor=RD_PORTS
 						acc += A[i * M + k] * B[k * P + j];
+						if (k == (M - 1))
+							C[i * P + j] = acc;
 					}
-
-					C[i * P + j] = acc;
 				}
 			}
 		}
