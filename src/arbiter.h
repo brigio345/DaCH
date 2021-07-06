@@ -110,17 +110,17 @@ ARBITER_LOOP:		while (1) {
 		 * 			the data element to be read.
 		 * \param reader	The identifier of the process issuing
 		 * 			the request.
-		 *
-		 * \return		The read line.
+		 * \param line		The buffer to store the loaded line.
 		 */
-		line_t get_line(unsigned int addr_main, unsigned int reader) {
+		void get_line(unsigned int addr_main, unsigned int reader,
+				line_t &line) {
 #pragma HLS inline
 #pragma HLS function_instantiate variable=reader
 			_request[reader].write({addr_main, false});
 
 			ap_wait();
 
-			return _response[reader].read();
+			line = _response[reader].read();
 		}
 };
 

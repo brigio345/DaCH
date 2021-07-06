@@ -445,9 +445,8 @@ MEM_IF_LOOP:		while (1) {
 				if (req.load) {
 					// read line from main memory
 					if (arbitrate) {
-						line = arbiter->get_line(
-								req.load_addr,
-								id);
+						arbiter->get_line(req.load_addr,
+								id, line);
 					} else {
 						raw_cache_mem_if.get_line(
 								main_mem,
