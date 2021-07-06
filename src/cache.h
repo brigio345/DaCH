@@ -467,8 +467,8 @@ MEM_IF_LOOP:		while (1) {
 #endif
 			}
 
-			if (arbiter != nullptr)
-				arbiter->stop(id);
+			if ((arbiter != nullptr) && (id == 0))
+				arbiter->stop();
 		}
 
 		/**

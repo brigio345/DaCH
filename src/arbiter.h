@@ -98,9 +98,8 @@ ARBITER_LOOP:		while (1) {
 		 * \note	Must be called after the function in which DRAM
 		 * 		is accessed has completed.
 		 */
-		void stop(unsigned int reader) {
-#pragma HLS function_instantiate variable=reader
-			_request[reader].write({0, true});
+		void stop() {
+			_request[0].write({0, true});
 		}
 
 		/**
