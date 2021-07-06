@@ -126,10 +126,11 @@ class cache_multiport {
 
 		double get_hit_ratio() {
 			auto n_reqs = static_cast<double>(get_n_reqs());
-			if (n_reqs == 0)
-				return 0;
 
-			return (get_n_hits() / n_reqs);
+			if (n_reqs > 0)
+				return (get_n_hits() / n_reqs);
+
+			return 0;
 		}
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 

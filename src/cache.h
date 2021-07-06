@@ -280,10 +280,10 @@ class cache {
 		}
 
 		double get_hit_ratio() {
-			if (_n_reqs == 0)
-				return 0;
+			if (_n_reqs > 0)
+				return ((_n_hits + _n_l1_hits) / static_cast<double>(_n_reqs));
 
-			return ((_n_hits + _n_l1_hits) / static_cast<double>(_n_reqs));
+			return 0;
 		}
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
