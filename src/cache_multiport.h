@@ -15,10 +15,6 @@
 #include <thread>
 #endif /* __SYNTHESIS__ */
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-#define __PROFILE__
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
-
 template <typename T, size_t RD_PORTS, size_t MAIN_SIZE, size_t N_SETS,
 	 size_t N_WAYS, size_t N_ENTRIES_PER_LINE>
 class cache_multiport {
@@ -111,7 +107,7 @@ class cache_multiport {
 			return get(addr_main);
 		}
 
-#ifdef __PROFILE__
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		int get_n_reqs() {
 			auto n_reqs = 0;
 			for (auto port = 0; port < RD_PORTS; port++)
@@ -135,7 +131,7 @@ class cache_multiport {
 
 			return (get_n_hits() / n_reqs);
 		}
-#endif /* __PROFILE__ */
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 	private:
 		/**

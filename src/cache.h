@@ -30,10 +30,6 @@
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-#define __PROFILE__
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
-
 template <typename T, size_t RD_PORTS, bool WR_ENABLED, size_t MAIN_SIZE,
 	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE, bool L1_CACHE>
 class cache {
@@ -79,13 +75,13 @@ class cache {
 			STOP_REQ
 		} request_type_t;
 
-#ifdef __PROFILE__
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		typedef enum {
 			MISS,
 			HIT,
 			L1_HIT
 		} hit_status_t;
-#endif /* __PROFILE__ */
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 		typedef struct {
 			request_type_t type;
@@ -112,12 +108,12 @@ class cache {
 		hls::stream<mem_req_t, 2> _if_request;
 		l1_cache_t _l1_cache_get;
 		raw_cache_t _raw_cache_core;
-#ifdef __PROFILE__
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_t> _hit_status;
 		int _n_reqs = 0;
 		int _n_hits = 0;
 		int _n_l1_hits = 0;
-#endif /* __PROFILE__ */
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 	public:
 		cache() {
@@ -218,9 +214,9 @@ class cache {
 				}
 			}
 
-#ifdef __PROFILE__
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 			update_profiling(l1_hit ? L1_HIT : _hit_status.read());
-#endif /* __PROFILE__ */
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
 		/**
@@ -265,12 +261,12 @@ class cache {
 			// send write request to cache
 			_request.write({WRITE_REQ, addr_main});
 			_wr_data.write(data);
-#ifdef __PROFILE__
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 			update_profiling(_hit_status.read());
-#endif /* __PROFILE__ */
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
-#ifdef __PROFILE__
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		int get_n_reqs() {
 			return _n_reqs;
 		}
@@ -289,7 +285,7 @@ class cache {
 
 			return ((_n_hits + _n_l1_hits) / static_cast<double>(_n_reqs));
 		}
-#endif /* __PROFILE__ */
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 	private:
 		/**
@@ -383,9 +379,9 @@ CORE_LOOP:		while (1) {
 					_dirty[addr._addr_line] = true;
 				}
 
-#ifdef __PROFILE__
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 				_hit_status.write(is_hit ? HIT : MISS);
-#endif /* __PROFILE__ */
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 #ifdef __SYNTHESIS__
 				}
 #endif
@@ -620,7 +616,7 @@ MEM_IF_LOOP:		while (1) {
 			}
 		}
 
-#ifdef __PROFILE__
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		void update_profiling(hit_status_t status) {
 			_n_reqs++;
 
@@ -629,7 +625,7 @@ MEM_IF_LOOP:		while (1) {
 			else if (status == L1_HIT)
 				_n_l1_hits++;
 		}
-#endif /* __PROFILE__ */
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 		class square_bracket_proxy {
 			private:
