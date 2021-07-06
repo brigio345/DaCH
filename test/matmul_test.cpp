@@ -30,18 +30,6 @@ void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 	a_cache.stop();
 	b_cache.stop();
 	c_cache.stop();
-
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-	printf("A hit ratio = %.3f (%d / %d)\n",
-			a_cache.get_hit_ratio(), a_cache.get_n_hits(),
-			a_cache.get_n_reqs());
-	printf("B hit ratio = %.3f (%d / %d)\n",
-			b_cache.get_hit_ratio(), b_cache.get_n_hits(),
-			b_cache.get_n_reqs());
-	printf("C hit ratio = %.3f ((%d + %d) / %d)\n",
-			c_cache.get_hit_ratio(), c_cache.get_n_l1_hits(),
-			c_cache.get_n_hits(), c_cache.get_n_reqs());
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 }
 
 extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
@@ -79,6 +67,18 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	a_thd.join();
 	b_thd.join();
 	c_thd.join();
+
+#ifdef PROFILE
+	printf("A hit ratio = %.3f (%d / %d)\n",
+			a_cache.get_hit_ratio(), a_cache.get_n_hits(),
+			a_cache.get_n_reqs());
+	printf("B hit ratio = %.3f (%d / %d)\n",
+			b_cache.get_hit_ratio(), b_cache.get_n_hits(),
+			b_cache.get_n_reqs());
+	printf("C hit ratio = %.3f ((%d + %d) / %d)\n",
+			c_cache.get_hit_ratio(), c_cache.get_n_l1_hits(),
+			c_cache.get_n_hits(), c_cache.get_n_reqs());
+#endif /* PROFILE */
 #endif	/* __SYNTHESIS__ */
 }
 
@@ -97,6 +97,7 @@ int main() {
 	matrix::multiply<data_type *, data_type *, data_type *,
 		N, M, P, RD_PORTS>(a_arr, b_arr, c_arr_ref);
 
+#ifdef DEBUG
 	std::cout << "A = " << std::endl;
 	matrix::print(a_arr, N, M);
 	std::cout << std::endl << "B = " << std::endl;
@@ -105,6 +106,7 @@ int main() {
 	matrix::print(c_arr_ref, N, P);
 	std::cout << std::endl << "C (cache) = " << std::endl;
 	matrix::print(c_arr, N, P);
+#endif /* DEBUG */
 
 	if (!matrix::compare<data_type *>(c_arr, c_arr_ref, N, P)) {
 		std::cerr << "Mismatch detected" << std::endl;
