@@ -8,42 +8,42 @@ class l1_cache {
 	private:
 		typedef address<ADDR_SIZE, TAG_SIZE, 0, 0> l1_addr_t;
 
-		bool _valid;
-		line_t _line;
-		unsigned int _tag;
+		bool m_valid;
+		line_t m_line;
+		unsigned int m_tag;
 
 	public:
 		void init() {
-			_valid = false;
+			m_valid = false;
 		}
 
 		bool get_line(unsigned int addr_main, line_t &line) {
 			l1_addr_t addr(addr_main);
 
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-				line[off] = _line[off];
+				line[off] = m_line[off];
 
 			return hit(addr);
 		}
 
 		void set_line(unsigned int addr_main, line_t &line) {
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++)
-				_line[off] = line[off];
+				m_line[off] = line[off];
 			l1_addr_t addr(addr_main);
-			_valid = true;
-			_tag = addr._tag;
+			m_valid = true;
+			m_tag = addr.m_tag;
 		}
 
 		void invalidate_line(unsigned int addr_main) {
 			l1_addr_t addr(addr_main);
 
 			if (hit(addr))
-				_valid = false;
+				m_valid = false;
 		}
 
 	private:
 		inline bool hit(l1_addr_t addr) {
-			return (_valid && (addr._tag == _tag));
+			return (m_valid && (addr.m_tag == m_tag));
 		}
 };
 

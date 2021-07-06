@@ -7,46 +7,46 @@ class address {
 		static const size_t OFF_SIZE = (ADDR_SIZE - (TAG_SIZE + SET_SIZE));
 
 	public:
-		unsigned int _addr_main;
-		unsigned int _addr_cache;
-		unsigned int _addr_line;
-		unsigned int _tag;
-		unsigned int _set;
-		unsigned int _off;
-		unsigned int _way;
+		unsigned int m_addr_main;
+		unsigned int m_addr_cache;
+		unsigned int m_addr_line;
+		unsigned int m_tag;
+		unsigned int m_set;
+		unsigned int m_off;
+		unsigned int m_way;
 
-		address(unsigned int addr_main): _addr_main(addr_main) {
+		address(unsigned int addr_main): m_addr_main(addr_main) {
 			unsigned int off_mask = (~(-1U << OFF_SIZE));
 			unsigned int set_mask = (~(-1U << SET_SIZE));
 			unsigned int tag_mask = (~(-1U << TAG_SIZE));
 
-			_off = (addr_main & off_mask);
-			_set = ((addr_main >> OFF_SIZE) & set_mask);
-			_tag = ((addr_main >> (OFF_SIZE + SET_SIZE)) & tag_mask);
+			m_off = (addr_main & off_mask);
+			m_set = ((addr_main >> OFF_SIZE) & set_mask);
+			m_tag = ((addr_main >> (OFF_SIZE + SET_SIZE)) & tag_mask);
 		}
 
 		address(unsigned int tag, unsigned int set,
 				unsigned int off, unsigned int way):
-				_tag(tag), _set(set), _off(off) {
-			tag = (_tag << (SET_SIZE + OFF_SIZE));
-			set = (_set << OFF_SIZE);
+				m_tag(tag), m_set(set), m_off(off) {
+			tag = (m_tag << (SET_SIZE + OFF_SIZE));
+			set = (m_set << OFF_SIZE);
 
-			_addr_main = (tag | set | _off);
+			m_addr_main = (tag | set | m_off);
 
 			set_way(way);
 		}
 
 		void set_way(unsigned int way) {
-			_way = way;
+			m_way = way;
 
-			auto set = (_set << WAY_SIZE);
+			auto set = (m_set << WAY_SIZE);
 
-			_addr_line = (set | _way);
+			m_addr_line = (set | m_way);
 
-			set = (_set << (WAY_SIZE + OFF_SIZE));
-			way = (_way << OFF_SIZE);
+			set = (m_set << (WAY_SIZE + OFF_SIZE));
+			way = (m_way << OFF_SIZE);
 
-			_addr_cache = (set | way | _off);
+			m_addr_cache = (set | way | m_off);
 		}
 };
 

@@ -13,20 +13,20 @@ class raw_cache {
 	private:
 		static const size_t OFF_SIZE = (ADDR_SIZE - TAG_SIZE);
 
-		typedef address<ADDR_SIZE, TAG_SIZE, 0, 0> raw_addr_t;
+		typedef address<ADDR_SIZE, TAG_SIZE, 0, 0> addr_type;
 #ifdef __SYNTHESIS__
-		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_t;
+		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_type;
 #else
-		typedef std::array<T, N_ENTRIES_PER_LINE> line_t;
+		typedef std::array<T, N_ENTRIES_PER_LINE> line_type;
 #endif /* __SYNTHESIS__ */
 
-		bool _valid;
-		line_t _line;
-		unsigned int _tag;
+		bool m_valid;
+		line_t m_line;
+		unsigned int m_tag;
 
 	public:
 		void init() {
-			_valid = false;
+			m_valid = false;
 		}
 
 		void get_line(T *main_mem, unsigned int addr_main, line_t &line) {
@@ -36,10 +36,10 @@ class raw_cache {
 			if (hit(addr)) {
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
 #pragma HLS unroll
-					line[off] = _line[off];
+					line[off] = m_line[off];
 				}
 			} else {
-				T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
+				T *main_line = &(main_mem[addr.m_addr_main & (-1U << OFF_SIZE)]);
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
 #pragma HLS unroll
 					line[off] = main_line[off];
@@ -51,20 +51,20 @@ class raw_cache {
 #pragma HLS inline
 			raw_addr_t addr(addr_main);
 
-			T *main_line = &(main_mem[addr._addr_main & (-1U << OFF_SIZE)]);
+			T *main_line = &(main_mem[addr.m_addr_main & (-1U << OFF_SIZE)]);
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
 #pragma HLS unroll
-				main_line[off] = _line[off] = line[off];
+				main_line[off] = m_line[off] = line[off];
 			}
 			
-			_tag = addr._tag;
-			_valid = true;
+			m_tag = addr.m_tag;
+			m_valid = true;
 		}
 
 	private:
 		inline bool hit(raw_addr_t addr) {
 #pragma HLS inline
-			return (_valid && (addr._tag == _tag));
+			return (m_valid && (addr.m_tag == m_tag));
 		}
 };
 

@@ -96,32 +96,32 @@ class cache {
 			line_t line;
 		} mem_req_t;
 
-		unsigned int _tag[N_SETS * N_WAYS];
-		bool _valid[N_SETS * N_WAYS];
-		bool _dirty[N_SETS * N_WAYS];
-		unsigned int _lru[N_SETS][N_WAYS];
-		T _cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
-		hls::stream<request_t, 4> _core_req;
-		hls::stream<T, 4> _core_req_data;
-		hls::stream<line_t, 4> _core_resp;
-		hls::stream<mem_req_t, 2> _mem_req;
-		hls::stream<line_t, 2> _mem_resp;
-		l1_cache_t _l1_cache_get;
-		raw_cache_t _raw_cache_core;
+		unsigned int m_tag[N_SETS * N_WAYS];
+		bool m_valid[N_SETS * N_WAYS];
+		bool m_dirty[N_SETS * N_WAYS];
+		unsigned int m_lru[N_SETS][N_WAYS];
+		T m_cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
+		hls::stream<request_t, 4> m_core_req;
+		hls::stream<T, 4> m_core_req_data;
+		hls::stream<line_t, 4> m_core_resp;
+		hls::stream<mem_req_t, 2> m_mem_req;
+		hls::stream<line_t, 2> m_mem_resp;
+		l1_cache_t m_l1_cache_get;
+		raw_cache_t m_raw_cache_core;
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-		hls::stream<hit_status_t> _hit_status;
-		int _n_reqs = 0;
-		int _n_hits = 0;
-		int _n_l1_hits = 0;
+		hls::stream<hit_status_t> m_hit_status;
+		int m_n_reqs = 0;
+		int m_n_hits = 0;
+		int m_n_l1_hits = 0;
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 	public:
 		cache() {
-#pragma HLS array_partition variable=_tag complete dim=1
-#pragma HLS array_partition variable=_valid complete dim=1
-#pragma HLS array_partition variable=_dirty complete dim=1
-#pragma HLS array_partition variable=_lru complete dim=0
-#pragma HLS array_partition variable=_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
+#pragma HLS array_partition variable=m_tag complete dim=1
+#pragma HLS array_partition variable=m_valid complete dim=1
+#pragma HLS array_partition variable=m_dirty complete dim=1
+#pragma HLS array_partition variable=m_lru complete dim=0
+#pragma HLS array_partition variable=m_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 		}
 
 		/**
@@ -132,7 +132,7 @@ class cache {
 		 */
 		void init() {
 			if (L1_CACHE)
-				_l1_cache_get.init();
+				m_l1_cache_get.init();
 		}
 
 		/**
@@ -175,7 +175,7 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-			_core_req.write({STOP_REQ, 0});
+			m_core_req.write({STOP_REQ, 0});
 		}
 
 		/**
@@ -194,11 +194,11 @@ class cache {
 			// try to get line from L1 cache
 			auto l1_hit = false;
 			if (L1_CACHE)
-				l1_hit = _l1_cache_get.get_line(addr_main, line);
+				l1_hit = m_l1_cache_get.get_line(addr_main, line);
 
 			if (!l1_hit) {
 				// send read request to cache
-				_core_req.write({READ_REQ, addr_main});
+				m_core_req.write({READ_REQ, addr_main});
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
@@ -207,15 +207,15 @@ class cache {
 				// about the latency
 				ap_wait_n(3);
 				// read response from cache
-				_core_resp.read(line);
+				m_core_resp.read(line);
 				if (L1_CACHE) {
 					// store line to L1 cache
-					_l1_cache_get.set_line(addr_main, line);
+					m_l1_cache_get.set_line(addr_main, line);
 				}
 			}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			update_profiling(l1_hit ? L1_HIT : _hit_status.read());
+			update_profiling(l1_hit ? L1_HIT : m_hit_status.read());
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
@@ -237,7 +237,7 @@ class cache {
 			// extract information from address
 			addr_t addr(addr_main);
 
-			return line[addr._off];
+			return line[addr.m_off];
 		}
 
 		/**
@@ -255,33 +255,33 @@ class cache {
 
 			if (L1_CACHE) {
 				// inform L1 cache about the writing
-				_l1_cache_get.invalidate_line(addr_main);
+				m_l1_cache_get.invalidate_line(addr_main);
 			}
 
 			// send write request to cache
-			_core_req.write({WRITE_REQ, addr_main});
-			_core_req_data.write(data);
+			m_core_req.write({WRITE_REQ, addr_main});
+			m_core_req_data.write(data);
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			update_profiling(_hit_status.read());
+			update_profiling(m_hit_status.read());
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		int get_n_reqs() {
-			return _n_reqs;
+			return m_n_reqs;
 		}
 
 		int get_n_hits() {
-			return _n_hits;
+			return m_n_hits;
 		}
 
 		int get_n_l1_hits() {
-			return _n_l1_hits;
+			return m_n_l1_hits;
 		}
 
 		double get_hit_ratio() {
-			if (_n_reqs > 0)
-				return ((_n_hits + _n_l1_hits) / static_cast<double>(_n_reqs));
+			if (m_n_reqs > 0)
+				return ((m_n_hits + m_n_l1_hits) / static_cast<double>(m_n_reqs));
 
 			return 0;
 		}
@@ -300,27 +300,27 @@ class cache {
 #pragma HLS inline off
 			// invalidate all cache lines
 			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
-				_valid[line] = false;
+				m_valid[line] = false;
 
 			// initialize way counters
 			for (auto set = 0; set < N_SETS; set++) {
 				for (auto way = 0; way < N_WAYS; way++)
-					_lru[set][way] = way;
+					m_lru[set][way] = way;
 			}
 
-			_raw_cache_core.init();
+			m_raw_cache_core.init();
 
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline
-#pragma HLS dependence variable=_cache_mem distance=1 inter RAW false
-				request_t req;
+#pragma HLS dependence variable=m_cache_mem distance=1 inter RAW false
+				core_req_type req;
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (_core_req.read_nb(req)) {
+				if (m_core_req.read_nb(req)) {
 #else
 				// get request
-				_core_req.read(req);
+				m_core_req.read(req);
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
@@ -334,7 +334,7 @@ CORE_LOOP:		while (1) {
 				// in case of write request, read data to be written
 				T data;
 				if (!read)
-					_core_req_data.read(data);
+					m_core_req_data.read(data);
 
 				// extract information from address
 				addr_t addr(req.addr_main);
@@ -350,8 +350,8 @@ CORE_LOOP:		while (1) {
 				line_t line;
 				if (is_hit) {
 					// read from cache memory
-					_raw_cache_core.get_line(_cache_mem,
-							addr._addr_cache,
+					m_raw_cache_core.get_line(m_cache_mem,
+							addr.m_addr_cache,
 							line);
 				} else {
 					// read from main memory
@@ -359,28 +359,28 @@ CORE_LOOP:		while (1) {
 
 					if (read) {
 						// store loaded line to cache
-						_raw_cache_core.set_line(
-								_cache_mem,
-								addr._addr_cache,
+						m_raw_cache_core.set_line(
+								m_cache_mem,
+								addr.m_addr_cache,
 								line);
 					}
 				}
 
 				if (read) {
 					// send the response to the read request
-					_core_resp.write(line);
+					m_core_resp.write(line);
 				} else {
 					// modify the line
-					line[addr._off] = data;
+					line[addr.m_off] = data;
 
 					// store the modified line to cache
-					_raw_cache_core.set_line(_cache_mem,
-							addr._addr_cache, line);
-					_dirty[addr._addr_line] = true;
+					m_raw_cache_core.set_line(m_cache_mem,
+							addr.m_addr_cache, line);
+					m_dirty[addr.m_addr_line] = true;
 				}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-				_hit_status.write(is_hit ? HIT : MISS);
+				m_hit_status.write(is_hit ? HIT : MISS);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 #ifdef __SYNTHESIS__
 				}
@@ -396,7 +396,7 @@ CORE_LOOP:		while (1) {
 			ap_wait();
 			// stop memory interface
 			line_t dummy;
-			_mem_req.write({false, false, 0, 0, dummy});
+			m_mem_req.write({false, false, 0, 0, dummy});
 		}
 
 		/**
@@ -431,10 +431,10 @@ MEM_IF_LOOP:		while (1) {
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (_mem_req.read_nb(req)) {
+				if (m_mem_req.read_nb(req)) {
 #else
 				// get request
-				_mem_req.read(req);
+				m_mem_req.read(req);
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
@@ -454,7 +454,7 @@ MEM_IF_LOOP:		while (1) {
 								line);
 					}
 					// send the response to the read request
-					_mem_resp.write(line);
+					m_mem_resp.write(line);
 				}
 
 				if (WR_ENABLED && req.write_back) {
@@ -483,8 +483,8 @@ MEM_IF_LOOP:		while (1) {
 			auto hit_way = -1;
 			for (auto way = 0; way < N_WAYS; way++) {
 				addr.set_way(way);
-				if (_valid[addr._addr_line] &&
-						(addr._tag == _tag[addr._addr_line])) {
+				if (m_valid[addr.m_addr_line] &&
+						(addr.m_tag == m_tag[addr.m_addr_line])) {
 					hit_way = way;
 					update_way(addr);
 					break;
@@ -503,20 +503,20 @@ MEM_IF_LOOP:		while (1) {
 			// find the position of the last used way
 			int lru_idx;
 			for (lru_idx = 0; lru_idx < N_WAYS; lru_idx++)
-				if (_lru[addr._set][lru_idx] == addr._way)
+				if (m_lru[addr.m_set][lru_idx] == addr.m_way)
 					break;
 
 			// fill the vacant position of the last used way,
 			// by shifting other ways to the left
 			for (auto way = 0; way < (N_WAYS - 1); way++) {
 				if (way >= lru_idx) {
-					_lru[addr._set][way] =
-						_lru[addr._set][way + 1];
+					m_lru[addr.m_set][way] =
+						m_lru[addr.m_set][way + 1];
 				}
 			}
 
 			// put the last used way to the rightmost position
-			_lru[addr._set][N_WAYS - 1] = addr._way;
+			m_lru[addr.m_set][N_WAYS - 1] = addr.m_way;
 		}
 
 		/**
@@ -528,7 +528,7 @@ MEM_IF_LOOP:		while (1) {
 		 * \return	The least recently used way.
 		 */
 		int get_way(addr_t addr) {
-			unsigned int way = _lru[addr._set][0];
+			unsigned int way = m_lru[addr.m_set][0];
 
 			addr.set_way(way);
 			update_way(addr);
@@ -547,33 +547,33 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			auto do_write_back = false;
 			// build write-back address
-			addr_t write_back_addr(_tag[addr._addr_line], addr._set,
-					0, addr._way);
+			addr_t write_back_addr(m_tag[addr.m_addr_line], addr.m_set,
+					0, addr.m_way);
 			// check if write back is necessary
-			if (WR_ENABLED && _valid[addr._addr_line] &&
-					_dirty[addr._addr_line]) {
+			if (WR_ENABLED && m_valid[addr.m_addr_line] &&
+					m_dirty[addr.m_addr_line]) {
 				// get the line to be written back
-				_raw_cache_core.get_line(_cache_mem,
-						write_back_addr._addr_cache,
+				m_raw_cache_core.get_line(m_cache_mem,
+						write_back_addr.m_addr_cache,
 						line);
 				do_write_back = true;
 			}
 
 			// send read request to memory interface and
 			// write request if write-back is necessary
-			_mem_req.write({true, do_write_back, addr._addr_main,
-					write_back_addr._addr_main, line});
+			m_mem_req.write({true, do_write_back, addr.m_addr_main,
+					write_back_addr.m_addr_main, line});
 
 			// force FIFO write and FIFO read to separate pipeline
 			// stages to avoid deadlock due to the blocking read
 			ap_wait();
 
 			// read response from memory interface
-			_mem_resp.read(line);
+			m_mem_resp.read(line);
 
-			_tag[addr._addr_line] = addr._tag;
-			_valid[addr._addr_line] = true;
-			_dirty[addr._addr_line] = false;
+			m_tag[addr.m_addr_line] = addr.m_tag;
+			m_valid[addr.m_addr_line] = true;
+			m_dirty[addr.m_addr_line] = false;
 		}
 
 		/**
@@ -587,13 +587,13 @@ MEM_IF_LOOP:		while (1) {
 			line_t line;
 
 			// read line
-			_raw_cache_core.get_line(_cache_mem,
-					addr._addr_cache, line);
+			m_raw_cache_core.get_line(m_cache_mem,
+					addr.m_addr_cache, line);
 
 			// send write request to memory interface
-			_mem_req.write({false, true, 0, addr._addr_main, line});
+			m_mem_req.write({false, true, 0, addr.m_addr_main, line});
 
-			_dirty[addr._addr_line] = false;
+			m_dirty[addr.m_addr_line] = false;
 		}
 
 		/**
@@ -603,11 +603,11 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			for (auto set = 0; set < N_SETS; set++) {
 				for (auto way = 0; way < N_WAYS; way++) {
-					addr_t addr(_tag[set * N_WAYS + way], set,
+					addr_t addr(m_tag[set * N_WAYS + way], set,
 							0, way);
 					// check if line has to be written back
-					if (_valid[addr._addr_line] &&
-							_dirty[addr._addr_line]) {
+					if (m_valid[addr.m_addr_line] &&
+							m_dirty[addr.m_addr_line]) {
 						// write line back
 						write_back(addr);
 					}
@@ -617,31 +617,31 @@ MEM_IF_LOOP:		while (1) {
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		void update_profiling(hit_status_t status) {
-			_n_reqs++;
+			m_n_reqs++;
 
 			if (status == HIT)
-				_n_hits++;
+				m_n_hits++;
 			else if (status == L1_HIT)
-				_n_l1_hits++;
+				m_n_l1_hits++;
 		}
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 		class square_bracket_proxy {
 			private:
-				void *_cache;
-				unsigned int _addr_main;
+				void *m_cache;
+				unsigned int m_addr_main;
 			public:
 				square_bracket_proxy(cache *c, unsigned int addr_main):
-					_cache(c), _addr_main(addr_main) {}
+					m_cache(c), m_addr_main(addr_main) {}
 
 				operator T() const {
 #pragma HLS inline
-					return (static_cast<cache *>(_cache))->get(_addr_main);
+					return (static_cast<cache *>(m_cache))->get(m_addr_main);
 				}
 
 				square_bracket_proxy &operator=(T data) {
 #pragma HLS inline
-					(static_cast<cache *>(_cache))->set(_addr_main, data);
+					(static_cast<cache *>(m_cache))->set(m_addr_main, data);
 					return *this;
 				}
 		};

@@ -37,9 +37,9 @@ class arbiter {
 			bool stop;
 		} request_t;
 
-		hls::stream<request_t, 4> _request[N_READERS];
-		hls::stream<line_t, 4> _response[N_READERS];
-		unsigned int _reader;
+		hls::stream<request_t, 4> m_request[N_READERS];
+		hls::stream<line_t, 4> m_response[N_READERS];
+		unsigned int m_reader;
 
 	public:
 		/**
@@ -73,7 +73,7 @@ ARBITER_LOOP:		while (1) {
 					// get request and
 					// make pipeline flushable (to avoid deadlock)
 					// skip reader if it is not issuing a request
-					if (!_request[reader].read_nb(req))
+					if (!m_request[reader].read_nb(req))
 						continue;
 
 					// exit the loop if request is "end-of-request"
@@ -87,7 +87,7 @@ ARBITER_LOOP:		while (1) {
 						line[off] = main_line[off];
 					}
 
-					_response[reader].write(line);
+					m_response[reader].write(line);
 				}
 			}
 		}
@@ -99,7 +99,7 @@ ARBITER_LOOP:		while (1) {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-			_request[0].write({0, true});
+			m_request[0].write({0, true});
 		}
 
 		/**
@@ -115,11 +115,11 @@ ARBITER_LOOP:		while (1) {
 				line_t &line) {
 #pragma HLS inline
 #pragma HLS function_instantiate variable=reader
-			_request[reader].write({addr_main, false});
+			m_request[reader].write({addr_main, false});
 
 			ap_wait();
 
-			line = _response[reader].read();
+			line = m_response[reader].read();
 		}
 };
 

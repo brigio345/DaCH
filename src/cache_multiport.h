@@ -25,12 +25,12 @@ class cache_multiport {
 		typedef cache<T, RD_PORTS, false, MAIN_SIZE, N_SETS,
 			N_WAYS, N_ENTRIES_PER_LINE, false> cache_t;
 
-		cache_t _caches[RD_PORTS];
-		unsigned int _rd_port;
+		cache_t m_caches[RD_PORTS];
+		unsigned int m_rd_port;
 
 	public:
 		cache_multiport() {
-#pragma HLS array_partition variable=_caches complete
+#pragma HLS array_partition variable=m_caches complete
 		}
 
 		/**
@@ -42,10 +42,10 @@ class cache_multiport {
 		void init() {
 			for (auto port = 0; port < RD_PORTS; port++) {
 #pragma HLS unroll
-				_caches[port].init();
+				m_caches[port].init();
 			}
 
-			_rd_port = 0;
+			m_rd_port = 0;
 		}
 
 		/**
@@ -67,7 +67,7 @@ class cache_multiport {
 			arbiter.run(main_mem);
 			for (auto port = 0; port < RD_PORTS; port++) {
 #pragma HLS unroll
-				_caches[port].run(main_mem, port, &arbiter);
+				m_caches[port].run(main_mem, port, &arbiter);
 			}
 #else
 			std::thread arbiter_thd([&]{arbiter.run(main_mem);});
@@ -76,7 +76,7 @@ class cache_multiport {
 #pragma HLS unroll
 				auto arbiter_ptr = &arbiter;
 				cache_thds[port] = std::thread([=]{
-						_caches[port].run(main_mem, port,
+						m_caches[port].run(main_mem, port,
 								arbiter_ptr);
 						});
 			}
@@ -98,7 +98,7 @@ class cache_multiport {
 		void stop() {
 			for (auto port = 0; port < RD_PORTS; port++) {
 #pragma HLS unroll
-				_caches[port].stop();
+				m_caches[port].stop();
 			}
 		}
 
@@ -111,7 +111,7 @@ class cache_multiport {
 		int get_n_reqs() {
 			auto n_reqs = 0;
 			for (auto port = 0; port < RD_PORTS; port++)
-				n_reqs += _caches[port].get_n_reqs();
+				n_reqs += m_caches[port].get_n_reqs();
 
 			return n_reqs;
 		}
@@ -119,7 +119,7 @@ class cache_multiport {
 		int get_n_hits() {
 			auto n_hits = 0;
 			for (auto port = 0; port < RD_PORTS; port++)
-				n_hits += _caches[port].get_n_hits();
+				n_hits += m_caches[port].get_n_hits();
 
 			return n_hits;
 		}
@@ -145,9 +145,9 @@ class cache_multiport {
 		 */
 		T get(unsigned int addr_main) {
 #pragma HLS inline
-			auto port = _rd_port;
+			auto port = m_rd_port;
 
-			_rd_port = (_rd_port + 1) % RD_PORTS;
+			m_rd_port = (m_rd_port + 1) % RD_PORTS;
 
 			return get(addr_main, port);
 		}
@@ -165,7 +165,7 @@ class cache_multiport {
 		T get(unsigned int addr_main, unsigned int port) {
 #pragma HLS inline
 #pragma HLS function_instantiate variable=port
-			return _caches[port][addr_main];
+			return m_caches[port][addr_main];
 		}
 };
 
