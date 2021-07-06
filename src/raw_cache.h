@@ -21,7 +21,7 @@ class raw_cache {
 #endif /* __SYNTHESIS__ */
 
 		bool m_valid;
-		line_t m_line;
+		line_type m_line;
 		unsigned int m_tag;
 
 	public:
@@ -29,9 +29,9 @@ class raw_cache {
 			m_valid = false;
 		}
 
-		void get_line(T *main_mem, unsigned int addr_main, line_t &line) {
+		void get_line(T *main_mem, unsigned int addr_main, line_type &line) {
 #pragma HLS inline
-			raw_addr_t addr(addr_main);
+			addr_type addr(addr_main);
 
 			if (hit(addr)) {
 				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
@@ -47,9 +47,9 @@ class raw_cache {
 			}
 		}
 
-		void set_line(T *main_mem, unsigned int addr_main, line_t &line) {
+		void set_line(T *main_mem, unsigned int addr_main, line_type &line) {
 #pragma HLS inline
-			raw_addr_t addr(addr_main);
+			addr_type addr(addr_main);
 
 			T *main_line = &(main_mem[addr.m_addr_main & (-1U << OFF_SIZE)]);
 			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
@@ -62,7 +62,7 @@ class raw_cache {
 		}
 
 	private:
-		inline bool hit(raw_addr_t addr) {
+		inline bool hit(addr_type addr) {
 #pragma HLS inline
 			return (m_valid && (addr.m_tag == m_tag));
 		}

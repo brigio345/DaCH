@@ -21,11 +21,11 @@ class cache_multiport {
 	private:
 		static_assert((RD_PORTS > 0), "RD_PORTS must be greater than 0");
 
-		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE> arbiter_t;
+		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE> arbiter_type;
 		typedef cache<T, RD_PORTS, false, MAIN_SIZE, N_SETS,
-			N_WAYS, N_ENTRIES_PER_LINE, false> cache_t;
+			N_WAYS, N_ENTRIES_PER_LINE, false> cache_type;
 
-		cache_t m_caches[RD_PORTS];
+		cache_type m_caches[RD_PORTS];
 		unsigned int m_rd_port;
 
 	public:
@@ -62,7 +62,7 @@ class cache_multiport {
 		 */
 		void run(T *main_mem) {
 #pragma HLS inline
-			arbiter_t arbiter;
+			arbiter_type arbiter;
 #ifdef __SYNTHESIS__
 			arbiter.run(main_mem);
 			for (auto port = 0; port < RD_PORTS; port++) {

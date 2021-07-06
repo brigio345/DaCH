@@ -25,20 +25,20 @@ class arbiter {
 
 #ifdef __SYNTHESIS__
 		template <typename TYPE, size_t SIZE>
-			using array_t = hls::vector<TYPE, SIZE>;
+			using array_type = hls::vector<TYPE, SIZE>;
 #else
 		template <typename TYPE, size_t SIZE>
-			using array_t = std::array<TYPE, SIZE>;
+			using array_type = std::array<TYPE, SIZE>;
 #endif /* __SYNTHESIS__ */
-		typedef array_t<T, N_ENTRIES_PER_LINE> line_t;
+		typedef array_type<T, N_ENTRIES_PER_LINE> line_type;
 
 		typedef struct {
 			unsigned int addr_main;
 			bool stop;
-		} request_t;
+		} request_type;
 
-		hls::stream<request_t, 4> m_request[N_READERS];
-		hls::stream<line_t, 4> m_response[N_READERS];
+		hls::stream<request_type, 4> m_request[N_READERS];
+		hls::stream<line_type, 4> m_response[N_READERS];
 		unsigned int m_reader;
 
 	public:
@@ -69,7 +69,7 @@ ARBITER_LOOP:		while (1) {
 #pragma HLS pipeline
 				for (auto reader = 0; reader < N_READERS; reader++) {
 #pragma HLS unroll
-					request_t req;
+					request_type req;
 					// get request and
 					// make pipeline flushable (to avoid deadlock)
 					// skip reader if it is not issuing a request
@@ -80,7 +80,7 @@ ARBITER_LOOP:		while (1) {
 					if (req.stop)
 						return;
 
-					line_t line;
+					line_type line;
 					auto main_line = &(main_mem[req.addr_main & (-1U << OFF_SIZE)]);
 					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
 #pragma HLS unroll
@@ -112,7 +112,7 @@ ARBITER_LOOP:		while (1) {
 		 * \param line		The buffer to store the loaded line.
 		 */
 		void get_line(unsigned int addr_main, unsigned int reader,
-				line_t &line) {
+				line_type &line) {
 #pragma HLS inline
 #pragma HLS function_instantiate variable=reader
 			m_request[reader].write({addr_main, false});
