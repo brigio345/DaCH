@@ -73,7 +73,7 @@ class cache {
 			READ_REQ,
 			WRITE_REQ,
 			STOP_REQ
-		} operation_type;
+		} op_type;
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		typedef enum {
@@ -82,11 +82,6 @@ class cache {
 			L1_HIT
 		} hit_status_type;
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
-
-		typedef struct {
-			operation_type op;
-			unsigned int addr_main;
-		} core_req_type;
 
 		typedef struct {
 			bool load;
@@ -101,7 +96,8 @@ class cache {
 		bool m_dirty[N_SETS * N_WAYS];
 		unsigned int m_lru[N_SETS][N_WAYS];
 		T m_cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
-		hls::stream<core_req_type, 4> m_core_req;
+		hls::stream<op_type, 4> m_core_req_op;
+		hls::stream<unsigned int, 4> m_core_req_addr;
 		hls::stream<T, 4> m_core_req_data;
 		hls::stream<line_type, 4> m_core_resp;
 		hls::stream<mem_req_type, 2> m_mem_req;
@@ -176,7 +172,7 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-			m_core_req.write({STOP_REQ, 0});
+			m_core_req_op.write(STOP_REQ);
 		}
 
 		/**
@@ -199,7 +195,8 @@ class cache {
 
 			if (!l1_hit) {
 				// send read request to cache
-				m_core_req.write({READ_REQ, addr_main});
+				m_core_req_op.write(READ_REQ);
+				m_core_req_addr.write(addr_main);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
@@ -260,7 +257,8 @@ class cache {
 			}
 
 			// send write request to cache
-			m_core_req.write({WRITE_REQ, addr_main});
+			m_core_req_op.write(WRITE_REQ);
+			m_core_req_addr.write(addr_main);
 			m_core_req_data.write(data);
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 			update_profiling(m_hit_status.read());
@@ -314,31 +312,30 @@ class cache {
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline
 #pragma HLS dependence variable=m_cache_mem distance=1 inter RAW false
-				core_req_type req;
+				op_type op;
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (m_core_req.read_nb(req)) {
+				if (m_core_req_op.read_nb(op)) {
 #else
 				// get request
-				m_core_req.read(req);
+				m_core_req_op.read(op);
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
-				if (req.op == STOP_REQ)
+				if (op == STOP_REQ)
 					break;
 
 				// check the request type
-				const auto read = ((RD_ENABLED && (req.op == READ_REQ)) ||
+				const auto read = ((RD_ENABLED && (op == READ_REQ)) ||
 						(!WR_ENABLED));
 
 				// in case of write request, read data to be written
-				T data;
-				if (!read)
-					m_core_req_data.read(data);
+				const auto addr_main = m_core_req_addr.read();
+				const auto data = read ? 0 : m_core_req_data.read();
 
 				// extract information from address
-				address_type addr(req.addr_main);
+				address_type addr(addr_main);
 
 				auto way = hit(addr);
 				const auto is_hit = (way != -1);
