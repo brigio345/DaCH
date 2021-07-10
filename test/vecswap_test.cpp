@@ -7,7 +7,7 @@
 
 #define N 64
 
-typedef cache<int, true, true, N, 2, 1, 8, true> cache_t;
+typedef cache<int, true, true, N, 1, 1, 8, true, false> cache_t;
 
 template <typename T>
 	void vecswap(T a, T b) {

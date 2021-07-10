@@ -16,14 +16,14 @@
 #endif /* __SYNTHESIS__ */
 
 template <typename T, size_t RD_PORTS, size_t MAIN_SIZE, size_t N_SETS,
-	 size_t N_WAYS, size_t N_ENTRIES_PER_LINE>
+	 size_t N_WAYS, size_t N_ENTRIES_PER_LINE, bool LRU>
 class cache_multiport {
 	private:
 		static_assert((RD_PORTS > 0), "RD_PORTS must be greater than 0");
 
 		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE> arbiter_type;
 		typedef cache<T, RD_PORTS, false, MAIN_SIZE, N_SETS,
-			N_WAYS, N_ENTRIES_PER_LINE, false> cache_type;
+			N_WAYS, N_ENTRIES_PER_LINE, LRU, false> cache_type;
 
 		cache_type m_caches[RD_PORTS];
 		unsigned int m_rd_port;

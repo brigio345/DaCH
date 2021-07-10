@@ -14,9 +14,9 @@
 static const int RD_PORTS = 2;
 
 typedef int data_type;
-typedef cache_multiport<data_type, RD_PORTS, N * M, 1, 1, M> cache_a;
-typedef cache_multiport<data_type, RD_PORTS, M * P, 1, M, 4> cache_b;
-typedef cache<data_type, false, true, N * P, 2, 1, M, true> cache_c;
+typedef cache_multiport<data_type, RD_PORTS, N * M, 1, 1, M, false> cache_a;
+typedef cache_multiport<data_type, RD_PORTS, M * P, 1, M, 4, true> cache_b;
+typedef cache<data_type, false, true, N * P, 2, 1, M, true, false> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 #pragma HLS inline off

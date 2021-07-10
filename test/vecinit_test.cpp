@@ -7,7 +7,7 @@
 
 #define N 128
 
-typedef cache<int, false, true, N, 2, 1, 8, true> cache_t;
+typedef cache<int, false, true, N, 2, 1, 8, false, true> cache_t;
 
 template <typename T>
 	void vecinit(T a) {

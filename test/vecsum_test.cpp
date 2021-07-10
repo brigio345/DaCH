@@ -9,7 +9,7 @@
 
 static const size_t RD_PORTS = 2;
 
-typedef cache_multiport<int, RD_PORTS, N, 1, 1, 8> cache_a;
+typedef cache_multiport<int, RD_PORTS, N, 1, 1, 8, false> cache_a;
 
 template <typename T>
 	void vecsum(T a, int &sum) {
