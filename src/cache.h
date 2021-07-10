@@ -8,7 +8,8 @@
  *
  *		Cache module whose characteristics are:
  *			- address mapping: set-associative;
- *			- replacement policy: least recently used;
+ *			- replacement policy: least-recently-used or
+ *						last-in first-out;
  *			- write policy: write-back.
  *
  *		Synthesizability is guaranteed with Vitis HLS 2020.2, with II=1
@@ -17,6 +18,7 @@
 
 #include "address.h"
 #include "arbiter.h"
+#include "replacer.h"
 #include "l1_cache.h"
 #include "raw_cache.h"
 #include "hls_stream.h"
@@ -31,7 +33,8 @@
 #endif /* __SYNTHESIS__ */
 
 template <typename T, size_t RD_PORTS, bool WR_ENABLED, size_t MAIN_SIZE,
-	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE, bool L1_CACHE>
+	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE,
+	 bool LRU, bool L1_CACHE>
 class cache {
 	private:
 		static const bool RD_ENABLED = (RD_PORTS > 0);
@@ -68,6 +71,8 @@ class cache {
 		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
 				N_ENTRIES_PER_LINE> raw_cache_type;
 		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE> arbiter_type;
+		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
+			N_ENTRIES_PER_LINE> replacer_type;
 
 		typedef enum {
 			READ_REQ,
@@ -94,7 +99,6 @@ class cache {
 		unsigned int m_tag[N_SETS * N_WAYS];
 		bool m_valid[N_SETS * N_WAYS];
 		bool m_dirty[N_SETS * N_WAYS];
-		unsigned int m_lru[N_SETS][N_WAYS];
 		T m_cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
 		hls::stream<op_type, 4> m_core_req_op;
 		hls::stream<unsigned int, 4> m_core_req_addr;
@@ -104,6 +108,7 @@ class cache {
 		hls::stream<line_type, 2> m_mem_resp;
 		l1_cache_type m_l1_cache_get;
 		raw_cache_type m_raw_cache_core;
+		replacer_type m_replacer;
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs = 0;
@@ -116,7 +121,6 @@ class cache {
 #pragma HLS array_partition variable=m_tag complete dim=1
 #pragma HLS array_partition variable=m_valid complete dim=1
 #pragma HLS array_partition variable=m_dirty complete dim=1
-#pragma HLS array_partition variable=m_lru complete dim=0
 #pragma HLS array_partition variable=m_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
 		}
 
@@ -301,11 +305,7 @@ class cache {
 			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
 				m_valid[line] = false;
 
-			// initialize way counters
-			for (auto set = 0; set < N_SETS; set++) {
-				for (auto way = 0; way < N_WAYS; way++)
-					m_lru[set][way] = way;
-			}
+			m_replacer.init();
 
 			m_raw_cache_core.init();
 
@@ -341,10 +341,10 @@ CORE_LOOP:		while (1) {
 				const auto is_hit = (way != -1);
 
 				if (!is_hit)
-					way = get_way(addr);
+					way = m_replacer.get_way(addr);
 
 				addr.set_way(way);
-				notify_use(addr);
+				m_replacer.notify_use(addr);
 
 				line_type line;
 				if (is_hit) {
@@ -496,45 +496,6 @@ MEM_IF_LOOP:		while (1) {
 		}
 
 		/**
-		 * \brief	Update least-recently-used data structures.
-		 *
-		 * \param addr	The address which has been used.
-		 */
-		void notify_use(const address_type &addr) {
-#pragma HLS inline
-			// find the position of the last used way
-			int lru_idx;
-			for (lru_idx = 0; lru_idx < N_WAYS; lru_idx++)
-				if (m_lru[addr.m_set][lru_idx] == addr.m_way)
-					break;
-
-			// fill the vacant position of the last used way,
-			// by shifting other ways to the left
-			for (auto way = 0; way < (N_WAYS - 1); way++) {
-				if (way >= lru_idx) {
-					m_lru[addr.m_set][way] =
-						m_lru[addr.m_set][way + 1];
-				}
-			}
-
-			// put the last used way to the rightmost position
-			m_lru[addr.m_set][N_WAYS - 1] = addr.m_way;
-		}
-
-		/**
-		 * \brief	Return the least recently used way associable
-		 * 		with \p addr.
-		 *
-		 * \param addr	The address to be associated.
-		 *
-		 * \return	The least recently used way.
-		 */
-		inline int get_way(const address_type &addr) const {
-#pragma HLS inline
-			return m_lru[addr.m_set][0];
-		}
-
-		/**
 		 * \brief	Load line from main to cache memory and write
 		 * 		back the line to be overwritten, if necessary.
 		 *
@@ -572,6 +533,8 @@ MEM_IF_LOOP:		while (1) {
 			m_tag[addr.m_addr_line] = addr.m_tag;
 			m_valid[addr.m_addr_line] = true;
 			m_dirty[addr.m_addr_line] = false;
+
+			m_replacer.notify_insertion(addr);
 		}
 
 		/**
