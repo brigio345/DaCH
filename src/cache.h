@@ -77,6 +77,7 @@ class cache {
 		typedef enum {
 			READ_REQ,
 			WRITE_REQ,
+			READ_WRITE_REQ,
 			STOP_REQ
 		} op_type;
 
@@ -89,8 +90,7 @@ class cache {
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 		typedef struct {
-			bool load;
-			bool write_back;
+			op_type op;
 			unsigned int load_addr;
 			unsigned int write_back_addr;
 			line_type line;
@@ -395,7 +395,7 @@ CORE_LOOP:		while (1) {
 			ap_wait();
 			// stop memory interface
 			line_type dummy;
-			m_mem_req.write({false, false, 0, 0, dummy});
+			m_mem_req.write({STOP_REQ, 0, 0, dummy});
 		}
 
 		/**
@@ -438,11 +438,11 @@ MEM_IF_LOOP:		while (1) {
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
-				if (!req.load && !req.write_back)
+				if (req.op == STOP_REQ)
 					break;
 
 				line_type line;
-				if (req.load) {
+				if ((req.op == READ_REQ) || (req.op == READ_WRITE_REQ)) {
 					// read line from main memory
 					if (arbitrate) {
 						arbiter->get_line(req.load_addr,
@@ -457,7 +457,8 @@ MEM_IF_LOOP:		while (1) {
 					m_mem_resp.write(line);
 				}
 
-				if (WR_ENABLED && req.write_back) {
+				if (WR_ENABLED && ((req.op == WRITE_REQ) ||
+							(req.op == READ_WRITE_REQ))) {
 					// write line to main memory
 					raw_cache_mem_if.set_line(main_mem,
 							req.write_back_addr, req.line);
@@ -504,7 +505,7 @@ MEM_IF_LOOP:		while (1) {
 		 */
 		void load(const address_type &addr, line_type &line) {
 #pragma HLS inline
-			auto do_write_back = false;
+			auto op = READ_REQ;
 			// build write-back address
 			address_type write_back_addr(m_tag[addr.m_addr_line], addr.m_set,
 					0, addr.m_way);
@@ -515,12 +516,12 @@ MEM_IF_LOOP:		while (1) {
 				m_raw_cache_core.get_line(m_cache_mem,
 						write_back_addr.m_addr_cache,
 						line);
-				do_write_back = true;
+				op = READ_WRITE_REQ;
 			}
 
 			// send read request to memory interface and
 			// write request if write-back is necessary
-			m_mem_req.write({true, do_write_back, addr.m_addr_main,
+			m_mem_req.write({op, addr.m_addr_main,
 					write_back_addr.m_addr_main, line});
 
 			// force FIFO write and FIFO read to separate pipeline
@@ -552,7 +553,7 @@ MEM_IF_LOOP:		while (1) {
 					addr.m_addr_cache, line);
 
 			// send write request to memory interface
-			m_mem_req.write({false, true, 0, addr.m_addr_main, line});
+			m_mem_req.write({WRITE_REQ, 0, addr.m_addr_main, line});
 
 			m_dirty[addr.m_addr_line] = false;
 		}
