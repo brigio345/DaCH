@@ -316,7 +316,8 @@ CORE_LOOP:		while (1) {
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (m_core_req_op.read_nb(op)) {
+				if (!m_core_req_op.read_nb(op))
+					continue;
 #else
 				// get request
 				m_core_req_op.read(op);
@@ -381,9 +382,6 @@ CORE_LOOP:		while (1) {
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 				m_hit_status.write(is_hit ? HIT : MISS);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
-#ifdef __SYNTHESIS__
-				}
-#endif
 			}
 
 			// synchronize main memory with cache memory
@@ -431,7 +429,8 @@ MEM_IF_LOOP:		while (1) {
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (m_mem_req.read_nb(req)) {
+				if (!m_mem_req.read_nb(req))
+					continue;
 #else
 				// get request
 				m_mem_req.read(req);
@@ -463,9 +462,6 @@ MEM_IF_LOOP:		while (1) {
 					raw_cache_mem_if.set_line(main_mem,
 							req.write_back_addr, req.line);
 				}
-#ifdef __SYNTHESIS__
-				}
-#endif
 			}
 
 			if ((arbiter != nullptr) && (id == 0))
