@@ -75,10 +75,10 @@ class cache {
 			N_ENTRIES_PER_LINE> replacer_type;
 
 		typedef enum {
-			READ_REQ,
-			WRITE_REQ,
-			READ_WRITE_REQ,
-			STOP_REQ
+			READ_OP,
+			WRITE_OP,
+			READ_WRITE_OP,
+			STOP_OP
 		} op_type;
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
@@ -176,7 +176,7 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-			m_core_req_op.write(STOP_REQ);
+			m_core_req_op.write(STOP_OP);
 		}
 
 		/**
@@ -199,7 +199,7 @@ class cache {
 
 			if (!l1_hit) {
 				// send read request to cache
-				m_core_req_op.write(READ_REQ);
+				m_core_req_op.write(READ_OP);
 				m_core_req_addr.write(addr_main);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
@@ -261,7 +261,7 @@ class cache {
 			}
 
 			// send write request to cache
-			m_core_req_op.write(WRITE_REQ);
+			m_core_req_op.write(WRITE_OP);
 			m_core_req_addr.write(addr_main);
 			m_core_req_data.write(data);
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
@@ -323,11 +323,11 @@ CORE_LOOP:		while (1) {
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
-				if (op == STOP_REQ)
+				if (op == STOP_OP)
 					break;
 
 				// check the request type
-				const auto read = ((RD_ENABLED && (op == READ_REQ)) ||
+				const auto read = ((RD_ENABLED && (op == READ_OP)) ||
 						(!WR_ENABLED));
 
 				// in case of write request, read data to be written
@@ -395,7 +395,7 @@ CORE_LOOP:		while (1) {
 			ap_wait();
 			// stop memory interface
 			line_type dummy;
-			m_mem_req.write({STOP_REQ, 0, 0, dummy});
+			m_mem_req.write({STOP_OP, 0, 0, dummy});
 		}
 
 		/**
@@ -438,11 +438,11 @@ MEM_IF_LOOP:		while (1) {
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
-				if (req.op == STOP_REQ)
+				if (req.op == STOP_OP)
 					break;
 
 				line_type line;
-				if ((req.op == READ_REQ) || (req.op == READ_WRITE_REQ)) {
+				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
 					// read line from main memory
 					if (arbitrate) {
 						arbiter->get_line(req.load_addr,
@@ -457,8 +457,8 @@ MEM_IF_LOOP:		while (1) {
 					m_mem_resp.write(line);
 				}
 
-				if (WR_ENABLED && ((req.op == WRITE_REQ) ||
-							(req.op == READ_WRITE_REQ))) {
+				if (WR_ENABLED && ((req.op == WRITE_OP) ||
+							(req.op == READ_WRITE_OP))) {
 					// write line to main memory
 					raw_cache_mem_if.set_line(main_mem,
 							req.write_back_addr, req.line);
@@ -505,7 +505,7 @@ MEM_IF_LOOP:		while (1) {
 		 */
 		void load(const address_type &addr, line_type &line) {
 #pragma HLS inline
-			auto op = READ_REQ;
+			auto op = READ_OP;
 			// build write-back address
 			address_type write_back_addr(m_tag[addr.m_addr_line], addr.m_set,
 					0, addr.m_way);
@@ -516,7 +516,7 @@ MEM_IF_LOOP:		while (1) {
 				m_raw_cache_core.get_line(m_cache_mem,
 						write_back_addr.m_addr_cache,
 						line);
-				op = READ_WRITE_REQ;
+				op = READ_WRITE_OP;
 			}
 
 			// send read request to memory interface and
@@ -553,7 +553,7 @@ MEM_IF_LOOP:		while (1) {
 					addr.m_addr_cache, line);
 
 			// send write request to memory interface
-			m_mem_req.write({WRITE_REQ, 0, addr.m_addr_main, line});
+			m_mem_req.write({WRITE_OP, 0, addr.m_addr_main, line});
 
 			m_dirty[addr.m_addr_line] = false;
 		}
