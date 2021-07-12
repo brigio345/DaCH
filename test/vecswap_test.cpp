@@ -7,16 +7,17 @@
 
 #define N 64
 
-typedef cache<int, true, true, N, 1, 1, 8, true, false> cache_t;
+typedef cache<int, true, true, N, 2, 1, 8, true, false> cache_t;
 
 template <typename T>
 	void vecswap(T a, T b) {
 #pragma HLS inline off
 		int tmp;
 
-		for (auto i = 0; i < N; i++) {
+VECSWAP_LOOP:	for (auto i = 0; i < N; i++) {
+#pragma HLS inline
 			tmp = a[i];
-			a[i] = (int) b[i];
+			a[i] = b[i];
 			b[i] = tmp;
 		}
 	}
