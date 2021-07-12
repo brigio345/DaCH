@@ -596,13 +596,33 @@ MEM_IF_LOOP:		while (1) {
 
 				operator T() const {
 #pragma HLS inline
-					return (static_cast<cache *>(m_cache))->get(m_addr_main);
+					return get();
 				}
 
 				square_bracket_proxy &operator=(const T data) {
 #pragma HLS inline
-					(static_cast<cache *>(m_cache))->set(m_addr_main, data);
+					set(data);
 					return *this;
+				}
+
+				square_bracket_proxy &operator=(
+						const square_bracket_proxy &proxy) {
+#pragma HLS inline
+					set(proxy.get());
+					return *this;
+				}
+
+			private:
+				T get() const {
+#pragma HLS inline
+					return (static_cast<cache *>(m_cache))->
+						get(m_addr_main);
+				}
+
+				void set(const T data) {
+#pragma HLS inline
+					(static_cast<cache *>(m_cache))->
+						set(m_addr_main, data);
 				}
 		};
 
