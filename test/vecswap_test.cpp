@@ -15,7 +15,7 @@ template <typename T>
 		int tmp;
 
 VECSWAP_LOOP:	for (auto i = 0; i < N; i++) {
-#pragma HLS inline
+#pragma HLS pipeline
 			tmp = a[i];
 			a[i] = b[i];
 			b[i] = tmp;
