@@ -149,22 +149,6 @@ class cache_multiport {
 
 			m_rd_port = (m_rd_port + 1) % RD_PORTS;
 
-			return get(addr_main, port);
-		}
-
-		/**
-		 * \brief		Request to read a data element.
-		 *
-		 * \param addr_main	The address in main memory referring to
-		 * 			the data element to be read.
-		 * \param port		The port index at which the request
-		 *			is issued.
-		 *
-		 * \return		The read data element.
-		 */
-		T get(const unsigned int addr_main, const unsigned int port) {
-#pragma HLS inline
-#pragma HLS function_instantiate variable=port
 			return m_caches[port][addr_main];
 		}
 };
