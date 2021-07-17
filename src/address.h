@@ -20,9 +20,9 @@ class address {
 
 		address(const unsigned int addr_main):
 			m_addr_main(addr_main),
-			m_off(addr_main & OFF_MASK),
+			m_tag((addr_main >> (OFF_SIZE + SET_SIZE)) & TAG_MASK),
 			m_set((addr_main >> OFF_SIZE) & SET_MASK),
-			m_tag((addr_main >> (OFF_SIZE + SET_SIZE)) & TAG_MASK) {}
+			m_off(addr_main & OFF_MASK) {}
 
 		address(const unsigned int tag, const unsigned int set,
 				const unsigned int off, const unsigned int way):
