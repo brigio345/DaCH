@@ -10,14 +10,15 @@
 
 #include "address.h"
 #include "utils.h"
+#include "ap_int.h"
 
 template <bool LRU, typename ADDR_T, size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE>
 class replacer {
 	private:
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
 
-		unsigned int m_lru[N_SETS][N_WAYS];
-		unsigned int m_lifo[N_SETS];
+		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> m_lru[N_SETS][N_WAYS];
+		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> m_lifo[N_SETS];
 
 	public:
 		replacer() {
@@ -81,8 +82,8 @@ class replacer {
 		void notify_insertion(const ADDR_T &addr) {
 #pragma HLS inline
 			if (!LRU) {
-				m_lifo[addr.m_set]++;
-				m_lifo[addr.m_set] &= (~(-1U << WAY_SIZE));
+				if (WAY_SIZE > 0)
+					m_lifo[addr.m_set]++;
 			}
 		}
 

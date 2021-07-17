@@ -97,7 +97,7 @@ class cache {
 			line_type line;
 		} mem_req_type;
 
-		unsigned int m_tag[N_SETS * N_WAYS];
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];
 		bool m_valid[N_SETS * N_WAYS];
 		bool m_dirty[N_SETS * N_WAYS];
 		T m_cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
@@ -187,7 +187,7 @@ class cache {
 		 * 			the cache line to be read.
 		 * \param line		The buffer to store the read line.
 		 */
-		void get_line(const unsigned int addr_main, line_type &line) {
+		void get_line(const ap_uint<ADDR_SIZE> addr_main, line_type &line) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			assert(addr_main < MAIN_SIZE);
@@ -230,7 +230,7 @@ class cache {
 		 *
 		 * \return		The read data element.
 		 */
-		T get(const unsigned int addr_main) {
+		T get(const ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
 			line_type line;
 
@@ -250,7 +250,7 @@ class cache {
 		 * 			the data element to be written.
 		 * \param data		The data to be written.
 		 */
-		void set(const unsigned int addr_main, const T data) {
+		void set(const ap_uint<ADDR_SIZE> addr_main, const T data) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			assert(addr_main < MAIN_SIZE);
@@ -589,10 +589,10 @@ MEM_IF_LOOP:		while (1) {
 		class square_bracket_proxy {
 			private:
 				void *m_cache;
-				const unsigned int m_addr_main;
+				const ap_uint<ADDR_SIZE> m_addr_main;
 			public:
 				square_bracket_proxy(cache *c,
-						const unsigned int addr_main):
+						const ap_uint<ADDR_SIZE> addr_main):
 					m_cache(c), m_addr_main(addr_main) {}
 
 				operator T() const {
@@ -628,7 +628,7 @@ MEM_IF_LOOP:		while (1) {
 		};
 
 	public:
-		square_bracket_proxy operator[](const int addr_main) {
+		square_bracket_proxy operator[](const ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
 			return square_bracket_proxy(this, addr_main);
 		}

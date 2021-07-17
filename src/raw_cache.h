@@ -2,6 +2,7 @@
 #define RAW_CACHE_H
 
 #include "address.h"
+#include "ap_int.h"
 #ifdef __SYNTHESIS__
 #include "hls_vector.h"
 #else
@@ -22,14 +23,16 @@ class raw_cache {
 
 		bool m_valid;
 		line_type m_line;
-		unsigned int m_tag;
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag;
 
 	public:
 		void init() {
 			m_valid = false;
 		}
 
-		void get_line(const T * const main_mem, const unsigned int addr_main, line_type &line) {
+		void get_line(const T * const main_mem,
+				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main,
+				line_type &line) {
 #pragma HLS inline
 			const addr_type addr(addr_main);
 
@@ -47,7 +50,9 @@ class raw_cache {
 			}
 		}
 
-		void set_line(T * const main_mem, const unsigned int addr_main, const line_type &line) {
+		void set_line(T * const main_mem,
+				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main,
+				const line_type &line) {
 #pragma HLS inline
 			const addr_type addr(addr_main);
 
