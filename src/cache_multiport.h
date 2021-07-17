@@ -10,6 +10,7 @@
  */
 
 #include "cache.h"
+#include "utils.h"
 #include "arbiter.h"
 #ifndef __SYNTHESIS__
 #include <thread>
@@ -21,7 +22,9 @@ class cache_multiport {
 	private:
 		static_assert((RD_PORTS > 0), "RD_PORTS must be greater than 0");
 
-		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE> arbiter_type;
+		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
+
+		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE, ADDR_SIZE> arbiter_type;
 		typedef cache<T, RD_PORTS, false, MAIN_SIZE, N_SETS,
 			N_WAYS, N_ENTRIES_PER_LINE, LRU, false> cache_type;
 

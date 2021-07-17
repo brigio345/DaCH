@@ -23,6 +23,7 @@
 #include "raw_cache.h"
 #include "hls_stream.h"
 #include "ap_utils.h"
+#include "ap_int.h"
 #include "utils.h"
 #ifdef __SYNTHESIS__
 #include "hls_vector.h"
@@ -70,7 +71,7 @@ class cache {
 				N_ENTRIES_PER_LINE> l1_cache_type;
 		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
 				N_ENTRIES_PER_LINE> raw_cache_type;
-		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE> arbiter_type;
+		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE, ADDR_SIZE> arbiter_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
 			N_ENTRIES_PER_LINE> replacer_type;
 
@@ -91,8 +92,8 @@ class cache {
 
 		typedef struct {
 			op_type op;
-			unsigned int load_addr;
-			unsigned int write_back_addr;
+			ap_uint<ADDR_SIZE> load_addr;
+			ap_uint<ADDR_SIZE> write_back_addr;
 			line_type line;
 		} mem_req_type;
 
@@ -101,7 +102,7 @@ class cache {
 		bool m_dirty[N_SETS * N_WAYS];
 		T m_cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
 		hls::stream<op_type, 4> m_core_req_op;
-		hls::stream<unsigned int, 4> m_core_req_addr;
+		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr;
 		hls::stream<T, 4> m_core_req_data;
 		hls::stream<line_type, 4> m_core_resp;
 		hls::stream<mem_req_type, 2> m_mem_req;

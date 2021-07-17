@@ -11,6 +11,7 @@
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 #include "ap_utils.h"
+#include "ap_int.h"
 #include "utils.h"
 #ifdef __SYNTHESIS__
 #include "hls_vector.h"
@@ -18,7 +19,7 @@
 #include <array>
 #endif /* __SYNTHESIS__ */
 
-template <typename T, size_t N_READERS, size_t N_ENTRIES_PER_LINE>
+template <typename T, size_t N_READERS, size_t N_ENTRIES_PER_LINE, size_t ADDR_SIZE>
 class arbiter {
 	private:
 		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
@@ -33,7 +34,7 @@ class arbiter {
 		typedef array_type<T, N_ENTRIES_PER_LINE> line_type;
 
 		typedef struct {
-			unsigned int addr_main;
+			ap_uint<ADDR_SIZE> addr_main;
 			bool stop;
 		} request_type;
 
