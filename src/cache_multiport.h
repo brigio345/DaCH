@@ -26,7 +26,7 @@ class cache_multiport {
 
 		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE, ADDR_SIZE> arbiter_type;
 		typedef cache<T, RD_PORTS, false, MAIN_SIZE, N_SETS,
-			N_WAYS, N_ENTRIES_PER_LINE, LRU, false> cache_type;
+			N_WAYS, N_ENTRIES_PER_LINE, LRU, 0> cache_type;
 
 		cache_type m_caches[RD_PORTS];
 		unsigned int m_rd_port;

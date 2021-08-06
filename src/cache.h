@@ -35,10 +35,11 @@
 
 template <typename T, size_t RD_PORTS, bool WR_ENABLED, size_t MAIN_SIZE,
 	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE,
-	 bool LRU, bool L1_CACHE>
+	 bool LRU, size_t L1_CACHE_LINES>
 class cache {
 	private:
 		static const bool RD_ENABLED = (RD_PORTS > 0);
+		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
 		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
@@ -67,10 +68,10 @@ class cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> address_type;
 		typedef array_type<T, N_ENTRIES_PER_LINE> line_type;
-		typedef l1_cache<line_type, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
-				N_ENTRIES_PER_LINE> l1_cache_type;
+		typedef l1_cache<T, ADDR_SIZE, L1_CACHE_LINES, N_ENTRIES_PER_LINE>
+			l1_cache_type;
 		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
-				N_ENTRIES_PER_LINE> raw_cache_type;
+			N_ENTRIES_PER_LINE> raw_cache_type;
 		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE, ADDR_SIZE> arbiter_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
 			N_ENTRIES_PER_LINE> replacer_type;
@@ -258,7 +259,7 @@ class cache {
 
 			if (L1_CACHE) {
 				// inform L1 cache about the writing
-				m_l1_cache_get.invalidate_line(addr_main);
+				m_l1_cache_get.notify_write(addr_main);
 			}
 
 			// send write request to cache
