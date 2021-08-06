@@ -48,6 +48,8 @@ class cache {
 
 		static_assert((RD_ENABLED || WR_ENABLED),
 				"Cache must be read-enabled or write-enabled");
+		static_assert(((MAIN_SIZE > 0) && ((1 << ADDR_SIZE) == MAIN_SIZE)),
+				"MAIN_SIZE must be a power of 2 greater than 0");
 		static_assert(((N_SETS > 0) && ((1 << SET_SIZE) == N_SETS)),
 				"N_SETS must be a power of 2 greater than 0");
 		static_assert(((N_ENTRIES_PER_LINE > 0) &&
