@@ -7,6 +7,7 @@
 #include "cache.h"
 #include "cache_multiport.h"
 
+#define USE_CACHE
 #define N 8
 #define M 8
 #define P 8
@@ -14,9 +15,9 @@
 static const int RD_PORTS = 2;
 
 typedef int data_type;
-typedef cache_multiport<data_type, RD_PORTS, N * M, 1, 1, M, false> cache_a;
-typedef cache_multiport<data_type, RD_PORTS, M * P, 1, M, 4, true> cache_b;
-typedef cache<data_type, false, true, N * P, 2, 1, M, true, false> cache_c;
+typedef cache_multiport<data_type, RD_PORTS, N * M, 1, 1, 8, false> cache_a;
+typedef cache_multiport<data_type, RD_PORTS, M * P, 1, 8, 8, false> cache_b;
+typedef cache<data_type, 0, true, N * P, 2, 1, 8, true, false> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 #pragma HLS inline off
@@ -33,11 +34,12 @@ void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 }
 
 extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
-#pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0
-#pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1
-#pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2
+#pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0 latency=1
+#pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1 latency=1
+#pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2 latency=1
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
+#ifdef USE_CACHE
 #pragma HLS dataflow disable_start_propagation
 	cache_a a_cache;
 	cache_b b_cache;
@@ -80,6 +82,9 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 			c_cache.get_n_hits(), c_cache.get_n_reqs());
 #endif /* PROFILE */
 #endif	/* __SYNTHESIS__ */
+#else
+	matrix::multiply<data_type *, data_type *, data_type *, N, M, P, RD_PORTS>(a_arr, b_arr, c_arr);
+#endif
 }
 
 int main() {
