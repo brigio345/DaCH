@@ -2,6 +2,9 @@
 
 \usepackage{graphicx}
 \usepackage{geometry}
+\usepackage{float}
+
+\graphicspath{{figures/}}
 
 \renewcommand*{\maketitle}%
 {
@@ -54,28 +57,25 @@
 
 \frontmatter
 \chapter*{Abstract}
-Nowadays integrated circuit technology is approaching to its limits: transistors
-pitch is reaching the physical limit and power density is higher and higher.
-In this scenario it is more and more difficult to advance the general purpose
-processor based technology, therefore specialized components are taking place.
-These specialized components allow better performance and lower power
-consumption, but require much higher design costs, due to two main reasons:
-producing a dedicated IC takes a huge amount of time and money and hardware
-design is more complex than general purpose software design.
+The end of the Moore's Law validity is making the performance advance of
+software run on general purpose processors more challenging than ever.
+Since current technology cannot scale anymore it is necessary to approach the
+problem from a different point of view: application-specific hardware can
+provide higher performance and lower power consumption, while requiring higher
+design efforts and higher deployment costs.
 
-The first issue have been addressed by the introduction of FPGAs, which allow to
-implement a special-purpose hardware module on a general-purpose underlying
-architecture, without having to build an integrated circuit from ground-up.
+High-Level Synthesis is aimed at reducing design efforts, shrinking the gap
+between hardware and software design.
 
-The second issue have been addressed by the High Level Synthesis, which allows
-to translate general-purpose software into special-purpose hardware.
+FPGAs allow to reduce deployment costs, making possible to implement
+special-purpose hardware modules on general-purpose underlying architecture.
 
-One of the most precious resources available on board an FPGA are Block-RAMs,
-which should be used with care in order to fully take advantage of them.
-Therefore this work is aimed at designing and implementing a cache module which
-takes care of transferring data between external DRAM and internal BRAM, letting
-the designer to focus on his design, without having to worry about the memory
-management.
+FPGAs memory system is composed of three main kind of resources: registers,
+Block-RAMs and external DRAMs.
+Current HLS tools allow to exploit this memory hierarchy manually, in a
+scratchpad-like fashion: the objective of this thesis work is to automate the
+memory management by providing a easily integrable and fully customizable cache
+system for High-Level Synthesis.
 
 \pagebreak
 \tableofcontents*
@@ -107,14 +107,23 @@ This hierarchy can be managed by two main approaches:
 \end{itemize}
 
 \subsection{Structure}
-A cache memory is logically split into \emph{sets} containing \emph{lines} which
-are in turn made up of \emph{words}.
+A cache memory is logically split into \emph{sets} containing \emph{lines} (or
+\emph{ways}) which are in turn made up of \emph{words}, as shown in
+Figure~\ref{fig:cache_logic_structure}.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.5\textwidth]{cache_logic_structure}
+	\caption{Cache logic structure.}
+	\label{fig:cache_logic_structure}
+\end{figure}
+
 Whenever a word $w$ is requested there are two possibilities:
 \begin{itemize}
-	\item \emph{Hit}: $w$ is present on the cache: the request can be
+	\item \emph{Hit}: $w$ is present in the cache: the request can be
 		immediately fulfilled.
-	\item \emph{Miss}: $w$ is not present on the cache: it is necessary to
-		retrieve it from lower level memory before fulfill the request.
+	\item \emph{Miss}: $w$ is not present in the cache: it is necessary to
+		retrieve it from lower level memory before fulfilling the request.
 \end{itemize}
 During the data retrieving a cache line is filled with a block of contiguous
 words loaded from the lower level memory, trying to exploit spatial locality of
@@ -129,12 +138,20 @@ line to a cache set.
 
 The \emph{set associative} policy is the most common mapping policy: given a
 cache memory with $s$ sets of $w$ words, the word address (referred to the lower
-level memory) bits are split into three parts:
+level memory) bits are split into three parts (as shown in
+Figure~\ref{fig:address_partitioning}):
 \begin{enumerate}
 	\item $\log_2(w)$: offset of the word in the line.
 	\item $\log_2(s)$: set.
 	\item remaining MSBs: tag identifying the specific line.
 \end{enumerate}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.5\textwidth]{address_partitioning}
+	\caption{Set associative policy address bits meaning.}
+	\label{fig:address_partitioning}
+\end{figure}
 
 Special cases of this policy are:
 \begin{itemize}
@@ -178,7 +195,10 @@ The most common solutions to this problem are:
 \subsubsection{Communication modeling}
 \section{Previous work}
 \chapter{Thesis contribution}
-\section{Design}
+\section{Architecture}
+\subsection{L2 cache architecture}
+\subsection{L1 cache architecture}
+\subsection{Multi-port architecture}
 \section{Implementation}
 \section{Results}
 \chapter{Conclusion}
