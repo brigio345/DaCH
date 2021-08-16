@@ -207,14 +207,15 @@ class cache {
 #endif /* __SYNTHESIS__ */
 
 			// try to get line from L1 cache
-			auto l1_hit = false;
-			if (L1_CACHE)
-				l1_hit = m_l1_cache[m_core_port].get_line(addr_main, line);
+			const auto l1_hit = (L1_CACHE &&
+					m_l1_cache[m_core_port].hit(addr_main));
 
-			if (!l1_hit) {
+			if (l1_hit) {
+				m_l1_cache[m_core_port].get_line(addr_main, line);
+			} else {
 				// send read request to cache
-				m_core_req_op[m_core_port].write_dep(READ_OP, false);
-				m_core_req_addr[m_core_port].write_dep(addr_main, false);
+				m_core_req_op[m_core_port].write(READ_OP);
+				m_core_req_addr[m_core_port].write(addr_main);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read

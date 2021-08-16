@@ -44,12 +44,10 @@ class l1_cache {
 				m_valid[line] = false;
 		}
 
-		bool get_line(const ap_uint<ADDR_SIZE> addr_main, line_type &line) {
+		void get_line(const ap_uint<ADDR_SIZE> addr_main, line_type &line) const {
 			const addr_type addr(addr_main);
 
 			line = m_cache_mem[addr.m_set];
-
-			return hit(addr);
 		}
 
 		void set_line(const ap_uint<ADDR_SIZE> addr_main, const line_type &line) {
@@ -66,8 +64,9 @@ class l1_cache {
 				m_valid[addr.m_set] = false;
 		}
 
-	private:
-		inline bool hit(const addr_type &addr) const {
+		inline bool hit(const ap_uint<ADDR_SIZE> &addr_main) const {
+			const addr_type addr(addr_main);
+
 			return (m_valid[addr.m_set] &&
 					(addr.m_tag == m_tag[addr.m_set]));
 		}
