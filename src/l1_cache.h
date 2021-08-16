@@ -34,23 +34,26 @@ class l1_cache {
 
 	public:
 		l1_cache() {
-#pragma HLS array_partition variable=m_tag complete dim=1
-#pragma HLS array_partition variable=m_valid complete dim=1
-#pragma HLS array_partition variable=m_cache_mem complete dim=1
+#pragma HLS array_partition variable=m_tag complete
+#pragma HLS array_partition variable=m_valid complete
+#pragma HLS array_partition variable=m_cache_mem complete
 		}
 
 		void init() {
+#pragma HLS inline
 			for (auto line = 0; line < N_LINES; line++)
 				m_valid[line] = false;
 		}
 
 		void get_line(const ap_uint<ADDR_SIZE> addr_main, line_type &line) const {
+#pragma HLS inline
 			const addr_type addr(addr_main);
 
 			line = m_cache_mem[addr.m_set];
 		}
 
 		void set_line(const ap_uint<ADDR_SIZE> addr_main, const line_type &line) {
+#pragma HLS inline
 			const addr_type addr(addr_main);
 			m_cache_mem[addr.m_set] = line;
 			m_valid[addr.m_set] = true;
@@ -58,6 +61,7 @@ class l1_cache {
 		}
 
 		void notify_write(const ap_uint<ADDR_SIZE> addr_main) {
+#pragma HLS inline
 			const addr_type addr(addr_main);
 
 			if (hit(addr))
@@ -65,6 +69,7 @@ class l1_cache {
 		}
 
 		inline bool hit(const ap_uint<ADDR_SIZE> &addr_main) const {
+#pragma HLS inline
 			const addr_type addr(addr_main);
 
 			return (m_valid[addr.m_set] &&
