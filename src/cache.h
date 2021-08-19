@@ -219,7 +219,10 @@ class cache {
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
-				ap_wait();
+				// 3 is the read latency in case of HIT:
+				// it is put here to inform the scheduler
+				// about the latency
+				ap_wait_n(3);
 				// read response from cache
 				m_core_resp[m_core_port].read(line);
 				if (L1_CACHE) {
