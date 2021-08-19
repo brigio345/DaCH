@@ -3,6 +3,12 @@
 \usepackage{graphicx}
 \usepackage{geometry}
 \usepackage{float}
+\usepackage{hyperref}
+\hypersetup{
+	colorlinks=true,
+	linkcolor=black,
+	urlcolor=blue
+}
 
 \graphicspath{{figures/}}
 
@@ -86,7 +92,7 @@ system for High-Level Synthesis.
 Memory devices are usually the performance bottleneck in the execution of
 memory-bound algorithms.
 The ideal memory should be fast, large and cheap, but current technology forces
-the designer to choose a tradeoff between the metrics.
+the designer to choose a trade-off between the metrics.
 
 A common solution to this problem is to setup a memory hierarchy in
 which fast but small memories are paired with large but slow memories, which
@@ -190,17 +196,111 @@ The most common solutions to this problem are:
 \end{itemize}
 
 \section{High-Level Synthesis}
-\subsection{Multi-process modeling}
+The High-Level Synthesis (HLS) is an Electronic Design Automation technique
+aimed at translating an algorithm description in an high-level software
+programming language (such as C and C++) into an Hardware Description Language
+(HDL) description.
+
+HLS allows to design more complex systems in less time, compared to HDL design,
+moreover makes the hardware and software co-design much easier, at the cost of
+less expressiveness.
+
+\subsection{Workflow}
+The typical HLS workflow consists in:
+\begin{enumerate}
+	\item software implementation
+	\item software verification
+	\item hardware synthesis
+	\item hardware verification
+\end{enumerate}
+
+\subsection{Optimization techniques}
+Typical optimization techniques used by HLS for improving performance include:
+\begin{itemize}
+	\item pipelining: loops and functions logic can be pipelined so that
+		successive iterations/calls can start while previous ones are
+		still running. The introduced parallelism allows to increase
+		the throughput at a limited additional area cost (only pipeline
+		registers and an FSM are required).
+	\item dataflow: different functions composing the design are called in
+		a pipelined fashion (similarly to pipelining, but at task level,
+		instead of instruction level).
+	\item loop unrolling
+	\item memory optimizations
+		\begin{itemize}
+			\item interface widening
+			\item bursting
+		\end{itemize}
+\end{itemize}
+
+\section{FPGAs}
+\subsection{Memory system}
+
+\section{Previous work}
+
+\chapter{Architecture}
+\section{Basic architecture}
+The fundamental idea behind the proposed architecture is to keep application and
+cache logic into separate processes, in order to simplify synthesizer job and
+possibly obtain a better performing circuit, as shown in Figure~\ref{fig:basic_arch}.
+
+When application needs to access memory:
+\begin{enumerate}
+	\item application writes the request to the request FIFO.
+	\item cache reads the request FIFO and checks if it causes a miss
+	\item in case of miss, cache issues a request to the AXI interface to
+		prepare its own memory for fulfilling the requested access.
+	\item cache performs the access to its own memory and writes the outcome
+		to the response FIFO (in case of a read request).
+\end{enumerate}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.3\textwidth]{basic_arch}
+	\caption{Outer view of the basic architecture of a kernel using the cache.}
+	\label{fig:basic_arch}
+\end{figure}
+
+\subsection{Single-process solution}
+The straightforward solution is to design the cache as a single process, but
+the synthesizer would generate a pipeline which includes the AXI interfacing and
+any request, no matter if it is an hit, has to pass through it, cancelling any
+performance advantage from the cache.
+
+\subsection{Multi-process solution}
+The desirable cache architecture should be made up of a short pipeline which
+runs at full speed in case of hit and stalls in case of miss.
+To make the synthesizer generate such an architecture, the cache have been split
+into two processes (Figure~\ref{fig:basic_arch_inner}):
+\begin{itemize}
+	\item core: it is in charge of managing communication with application
+		and keeping cache data structures up to date.
+	\item memory interface: it is in charge of interfacing with the AXI
+		interface.
+\end{itemize}
+
+This solution makes the core pipeline shorter since it does not have to deal
+with AXI interfacing and in case of miss the pipeline stalls thanks to the
+blocking read of the memory interface response.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.3\textwidth]{basic_arch_inner}
+	\caption{Inner view of the basic architecture of a kernel using the cache.}
+	\label{fig:basic_arch_inner}
+\end{figure}
+
+\section{Optimizations}
+\subsection{L1 cache}
+\subsection{Multiple read ports}
+
+\chapter{Implementation}
+\section{Multi-process modeling}
 \subsubsection{Process modeling}
 \subsubsection{Communication modeling}
-\section{Previous work}
-\chapter{Thesis contribution}
-\section{Architecture}
-\subsection{L2 cache architecture}
-\subsection{L1 cache architecture}
-\subsection{Multi-port architecture}
-\section{Implementation}
-\section{Results}
+\section{RAW dependencies}
+
+\chapter{Results}
 \chapter{Conclusion}
 
 \end{document}
