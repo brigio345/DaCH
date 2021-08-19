@@ -25,7 +25,7 @@ class cache_multiport {
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 
 		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE, ADDR_SIZE> arbiter_type;
-		typedef cache<T, 1, RD_PORTS, false, MAIN_SIZE, N_SETS,
+		typedef cache<T, RD_PORTS, false, MAIN_SIZE, N_SETS,
 			N_WAYS, N_ENTRIES_PER_LINE, LRU, 0> cache_type;
 
 		cache_type m_caches[RD_PORTS];
