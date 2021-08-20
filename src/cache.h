@@ -39,6 +39,7 @@ template <typename T, size_t RD_PORTS, bool WR_ENABLED, size_t MAIN_SIZE,
 class cache {
 	private:
 		static const bool RD_ENABLED = (RD_PORTS > 0);
+		static const bool MEM_IF_PROCESS = WR_ENABLED;
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
@@ -112,6 +113,7 @@ class cache {
 		hls::stream<line_type, 2> m_mem_resp;
 		l1_cache_type m_l1_cache_get;
 		raw_cache_type m_raw_cache_core;
+		raw_cache_type m_raw_cache_mem_if;
 		replacer_type m_replacer;
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_type> m_hit_status;
@@ -159,17 +161,21 @@ class cache {
 				arbiter_type * const arbiter = nullptr) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
-			run_core();
-			run_mem_if(main_mem, arbiter, arbiter != nullptr, id);
+			run_core(main_mem, arbiter, arbiter != nullptr, id);
+			if (MEM_IF_PROCESS)
+				run_mem_if(main_mem, arbiter, arbiter != nullptr, id);
 #else
-			std::thread core_thd([&]{run_core();});
-			std::thread mem_if_thd([&]{
-					run_mem_if(main_mem, arbiter,
-							(arbiter != nullptr), id);
-					});
+			std::thread core_thd([&]{run_core(main_mem, arbiter, (arbiter != nullptr), id);});
+			if (MEM_IF_PROCESS) {
+				std::thread mem_if_thd([&]{
+						run_mem_if(main_mem, arbiter,
+								(arbiter != nullptr), id);
+						});
+
+				mem_if_thd.join();
+			}
 
 			core_thd.join();
-			mem_if_thd.join();
 #endif /* __SYNTHESIS__ */
 		}
 
@@ -297,14 +303,22 @@ class cache {
 
 	private:
 		/**
-		 * \brief	Infinite loop managing the cache access requests
-		 * 		(sent from the outside).
+		 * \brief		Infinite loop managing the cache access
+		 * 			requests (sent from the outside).
 		 *
-		 * \note	The infinite loop must be stopped by calling
-		 * 		\ref stop (from the outside) when all the
-		 * 		accesses have been completed.
+		 * \param main_mem	The pointer to the main memory.
+		 * \param arbiter	The pointer to the AXI arbiter.
+		 * \param arbitrate	The boolean value set to \c true if the
+		 * 			access to main memory must pass through
+		 * 			\ref arbiter.
+		 * \param id		The identifier for the \ref arbiter.
+		 *
+		 * \note		The infinite loop must be stopped by
+		 * 			calling \ref stop (from the outside)
+		 * 			when all the accesses have been completed.
 		 */
-		void run_core() {
+		void run_core(T * const main_mem, arbiter_type * const arbiter,
+				const bool arbitrate, const unsigned int id) {
 #pragma HLS inline off
 			// invalidate all cache lines
 			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
@@ -313,6 +327,10 @@ class cache {
 			m_replacer.init();
 
 			m_raw_cache_core.init();
+			if (!MEM_IF_PROCESS) {
+				if (!arbitrate)
+					m_raw_cache_mem_if.init();
+			}
 
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline
@@ -321,8 +339,7 @@ CORE_LOOP:		while (1) {
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (!m_core_req_op.read_nb(op))
-					continue;
+				if (m_core_req_op.read_nb(op)) {
 #else
 				// get request
 				m_core_req_op.read(op);
@@ -360,7 +377,44 @@ CORE_LOOP:		while (1) {
 							line);
 				} else {
 					// read from main memory
-					load(addr, line);
+					auto op = READ_OP;
+					// build write-back address
+					address_type write_back_addr(m_tag[addr.m_addr_line], addr.m_set,
+							0, addr.m_way);
+					// check if write back is necessary
+					if (WR_ENABLED && m_valid[addr.m_addr_line] &&
+							m_dirty[addr.m_addr_line]) {
+						// get the line to be written back
+						m_raw_cache_core.get_line(m_cache_mem,
+								write_back_addr.m_addr_cache,
+								line);
+						op = READ_WRITE_OP;
+					}
+
+					const mem_req_type req = {op, addr.m_addr_main,
+								write_back_addr.m_addr_main, line};
+					if (MEM_IF_PROCESS) {
+						// send read request to memory interface and
+						// write request if write-back is necessary
+						m_mem_req.write(req);
+
+						// force FIFO write and FIFO read to separate pipeline
+						// stages to avoid deadlock due to the blocking read
+						ap_wait();
+
+						// read response from memory interface
+						m_mem_resp.read(line);
+					} else {
+						execute_mem_if_req(main_mem,
+								arbiter, arbitrate,
+								id, req, line);
+					}
+
+					m_tag[addr.m_addr_line] = addr.m_tag;
+					m_valid[addr.m_addr_line] = true;
+					m_dirty[addr.m_addr_line] = false;
+
+					m_replacer.notify_insertion(addr);
 
 					if (read) {
 						// store loaded line to cache
@@ -387,6 +441,9 @@ CORE_LOOP:		while (1) {
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 				m_hit_status.write(is_hit ? HIT : MISS);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#ifdef __SYNTHESIS__
+				}
+#endif /* __SYNTHESIS__ */
 			}
 
 			// synchronize main memory with cache memory
@@ -399,6 +456,11 @@ CORE_LOOP:		while (1) {
 			// stop memory interface
 			line_type dummy;
 			m_mem_req.write({STOP_OP, 0, 0, dummy});
+
+			if (!MEM_IF_PROCESS) {
+				if ((arbiter != nullptr) && (id == 0))
+					arbiter->stop();
+			}
 		}
 
 		/**
@@ -410,6 +472,7 @@ CORE_LOOP:		while (1) {
 		 * \param arbitrate	The boolean value set to \c true if the
 		 * 			access to main memory must pass through
 		 * 			\ref arbiter.
+		 * \param id		The identifier for the \ref arbiter.
 		 *
 		 * \note		\p main_mem must be associated with
 		 * 			a dedicated AXI port.
@@ -420,12 +483,9 @@ CORE_LOOP:		while (1) {
 		 */
 		void run_mem_if(T * const main_mem, arbiter_type * const arbiter,
 				const bool arbitrate, const unsigned int id) {
-#pragma HLS function_instantiate variable=id
-#pragma HLS function_instantiate variable=arbitrate
-			raw_cache_type raw_cache_mem_if;
-
+#pragma HLS inline off
 			if (!arbitrate)
-				raw_cache_mem_if.init();
+				m_raw_cache_mem_if.init();
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline
@@ -434,8 +494,7 @@ MEM_IF_LOOP:		while (1) {
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (!m_mem_req.read_nb(req))
-					continue;
+				if (m_mem_req.read_nb(req)) {
 #else
 				// get request
 				m_mem_req.read(req);
@@ -446,31 +505,60 @@ MEM_IF_LOOP:		while (1) {
 					break;
 
 				line_type line;
+				execute_mem_if_req(main_mem, arbiter, arbitrate,
+						id, req, line);
+
 				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
-					// read line from main memory
-					if (arbitrate) {
-						arbiter->get_line(req.load_addr,
-								id, line);
-					} else {
-						raw_cache_mem_if.get_line(
-								main_mem,
-								req.load_addr,
-								line);
-					}
 					// send the response to the read request
 					m_mem_resp.write(line);
 				}
-
-				if (WR_ENABLED && ((req.op == WRITE_OP) ||
-							(req.op == READ_WRITE_OP))) {
-					// write line to main memory
-					raw_cache_mem_if.set_line(main_mem,
-							req.write_back_addr, req.line);
+#ifdef __SYNTHESIS__
 				}
+#endif /* __SYNTHESIS__ */
 			}
 
 			if ((arbiter != nullptr) && (id == 0))
 				arbiter->stop();
+		}
+
+		/**
+		 * \brief		Execute memory access(es) specified in
+		 * 			\p req.
+		 *
+		 * \param main_mem	The pointer to the main memory.
+		 * \param arbiter	The pointer to the AXI arbiter.
+		 * \param arbitrate	The boolean value set to \c true if the
+		 * 			access to main memory must pass through
+		 * 			\ref arbiter.
+		 * \param id		The identifier for the \ref arbiter.
+		 * \param req		The request to be executed.
+		 * \param line		The buffer to store the read line.
+		 *
+		 * \note		\p main_mem must be associated with
+		 * 			a dedicated AXI port.
+		 */
+		void execute_mem_if_req(T * const main_mem, arbiter_type * const arbiter,
+				const bool arbitrate, const unsigned int id,
+				const mem_req_type &req, line_type &line) {
+#pragma HLS inline
+#pragma HLS function_instantiate variable=id
+#pragma HLS function_instantiate variable=arbitrate
+			if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
+				// read line from main memory
+				if (arbitrate) {
+					arbiter->get_line(req.load_addr, id, line);
+				} else {
+					m_raw_cache_mem_if.get_line(main_mem,
+							req.load_addr, line);
+				}
+			}
+
+			if (WR_ENABLED && ((req.op == WRITE_OP) ||
+						(req.op == READ_WRITE_OP))) {
+				// write line to main memory
+				m_raw_cache_mem_if.set_line(main_mem,
+						req.write_back_addr, req.line);
+			}
 		}
 
 		/**
@@ -495,48 +583,6 @@ MEM_IF_LOOP:		while (1) {
 			}
 
 			return hit_way;
-		}
-
-		/**
-		 * \brief	Load line from main to cache memory and write
-		 * 		back the line to be overwritten, if necessary.
-		 *
-		 * \param addr	The address belonging to the line to be loaded.
-		 * \param line	The buffer to store the loaded line.
-		 */
-		void load(const address_type &addr, line_type &line) {
-#pragma HLS inline
-			auto op = READ_OP;
-			// build write-back address
-			address_type write_back_addr(m_tag[addr.m_addr_line], addr.m_set,
-					0, addr.m_way);
-			// check if write back is necessary
-			if (WR_ENABLED && m_valid[addr.m_addr_line] &&
-					m_dirty[addr.m_addr_line]) {
-				// get the line to be written back
-				m_raw_cache_core.get_line(m_cache_mem,
-						write_back_addr.m_addr_cache,
-						line);
-				op = READ_WRITE_OP;
-			}
-
-			// send read request to memory interface and
-			// write request if write-back is necessary
-			m_mem_req.write({op, addr.m_addr_main,
-					write_back_addr.m_addr_main, line});
-
-			// force FIFO write and FIFO read to separate pipeline
-			// stages to avoid deadlock due to the blocking read
-			ap_wait();
-
-			// read response from memory interface
-			m_mem_resp.read(line);
-
-			m_tag[addr.m_addr_line] = addr.m_tag;
-			m_valid[addr.m_addr_line] = true;
-			m_dirty[addr.m_addr_line] = false;
-
-			m_replacer.notify_insertion(addr);
 		}
 
 		/**
