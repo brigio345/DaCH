@@ -35,10 +35,11 @@
 
 template <typename T, size_t RD_PORTS, bool WR_ENABLED, size_t MAIN_SIZE,
 	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE,
-	 bool LRU, size_t L1_CACHE_LINES>
+	 bool LRU, size_t L1_CACHE_LINES, bool MULTI_L1_CACHES>
 class cache {
 	private:
 		static const bool RD_ENABLED = (RD_PORTS > 0);
+		static const size_t PORTS = (MULTI_L1_CACHES ? RD_PORTS : 1);
 		static const bool MEM_IF_PROCESS = WR_ENABLED;
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
@@ -105,16 +106,17 @@ class cache {
 		bool m_valid[N_SETS * N_WAYS];
 		bool m_dirty[N_SETS * N_WAYS];
 		T m_cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
-		hls::stream<op_type, 4> m_core_req_op;
-		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr;
-		hls::stream<T, 4> m_core_req_data;
-		hls::stream<line_type, 4> m_core_resp;
+		hls::stream<op_type, 4> m_core_req_op[PORTS];
+		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];
+		hls::stream<T, 4> m_core_req_data[PORTS];
+		hls::stream<line_type, 4> m_core_resp[PORTS];
 		hls::stream<mem_req_type, 2> m_mem_req;
 		hls::stream<line_type, 2> m_mem_resp;
-		l1_cache_type m_l1_cache_get;
+		l1_cache_type m_l1_cache_get[PORTS];
 		raw_cache_type m_raw_cache_core;
 		raw_cache_type m_raw_cache_mem_if;
 		replacer_type m_replacer;
+		unsigned int m_core_port;
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs = 0;
@@ -128,6 +130,11 @@ class cache {
 #pragma HLS array_partition variable=m_valid complete dim=1
 #pragma HLS array_partition variable=m_dirty complete dim=1
 #pragma HLS array_partition variable=m_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
+#pragma HLS array_partition variable=m_core_req_op complete
+#pragma HLS array_partition variable=m_core_req_addr complete
+#pragma HLS array_partition variable=m_core_req_data complete
+#pragma HLS array_partition variable=m_core_resp complete
+#pragma HLS array_partition variable=m_l1_cache_get complete
 		}
 
 		/**
@@ -137,8 +144,11 @@ class cache {
 		 * 		if \ref L1_CACHE is \c true.
 		 */
 		void init() {
-			if (L1_CACHE)
-				m_l1_cache_get.init();
+			m_core_port = 0;
+			if (L1_CACHE) {
+				for (auto port = 0; port < PORTS; port++)
+					m_l1_cache_get[port].init();
+			}
 		}
 
 		/**
@@ -186,7 +196,8 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-			m_core_req_op.write(STOP_OP);
+			for (auto port = 0; port < PORTS; port++)
+				m_core_req_op[port].write(STOP_OP);
 		}
 
 		/**
@@ -202,28 +213,31 @@ class cache {
 			assert(addr_main < MAIN_SIZE);
 #endif /* __SYNTHESIS__ */
 
+			const auto port = m_core_port;
+			m_core_port = ((m_core_port + 1) % PORTS);
+
 			// try to get line from L1 cache
 			const auto l1_hit = (L1_CACHE &&
-					m_l1_cache_get.hit(addr_main));
+					m_l1_cache_get[port].hit(addr_main));
 
 			if (l1_hit) {
-				m_l1_cache_get.get_line(addr_main, line);
+				m_l1_cache_get[port].get_line(addr_main, line);
 			} else {
 				// send read request to cache
-				m_core_req_op.write(READ_OP);
-				m_core_req_addr.write(addr_main);
+				m_core_req_op[port].write(READ_OP);
+				m_core_req_addr[port].write(addr_main);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
-				// 3 is the read latency in case of HIT:
-				// it is put here to inform the scheduler
-				// about the latency
-				ap_wait_n(3);
-				// read response from cache
-				m_core_resp.read(line);
+IO_SECTION:			{
+#pragma HLS protocol fixed
+					// read response from cache
+					m_core_resp[port].read(line);
+				}
+
 				if (L1_CACHE) {
 					// store line to L1 cache
-					m_l1_cache_get.set_line(addr_main, line);
+					m_l1_cache_get[port].set_line(addr_main, line);
 				}
 			}
 
@@ -267,14 +281,18 @@ class cache {
 #endif /* __SYNTHESIS__ */
 
 			if (L1_CACHE) {
-				// inform L1 cache about the writing
-				m_l1_cache_get.notify_write(addr_main);
+				// inform L1 caches about the writing
+				for (auto port = 0; port < PORTS; port++)
+					m_l1_cache_get[port].notify_write(addr_main);
 			}
 
+			const auto port = m_core_port;
+			m_core_port = ((m_core_port + 1) % PORTS);
+
 			// send write request to cache
-			m_core_req_op.write(WRITE_OP);
-			m_core_req_addr.write(addr_main);
-			m_core_req_data.write(data);
+			m_core_req_op[port].write(WRITE_OP);
+			m_core_req_addr[port].write(addr_main);
+			m_core_req_data[port].write(data);
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 			update_profiling(m_hit_status.read());
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
@@ -327,10 +345,13 @@ class cache {
 			m_replacer.init();
 
 			m_raw_cache_core.init();
+
 			if (!MEM_IF_PROCESS) {
 				if (!arbitrate)
 					m_raw_cache_mem_if.init();
 			}
+
+			auto port = 0;
 
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline
@@ -339,10 +360,10 @@ CORE_LOOP:		while (1) {
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				if (m_core_req_op.read_nb(op)) {
+				if (m_core_req_op[port].read_nb(op)) {
 #else
 				// get request
-				m_core_req_op.read(op);
+				m_core_req_op[port].read(op);
 #endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
@@ -354,8 +375,8 @@ CORE_LOOP:		while (1) {
 						(!WR_ENABLED));
 
 				// in case of write request, read data to be written
-				const auto addr_main = m_core_req_addr.read();
-				const auto data = read ? 0 : m_core_req_data.read();
+				const auto addr_main = m_core_req_addr[port].read();
+				const auto data = read ? 0 : m_core_req_data[port].read();
 
 				// extract information from address
 				address_type addr(addr_main);
@@ -427,7 +448,7 @@ CORE_LOOP:		while (1) {
 
 				if (read) {
 					// send the response to the read request
-					m_core_resp.write(line);
+					m_core_resp[port].write(line);
 				} else {
 					// modify the line
 					line[addr.m_off] = data;
@@ -437,6 +458,8 @@ CORE_LOOP:		while (1) {
 							addr.m_addr_cache, line);
 					m_dirty[addr.m_addr_line] = true;
 				}
+
+				port = ((port + 1) % PORTS);
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 				m_hit_status.write(is_hit ? HIT : MISS);
