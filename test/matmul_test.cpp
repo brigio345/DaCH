@@ -5,6 +5,7 @@
 #endif	/* __SYNTHESIS__ */
 #include "matrix.h"
 #include "cache.h"
+#include "cache_multiport.h"
 
 #define USE_CACHE
 #define N 8
@@ -14,9 +15,9 @@
 static const int RD_PORTS = 2;
 
 typedef int data_type;
-typedef cache<data_type, RD_PORTS, false, N * M, 1, 1, 8, false, 1, true> cache_a;
-typedef cache<data_type, RD_PORTS, false, M * P, 1, 1, 8, false, 8, true> cache_b;
-typedef cache<data_type, 0, true, N * P, 2, 1, 8, false, 0, false> cache_c;
+typedef cache_multiport<data_type, RD_PORTS, N * M, 1, 1, 8, false> cache_a;
+typedef cache_multiport<data_type, RD_PORTS, M * P, 1, 8, 8, false> cache_b;
+typedef cache<data_type, 0, true, N * P, 2, 1, 8, true, false> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 #pragma HLS inline off

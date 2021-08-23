@@ -2,14 +2,14 @@
 #ifndef __SYNTHESIS__
 #include <thread>
 #endif	/* __SYNTHESIS__ */
-#include "cache.h"
+#include "cache_multiport.h"
 #define DEBUG
 
 #define N 128
 
-static const size_t RD_PORTS = 16;
+static const size_t RD_PORTS = 2;
 
-typedef cache<int, RD_PORTS, false, N, 1, 1, 8, false, 1, true> cache_a;
+typedef cache_multiport<int, RD_PORTS, N, 1, 1, 8, false> cache_a;
 
 template <typename T>
 	void vecsum(T a, int &sum) {
