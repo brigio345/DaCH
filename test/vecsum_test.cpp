@@ -2,38 +2,39 @@
 #ifndef __SYNTHESIS__
 #include <thread>
 #endif	/* __SYNTHESIS__ */
-#include "matrix.h"
 #include "cache.h"
+#define DEBUG
 
 #define N 128
 
-typedef cache<int, true, false, N, 2, 8> cache_a;
+static const size_t RD_PORTS = 16;
 
-void vecsum(int a[N], int &sum) {
-	int tmp = 0;
+typedef cache<int, RD_PORTS, false, N, 1, 1, 8, false, 1, true> cache_a;
 
-	for (int i = 0; i < N; i++) {
-		tmp += a[i];
+template <typename T>
+	void vecsum(T a, int &sum) {
+#pragma HLS inline
+		int tmp = 0;
+		int data;
+
+VECSUM_LOOP:	for (auto i = 0; i < N; i++) {
+#pragma HLS pipeline
+#pragma HLS unroll factor=RD_PORTS
+			data = a[i];
+			tmp += data;
+#ifdef DEBUG
+			std::cout << i << " " << data << std::endl;
+#endif /* DEBUG */
+		}
+
+		sum = tmp;
 	}
-
-	sum = tmp;
-}
-
-void vecsum_cache(cache_a &a, int &sum) {
-#pragma HLS inline off
-	int tmp = 0;
-
-	a.init();
-
-	for (int i = 0; i < N; i++) {
-		tmp += a.get(i);
-	}
-
-	sum = tmp;
-}
 
 void vecsum_syn(cache_a &a, int &sum) {
-	vecsum_cache(a, sum);
+#pragma HLS inline off
+	a.init();
+
+	vecsum<cache_a &>(a, sum);
 
 	a.stop();
 }
@@ -51,8 +52,8 @@ extern "C" void vecsum_top(int a[N], int &sum) {
 #else
 	a_cache.init();
 
-	std::thread cache_thread(&cache_a::run, std::ref(a_cache), std::ref(a));
-	std::thread vecsum_thread(vecsum_cache, std::ref(a_cache), std::ref(sum));
+	std::thread cache_thread([&]{a_cache.run(a);});
+	std::thread vecsum_thread([&]{vecsum<cache_a &>(a_cache, sum);});
 
 	vecsum_thread.join();
 
@@ -66,11 +67,10 @@ int main() {
 	int sum;
 	int sum_ref;
 
-	matrix::generate_random<int>(a, 1, N);
-	std::cout << "a=";
-	matrix::print(a, 1, N);
+	for (auto i = 0; i < N; i++)
+		a[i] = i;
 	vecsum_top(a, sum);
-	vecsum(a, sum_ref);
+	vecsum<int *>(a, sum_ref);
 	std::cout << "sum=" << sum << std::endl;
 	std::cout << "sum_ref=" << sum_ref << std::endl;
 

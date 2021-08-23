@@ -1,2 +1,7 @@
 *.log
 proj_*/*
+*.aux
+*.nav
+*.out
+*.snm
+*.toc

@@ -7,31 +7,28 @@
 
 #define N 128
 
-typedef cache<int, false, true, N, 2, 8> cache_t;
+typedef cache<int, false, true, N, 1, 1, 8, false, true> cache_t;
 
-void vecinit(int a[N]) {
-	for (int i = 0; i < N; i++) {
-		a[i] = i;
+template <typename T>
+	void vecinit(T a) {
+#pragma HLS inline
+		for (int i = 0; i < N; i++) {
+#pragma HLS pipeline
+			a[i] = i;
+		}
 	}
-}
 
-void vecinit_cache(cache_t &a) {
+void vecinit_syn(cache_t &a) {
 #pragma HLS inline off
 	a.init();
 
-	for (int i = 0; i < N; i++) {
-		a.set(i, i);
-	}
-}
-
-void vecinit_syn(cache_t &a) {
-	vecinit_cache(a);
+	vecinit<cache_t &>(a);
 
 	a.stop();
 }
 
 extern "C" void vecinit_top(int a[N]) {
-#pragma HLS INTERFACE m_axi port=a bundle=gmem0 max_widen_bitwidth=1024
+#pragma HLS INTERFACE m_axi port=a bundle=gmem0
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #pragma HLS dataflow disable_start_propagation
@@ -43,8 +40,8 @@ extern "C" void vecinit_top(int a[N]) {
 #else
 	a_cache.init();
 
-	std::thread cache_thread(&cache_t::run, std::ref(a_cache), std::ref(a));
-	std::thread vecinit_thread(vecinit_cache, std::ref(a_cache));
+	std::thread cache_thread([&]{a_cache.run(a);});
+	std::thread vecinit_thread([&]{vecinit<cache_t &>(a_cache);});
 
 	vecinit_thread.join();
 

@@ -7,33 +7,26 @@
 
 #define N 64
 
-typedef cache<int, true, true, N, 2, 8> cache_t;
+typedef cache<int, true, true, N, 2, 1, 8, true, false> cache_t;
 
-void vecswap(int a[N], int b[N]) {
-	int tmp;
-
-	for (int i = 0; i < N; i++) {
-		tmp = a[i];
-		a[i] = b[i];
-		b[i] = tmp;
-	}
-}
-
-void vecswap_cache(cache_t &a, cache_t &b) {
+template <typename T>
+	void vecswap(T a, T b) {
 #pragma HLS inline off
-	int tmp;
+		int tmp;
 
-	a.init();
-	b.init();
-	for (int i = 0; i < N; i++) {
-		tmp = a.get(i);
-		a.set(i, b.get(i));
-		b.set(i, tmp);
+VECSWAP_LOOP:	for (auto i = 0; i < N; i++) {
+#pragma HLS pipeline
+			tmp = a[i];
+			a[i] = b[i];
+			b[i] = tmp;
+		}
 	}
-}
 
 void vecswap_syn(cache_t &a, cache_t &b) {
-	vecswap_cache(a, b);
+	a.init();
+	b.init();
+
+	vecswap<cache_t &>(a, b);
 
 	a.stop();
 	b.stop();
@@ -56,9 +49,9 @@ extern "C" void vecswap_top(int a[N], int b[N]) {
 	a_cache.init();
 	b_cache.init();
 
-	std::thread a_cache_thd(&cache_t::run, std::ref(a_cache), std::ref(a));
-	std::thread b_cache_thd(&cache_t::run, std::ref(b_cache), std::ref(b));
-	std::thread vecswap_thread(vecswap_cache, std::ref(a_cache), std::ref(b_cache));
+	std::thread a_cache_thd([&]{a_cache.run(a);});
+	std::thread b_cache_thd([&]{b_cache.run(b);});
+	std::thread vecswap_thread([&]{vecswap<cache_t &>(a_cache, b_cache);});
 
 	vecswap_thread.join();
 
@@ -75,26 +68,20 @@ int main() {
 	int a_ref[N];
 	int b_ref[N];
 
-	matrix::generate_random<int>(a, 1, N);
-	std::cout << "IN: a=";
-	matrix::print(a, 1, N);
-	matrix::generate_random<int>(b, 1, N);
-	std::cout << "IN: b=";
-	matrix::print(b, 1, N);
-	for (int i = 0; i < N; i++) {
+	for (auto i = 0; i < N; i++) {
+		a[i] = i;
+		b[i] = -i;
 		a_ref[i] = a[i];
 		b_ref[i] = b[i];
 	}
+
 	vecswap_top(a, b);
-	vecswap(a_ref, b_ref);
+	vecswap<int *>(a_ref, b_ref);
+
 	std::cout << "OUT: a=";
 	matrix::print(a, 1, N);
 	std::cout << "OUT: b=";
 	matrix::print(b, 1, N);
-	std::cout << "OUT: a_ref=";
-	matrix::print(a_ref, 1, N);
-	std::cout << "OUT: b_ref=";
-	matrix::print(b_ref, 1, N);
 
 	for (int i = 0; i < N; i++) {
 		if (a[i] != a_ref[i] || b[i] != b_ref[i])

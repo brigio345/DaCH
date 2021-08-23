@@ -96,7 +96,7 @@
 \section{Implementation}
 \subsection{Tools}
 \begin{frame}{Tools}
-	\texttt{C++} code coupled with \emph{Vitis HLS} (2020.2) allow:
+	\emph{Vitis HLS} (2020.2) workflow (\texttt{C++}):
 	\pause
 	\begin{itemize}[<+->]
 		\item \textbf{Multiple processes modeling}:\\
@@ -205,12 +205,15 @@
 		\begin{itemize}[<+->]
 			\item \textbf{Problem}:
 				\highlight{reading BRAM} line immediately
-				\highlight{after it has been loaded} from DRAM
-				causes a \emph{Read-After-Write} dependency
+				\highlight{after it has been loaded} from DRAM:
+				\emph{Read-After-Write} dependency
 			\item \textbf{Proposed solution}:
-				store the \texttt{mem\_if} response in a
-				\highlight{buffer} which can be immediately
-				accessed and update BRAM afterwards
+				\begin{enumerate}[<.->]
+					\item store the \texttt{mem\_if} response in a
+						\highlight{buffer}
+					\item perform the request on the buffer
+					\item update BRAM
+				\end{enumerate}
 		\end{itemize}
 	\end{minipage}
 	\onslide<1->
@@ -224,9 +227,9 @@
 	\begin{minipage}{.7\textwidth}
 		\begin{itemize}[<+->]
 			\item \textbf{Problem}:
-				a \highlight{\texttt{write request}} immediately
+				\highlight{\texttt{write request}} immediately
 				followed by a \highlight{\texttt{read request}}
-				to the same element causes a \emph{Read-After-Write}
+				to the same element: \emph{Read-After-Write}
 				dependency on BRAM
 			\item \textbf{Proposed solution}:
 				\texttt{raw\_cache} inside \texttt{cache}:
@@ -285,8 +288,9 @@
 				\item \texttt{core}: $II=1$
 				\item \texttt{mem\_if}: $II=\left\lceil \frac{line\_size}{AXI\_if\_size} \right\rceil$
 			\end{itemize}
-		\item \textbf{L1 HIT}: latency of 1 cycle
-		\item \textbf{HIT}: latency of 6 cycles
+		\item \textbf{L1 HIT}: latency of $1$ cycle
+		\item \textbf{HIT}: latency of $6$ cycles
+		\item \textbf{MISS}: latency of $\sim 80$ cycles
 	\end{itemize}
 \end{frame}
 \subsection{Matrix Multiplication}
