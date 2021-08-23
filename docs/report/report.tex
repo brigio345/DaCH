@@ -208,10 +208,22 @@ less expressiveness.
 \subsection{Workflow}
 The typical HLS workflow consists in:
 \begin{enumerate}
-	\item software implementation
-	\item software verification
-	\item hardware synthesis
-	\item hardware verification
+	\item software implementation: the top level entity is a C function:
+		the function arguments are the entity ports and the functionality
+		is implemented in SW; in order to guarantee synthesizability
+		some constraints should be respected (e.g. no dynamic memory
+		allocation).
+	\item software verification: the testbench can be developed as a simple
+		main function which calls the top level entity function,
+		therefore the functionality is verified like any SW:
+		it is possible to exploit traditional tools (e.g. debuggers,
+		print statements...).
+	\item hardware synthesis: the synthesizer generates an RTL description
+		of the top level entity. It is possible to generate different
+		architectures by setting up some parameters through dedicated
+		directives.
+	\item hardware verification: the RTL description is simulated, to make
+		sure that SW and HW outputs match.
 \end{enumerate}
 
 \subsection{Optimization techniques}
@@ -225,16 +237,33 @@ Typical optimization techniques used by HLS for improving performance include:
 	\item dataflow: different functions composing the design are called in
 		a pipelined fashion (similarly to pipelining, but at task level,
 		instead of instruction level).
-	\item loop unrolling
+	\item loop unrolling: the loop logic is instantiated multiple times,
+		to execute multiple loop iterations in parallel, reducing latency
+		and improving throughput.
 	\item memory optimizations
 		\begin{itemize}
-			\item interface widening
-			\item bursting
+			\item bursting: multiple memory accesses are aggregated
+				to reduce overall latency and improving throughput.
+			\item interface widening: multiple data elements are
+				packed into a single bigger word, to perform
+				multiple accesses at the same time.
 		\end{itemize}
 \end{itemize}
 
 \section{FPGAs}
+Field Programmable Gate Arrays are integrated circuits able to implement special
+purpose circuits described in HDL, thanks to their programmable logic blocks and
+interconnections.
 \subsection{Memory system}
+An FPGA memory system is typically made up of:
+\begin{itemize}
+	\item registers: the fastest but most expensive memories, therefore
+		there are only a few.
+	\item block RAMs: on chip RAMs accessible through simple and fast
+		interface.
+	\item external DRAM: off chip RAMs through complex and slow interface
+		(e.g. AXI).
+\end{itemize}
 
 \section{Previous work}
 
