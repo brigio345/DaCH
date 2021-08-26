@@ -40,7 +40,7 @@ class cache {
 	private:
 		static const bool RD_ENABLED = (RD_PORTS > 0);
 		static const size_t PORTS = (MULTI_L1_CACHES ? RD_PORTS : 1);
-		static const bool MEM_IF_PROCESS = WR_ENABLED;
+		static const bool MEM_IF_PROCESS = true;
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
@@ -661,12 +661,14 @@ MEM_IF_LOOP:		while (1) {
 
 		class square_bracket_proxy {
 			private:
-				void *m_cache;
+				cache *m_cache;
 				const ap_uint<ADDR_SIZE> m_addr_main;
 			public:
 				square_bracket_proxy(cache *c,
 						const ap_uint<ADDR_SIZE> addr_main):
-					m_cache(c), m_addr_main(addr_main) {}
+					m_cache(c), m_addr_main(addr_main) {
+#pragma HLS inline
+					}
 
 				operator T() const {
 #pragma HLS inline

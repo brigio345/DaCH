@@ -28,9 +28,9 @@ class l1_cache {
 		typedef array_type<T, N_ENTRIES_PER_LINE> line_type;
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, 0> addr_type;
 
-		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_LINES];
-		bool m_valid[N_LINES];
-		line_type m_cache_mem[N_LINES];
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[(N_LINES > 0) ? N_LINES : 1];
+		bool m_valid[(N_LINES > 0) ? N_LINES : 1];
+		line_type m_cache_mem[(N_LINES > 0) ? N_LINES : 1];
 
 	public:
 		l1_cache() {
