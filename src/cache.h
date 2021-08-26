@@ -102,21 +102,21 @@ class cache {
 			line_type line;
 		} mem_req_type;
 
-		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];
-		bool m_valid[N_SETS * N_WAYS];
-		bool m_dirty[N_SETS * N_WAYS];
-		T m_cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];
-		hls::stream<op_type, 4> m_core_req_op[PORTS];
-		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];
-		hls::stream<T, 4> m_core_req_data[PORTS];
-		hls::stream<line_type, 4> m_core_resp[PORTS];
-		hls::stream<mem_req_type, 2> m_mem_req;
-		hls::stream<line_type, 2> m_mem_resp;
-		l1_cache_type m_l1_cache_get[PORTS];
-		raw_cache_type m_raw_cache_core;
-		raw_cache_type m_raw_cache_mem_if;
-		replacer_type m_replacer;
-		unsigned int m_core_port;
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];	// 1
+		bool m_valid[N_SETS * N_WAYS];					// 2
+		bool m_dirty[N_SETS * N_WAYS];					// 3
+		T m_cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];		// 4
+		hls::stream<op_type, 4> m_core_req_op[PORTS];			// 5
+		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];	// 6
+		hls::stream<T, 4> m_core_req_data[PORTS];			// 7
+		hls::stream<line_type, 4> m_core_resp[PORTS];			// 8
+		hls::stream<mem_req_type, 2> m_mem_req;				// 9
+		hls::stream<line_type, 2> m_mem_resp;				// 10
+		l1_cache_type m_l1_cache_get[PORTS];				// 11
+		raw_cache_type m_raw_cache_core;				// 12
+		raw_cache_type m_raw_cache_mem_if;				// 13
+		replacer_type m_replacer;					// 14
+		unsigned int m_core_port;					// 15
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs = 0;
