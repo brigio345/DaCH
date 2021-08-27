@@ -354,7 +354,7 @@ IO_SECTION:			{
 			auto port = 0;
 
 CORE_LOOP:		while (1) {
-#pragma HLS pipeline
+#pragma HLS pipeline II=1
 #pragma HLS dependence variable=m_cache_mem distance=1 inter RAW false
 				op_type op;
 #ifdef __SYNTHESIS__
@@ -511,7 +511,7 @@ CORE_LOOP:		while (1) {
 				m_raw_cache_mem_if.init();
 			
 MEM_IF_LOOP:		while (1) {
-#pragma HLS pipeline
+#pragma HLS pipeline II=1
 #pragma HLS dependence variable=main_mem distance=1 inter RAW false
 				mem_req_type req;
 #ifdef __SYNTHESIS__

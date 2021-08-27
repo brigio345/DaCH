@@ -13,7 +13,7 @@ MULT_I_LOOP:		for (int i = 0; i < N; i++) {
 MULT_J_LOOP:			for (int j = 0; j < P; j++) {
 					int acc = 0;
 MULT_K_LOOP:				for (int k = 0; k < M; k++) {
-#pragma HLS pipeline
+#pragma HLS pipeline II=1
 #pragma HLS unroll factor=RD_PORTS
 						acc += A[i * M + k] * B[k * P + j];
 						if (k == (M - 1))
