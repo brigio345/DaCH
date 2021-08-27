@@ -28,9 +28,9 @@ class l1_cache {
 		typedef array_type<T, N_ENTRIES_PER_LINE> line_type;
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, 0> addr_type;
 
-		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[(N_LINES > 0) ? N_LINES : 1];
-		bool m_valid[(N_LINES > 0) ? N_LINES : 1];
-		line_type m_cache_mem[(N_LINES > 0) ? N_LINES : 1];
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[(N_LINES > 0) ? N_LINES : 1];	// 1
+		bool m_valid[(N_LINES > 0) ? N_LINES : 1];					// 2
+		line_type m_cache_mem[(N_LINES > 0) ? N_LINES : 1];				// 3
 
 	public:
 		l1_cache() {
@@ -49,13 +49,20 @@ class l1_cache {
 #pragma HLS inline
 			const addr_type addr(addr_main);
 
-			line = m_cache_mem[addr.m_set];
+			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS unroll
+				line[off] = m_cache_mem[addr.m_set][off];
+			}
 		}
 
 		void set_line(const ap_uint<ADDR_SIZE> addr_main, const line_type &line) {
 #pragma HLS inline
 			const addr_type addr(addr_main);
-			m_cache_mem[addr.m_set] = line;
+
+			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+#pragma HLS unroll
+				m_cache_mem[addr.m_set][off] = line[off];
+			}
 			m_valid[addr.m_set] = true;
 			m_tag[addr.m_set] = addr.m_tag;
 		}
