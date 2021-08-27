@@ -691,14 +691,12 @@ MEM_IF_LOOP:		while (1) {
 			private:
 				T get() const {
 #pragma HLS inline
-					return (static_cast<cache *>(m_cache))->
-						get(m_addr_main);
+					return m_cache->get(m_addr_main);
 				}
 
 				void set(const T data) {
 #pragma HLS inline
-					(static_cast<cache *>(m_cache))->
-						set(m_addr_main, data);
+					m_cache->set(m_addr_main, data);
 				}
 		};
 
