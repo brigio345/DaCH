@@ -41,7 +41,7 @@ class cache {
 	private:
 		static const bool RD_ENABLED = (RD_PORTS > 0);
 		static const size_t PORTS = (MULTI_L1_CACHES ? RD_PORTS : 1);
-		static const bool MEM_IF_PROCESS = WR_ENABLED;
+		static const bool MEM_IF_PROCESS = (WR_ENABLED || (RD_PORTS > 1));
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
