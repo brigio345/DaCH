@@ -16,8 +16,9 @@
 #include <thread>
 #endif /* __SYNTHESIS__ */
 
-template <typename T, size_t RD_PORTS, size_t MAIN_SIZE, size_t N_SETS,
-	 size_t N_WAYS, size_t N_ENTRIES_PER_LINE, bool LRU>
+template <typename T, size_t RD_PORTS, size_t MAIN_SIZE,
+	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE,
+	 bool LRU, size_t L1_CACHE_LINES>
 class cache_multiport {
 	private:
 		static_assert((RD_PORTS > 0), "RD_PORTS must be greater than 0");
@@ -26,7 +27,7 @@ class cache_multiport {
 
 		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE, ADDR_SIZE> arbiter_type;
 		typedef cache<T, RD_PORTS, false, MAIN_SIZE, N_SETS,
-			N_WAYS, N_ENTRIES_PER_LINE, LRU, 0> cache_type;
+			N_WAYS, N_ENTRIES_PER_LINE, LRU, L1_CACHE_LINES, false> cache_type;
 
 		cache_type m_caches[RD_PORTS];
 		unsigned int m_rd_port;
@@ -127,11 +128,20 @@ class cache_multiport {
 			return n_hits;
 		}
 
+		int get_n_l1_hits() const {
+			auto n_l1_hits = 0;
+			for (auto port = 0; port < RD_PORTS; port++)
+				n_l1_hits += m_caches[port].get_n_l1_hits();
+
+			return n_l1_hits;
+		}
+
 		double get_hit_ratio() const {
 			auto n_reqs = static_cast<double>(get_n_reqs());
 
 			if (n_reqs > 0)
-				return (get_n_hits() / n_reqs);
+				return ((get_n_hits() + get_n_l1_hits()) /
+						n_reqs);
 
 			return 0;
 		}
