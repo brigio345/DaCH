@@ -41,7 +41,7 @@ class cache {
 	private:
 		static const bool RD_ENABLED = (RD_PORTS > 0);
 		static const size_t PORTS = (MULTI_L1_CACHES ? RD_PORTS : 1);
-		static const bool MEM_IF_PROCESS = (WR_ENABLED || (RD_PORTS > 1));
+		static const bool MEM_IF_PROCESS = (WR_ENABLED || ((RD_PORTS > 1) && MULTI_L1_CACHES));
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
@@ -174,13 +174,12 @@ class cache {
 #ifdef __SYNTHESIS__
 			run_core(main_mem, arbiter, arbiter != nullptr, id);
 			if (MEM_IF_PROCESS)
-				run_mem_if(main_mem, arbiter, arbiter != nullptr, id);
+				run_mem_if(main_mem);
 #else
 			std::thread core_thd([&]{run_core(main_mem, arbiter, (arbiter != nullptr), id);});
 			if (MEM_IF_PROCESS) {
 				std::thread mem_if_thd([&]{
-						run_mem_if(main_mem, arbiter,
-								(arbiter != nullptr), id);
+						run_mem_if(main_mem);
 						});
 
 				mem_if_thd.join();
@@ -509,8 +508,12 @@ core_end:
 					const bool arbitrate, const unsigned int id,
 					const mem_req_type &req, line_type &line) {
 #pragma HLS inline
-				execute_mem_if_req(main_mem, arbiter, arbitrate,
-						id, req, line);
+				if (arbitrate) {
+					arbiter->get_line(req.load_addr, id, line);
+				} else {
+					execute_mem_if_req(main_mem, arbiter, arbitrate,
+							id, req, line);
+				}
 			}
 
 		/**
@@ -518,11 +521,6 @@ core_end:
 		 * 			access requests (sent from \ref run_core).
 		 *
 		 * \param main_mem	The pointer to the main memory.
-		 * \param arbiter	The pointer to the AXI arbiter.
-		 * \param arbitrate	The boolean value set to \c true if the
-		 * 			access to main memory must pass through
-		 * 			\ref arbiter.
-		 * \param id		The identifier for the \ref arbiter.
 		 *
 		 * \note		\p main_mem must be associated with
 		 * 			a dedicated AXI port.
@@ -531,11 +529,9 @@ core_end:
 		 * 			\ref run_core when it is in turn stopped
 		 * 			from the outside.
 		 */
-		void run_mem_if(T * const main_mem, arbiter_type * const arbiter,
-				const bool arbitrate, const unsigned int id) {
+		void run_mem_if(T * const main_mem) {
 #pragma HLS inline off
-			if (!arbitrate)
-				m_raw_cache_mem_if.init();
+			m_raw_cache_mem_if.init();
 			
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline II=1
@@ -555,8 +551,8 @@ MEM_IF_LOOP:		while (1) {
 					break;
 
 				line_type line;
-				execute_mem_if_req(main_mem, arbiter, arbitrate,
-						id, req, line);
+				execute_mem_if_req(main_mem, nullptr, false,
+						0, req, line);
 
 				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
 					// send the response to the read request
@@ -567,8 +563,6 @@ MEM_IF_LOOP:		while (1) {
 #endif /* __SYNTHESIS__ */
 			}
 
-			if ((arbiter != nullptr) && (id == 0))
-				arbiter->stop();
 		}
 
 		/**
