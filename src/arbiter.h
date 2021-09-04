@@ -19,10 +19,10 @@
 #include <array>
 #endif /* __SYNTHESIS__ */
 
-template <typename T, size_t N_READERS, size_t N_ENTRIES_PER_LINE, size_t ADDR_SIZE>
+template <typename T, size_t N_READERS, size_t N_WORDS_PER_LINE, size_t ADDR_SIZE>
 class arbiter {
 	private:
-		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
+		static const size_t OFF_SIZE = utils::log2_ceil(N_WORDS_PER_LINE);
 
 #ifdef __SYNTHESIS__
 		template <typename TYPE, size_t SIZE>
@@ -31,7 +31,7 @@ class arbiter {
 		template <typename TYPE, size_t SIZE>
 			using array_type = std::array<TYPE, SIZE>;
 #endif /* __SYNTHESIS__ */
-		typedef array_type<T, N_ENTRIES_PER_LINE> line_type;
+		typedef array_type<T, N_WORDS_PER_LINE> line_type;
 
 		typedef struct {
 			ap_uint<ADDR_SIZE> addr_main;
@@ -83,7 +83,7 @@ ARBITER_LOOP:		while (1) {
 
 					line_type line;
 					const auto main_line = &(main_mem[req.addr_main & (-1U << OFF_SIZE)]);
-					for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+					for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
 						line[off] = main_line[off];
 					}

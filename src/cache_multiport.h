@@ -17,7 +17,7 @@
 #endif /* __SYNTHESIS__ */
 
 template <typename T, size_t RD_PORTS, size_t MAIN_SIZE,
-	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE,
+	 size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
 	 bool LRU, size_t L1_CACHE_LINES>
 class cache_multiport {
 	private:
@@ -25,9 +25,9 @@ class cache_multiport {
 
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 
-		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE, ADDR_SIZE> arbiter_type;
+		typedef arbiter<T, RD_PORTS, N_WORDS_PER_LINE, ADDR_SIZE> arbiter_type;
 		typedef cache<T, RD_PORTS, false, MAIN_SIZE, N_SETS,
-			N_WAYS, N_ENTRIES_PER_LINE, LRU, L1_CACHE_LINES, false> cache_type;
+			N_WAYS, N_WORDS_PER_LINE, LRU, L1_CACHE_LINES, false> cache_type;
 
 		cache_type m_caches[RD_PORTS];
 		unsigned int m_rd_port;

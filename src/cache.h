@@ -35,7 +35,7 @@
 #endif /* __SYNTHESIS__ */
 
 template <typename T, size_t RD_PORTS, bool WR_ENABLED, size_t MAIN_SIZE,
-	 size_t N_SETS, size_t N_WAYS, size_t N_ENTRIES_PER_LINE,
+	 size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
 	 bool LRU, size_t L1_CACHE_LINES, bool MULTI_L1_CACHES>
 class cache {
 	private:
@@ -45,7 +45,7 @@ class cache {
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
-		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
+		static const size_t OFF_SIZE = utils::log2_ceil(N_WORDS_PER_LINE);
 		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
 
@@ -55,13 +55,13 @@ class cache {
 				"MAIN_SIZE must be a power of 2 greater than 0");
 		static_assert(((N_SETS > 0) && ((1 << SET_SIZE) == N_SETS)),
 				"N_SETS must be a power of 2 greater than 0");
-		static_assert(((N_ENTRIES_PER_LINE > 0) &&
-					((1 << OFF_SIZE) == N_ENTRIES_PER_LINE)),
-				"N_ENTRIES_PER_LINE must be a power of 2 greater than 0");
+		static_assert(((N_WORDS_PER_LINE > 0) &&
+					((1 << OFF_SIZE) == N_WORDS_PER_LINE)),
+				"N_WORDS_PER_LINE must be a power of 2 greater than 0");
 		static_assert(((N_WAYS > 0) && ((1 << WAY_SIZE) == N_WAYS)),
 				"N_WAYS must be a power of 2 greater than 0");
-		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_ENTRIES_PER_LINE)),
-				"N_SETS and/or N_WAYS and/or N_ENTRIES_PER_LINE are too big for the specified MAIN_SIZE");
+		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_WORDS_PER_LINE)),
+				"N_SETS and/or N_WAYS and/or N_WORDS_PER_LINE are too big for the specified MAIN_SIZE");
 
 #ifdef __SYNTHESIS__
 		template <typename TYPE, size_t SIZE>
@@ -72,14 +72,14 @@ class cache {
 #endif /* __SYNTHESIS__ */
 
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> address_type;
-		typedef array_type<T, N_ENTRIES_PER_LINE> line_type;
-		typedef l1_cache<T, ADDR_SIZE, L1_CACHE_LINES, N_ENTRIES_PER_LINE>
+		typedef array_type<T, N_WORDS_PER_LINE> line_type;
+		typedef l1_cache<T, ADDR_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
 			l1_cache_type;
 		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
-			N_ENTRIES_PER_LINE> raw_cache_type;
-		typedef arbiter<T, RD_PORTS, N_ENTRIES_PER_LINE, ADDR_SIZE> arbiter_type;
+			N_WORDS_PER_LINE> raw_cache_type;
+		typedef arbiter<T, RD_PORTS, N_WORDS_PER_LINE, ADDR_SIZE> arbiter_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
-			N_ENTRIES_PER_LINE> replacer_type;
+			N_WORDS_PER_LINE> replacer_type;
 
 		typedef enum {
 			READ_OP,
@@ -106,7 +106,7 @@ class cache {
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];	// 1
 		bool m_valid[N_SETS * N_WAYS];					// 2
 		bool m_dirty[N_SETS * N_WAYS];					// 3
-		T m_cache_mem[N_SETS * N_WAYS * N_ENTRIES_PER_LINE];		// 4
+		T m_cache_mem[N_SETS * N_WAYS * N_WORDS_PER_LINE];		// 4
 		hls::stream<op_type, 4> m_core_req_op[PORTS];			// 5
 		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];	// 6
 		hls::stream<T, 4> m_core_req_data[PORTS];			// 7
@@ -130,7 +130,7 @@ class cache {
 #pragma HLS array_partition variable=m_tag complete dim=1
 #pragma HLS array_partition variable=m_valid complete dim=1
 #pragma HLS array_partition variable=m_dirty complete dim=1
-#pragma HLS array_partition variable=m_cache_mem cyclic factor=N_ENTRIES_PER_LINE dim=1
+#pragma HLS array_partition variable=m_cache_mem cyclic factor=N_WORDS_PER_LINE dim=1
 #pragma HLS array_partition variable=m_core_req_op complete
 #pragma HLS array_partition variable=m_core_req_addr complete
 #pragma HLS array_partition variable=m_core_req_data complete

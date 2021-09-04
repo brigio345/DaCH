@@ -9,16 +9,16 @@
 #include <array>
 #endif /* __SYNTHESIS__ */
 
-template <typename T, size_t ADDR_SIZE, size_t TAG_SIZE, size_t N_ENTRIES_PER_LINE>
+template <typename T, size_t ADDR_SIZE, size_t TAG_SIZE, size_t N_WORDS_PER_LINE>
 class raw_cache {
 	private:
 		static const size_t OFF_SIZE = (ADDR_SIZE - TAG_SIZE);
 
 		typedef address<ADDR_SIZE, TAG_SIZE, 0, 0> addr_type;
 #ifdef __SYNTHESIS__
-		typedef hls::vector<T, N_ENTRIES_PER_LINE> line_type;
+		typedef hls::vector<T, N_WORDS_PER_LINE> line_type;
 #else
-		typedef std::array<T, N_ENTRIES_PER_LINE> line_type;
+		typedef std::array<T, N_WORDS_PER_LINE> line_type;
 #endif /* __SYNTHESIS__ */
 
 		bool m_valid;
@@ -37,13 +37,13 @@ class raw_cache {
 			const addr_type addr(addr_main);
 
 			if (hit(addr)) {
-				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+				for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
 					line[off] = m_line[off];
 				}
 			} else {
 				const T *main_line = &(main_mem[addr.m_addr_main & (-1U << OFF_SIZE)]);
-				for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+				for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
 					line[off] = main_line[off];
 				}
@@ -57,7 +57,7 @@ class raw_cache {
 			const addr_type addr(addr_main);
 
 			T * const main_line = &(main_mem[addr.m_addr_main & (-1U << OFF_SIZE)]);
-			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
 				main_line[off] = line[off];
 				m_line[off] = line[off];

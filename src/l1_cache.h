@@ -10,11 +10,11 @@
 #include <array>
 #endif /* __SYNTHESIS__ */
 
-template <typename T, size_t ADDR_SIZE, size_t N_LINES, size_t N_ENTRIES_PER_LINE>
+template <typename T, size_t ADDR_SIZE, size_t N_LINES, size_t N_WORDS_PER_LINE>
 class l1_cache {
 	private:
 		static const size_t SET_SIZE = utils::log2_ceil(N_LINES);
-		static const size_t OFF_SIZE = utils::log2_ceil(N_ENTRIES_PER_LINE);
+		static const size_t OFF_SIZE = utils::log2_ceil(N_WORDS_PER_LINE);
 		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
 
 #ifdef __SYNTHESIS__
@@ -25,7 +25,7 @@ class l1_cache {
 			using array_type = std::array<TYPE, SIZE>;
 #endif /* __SYNTHESIS__ */
 
-		typedef array_type<T, N_ENTRIES_PER_LINE> line_type;
+		typedef array_type<T, N_WORDS_PER_LINE> line_type;
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, 0> addr_type;
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[(N_LINES > 0) ? N_LINES : 1];	// 1
@@ -49,7 +49,7 @@ class l1_cache {
 #pragma HLS inline
 			const addr_type addr(addr_main);
 
-			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
 				line[off] = m_cache_mem[addr.m_set][off];
 			}
@@ -59,7 +59,7 @@ class l1_cache {
 #pragma HLS inline
 			const addr_type addr(addr_main);
 
-			for (auto off = 0; off < N_ENTRIES_PER_LINE; off++) {
+			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
 				m_cache_mem[addr.m_set][off] = line[off];
 			}
