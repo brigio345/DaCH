@@ -17,10 +17,10 @@
  */
 
 #include "address.h"
-#include "arbiter.h"
 #include "replacer.h"
 #include "l1_cache.h"
 #include "raw_cache.h"
+#define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 #include "ap_utils.h"
 #include "ap_int.h"
@@ -34,14 +34,12 @@
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
-template <typename T, size_t RD_PORTS, bool WR_ENABLED, size_t MAIN_SIZE,
-	 size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
-	 bool LRU, size_t L1_CACHE_LINES, bool MULTI_L1_CACHES>
+template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
+	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
+	 bool LRU, size_t L1_CACHE_LINES>
 class cache {
 	private:
-		static const bool RD_ENABLED = (RD_PORTS > 0);
-		static const size_t PORTS = (MULTI_L1_CACHES ? RD_PORTS : 1);
-		static const bool MEM_IF_PROCESS = (WR_ENABLED || ((RD_PORTS > 1) && MULTI_L1_CACHES));
+		static const bool MEM_IF_PROCESS = (WR_ENABLED || (PORTS > 1));
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
@@ -77,7 +75,6 @@ class cache {
 			l1_cache_type;
 		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
 			N_WORDS_PER_LINE> raw_cache_type;
-		typedef arbiter<T, RD_PORTS, N_WORDS_PER_LINE, ADDR_SIZE> arbiter_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
 			N_WORDS_PER_LINE> replacer_type;
 
@@ -156,8 +153,6 @@ class cache {
 		 * \brief	Start cache internal processes.
 		 *
 		 * \param main_mem	The pointer to the main memory.
-		 * \param id		The identifier for the \ref arbiter.
-		 * \param arbiter	The pointer to the AXI arbiter.
 		 *
 		 * \note	In case of synthesis this must be called in a
 		 * 		dataflow region with disable_start_propagation
@@ -168,15 +163,14 @@ class cache {
 		 * 		a thread separated from the thread in which
 		 * 		cache is accessed.
 		 */
-		void run(T * const main_mem, const unsigned int id = 0,
-				arbiter_type * const arbiter = nullptr) {
+		void run(T * const main_mem) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
-			run_core(main_mem, arbiter, arbiter != nullptr, id);
+			run_core(main_mem);
 			if (MEM_IF_PROCESS)
 				run_mem_if(main_mem);
 #else
-			std::thread core_thd([&]{run_core(main_mem, arbiter, (arbiter != nullptr), id);});
+			std::thread core_thd([&]{run_core(main_mem);});
 			if (MEM_IF_PROCESS) {
 				std::thread mem_if_thd([&]{
 						run_mem_if(main_mem);
@@ -323,18 +317,12 @@ class cache {
 		 * 			requests (sent from the outside).
 		 *
 		 * \param main_mem	The pointer to the main memory.
-		 * \param arbiter	The pointer to the AXI arbiter.
-		 * \param arbitrate	The boolean value set to \c true if the
-		 * 			access to main memory must pass through
-		 * 			\ref arbiter.
-		 * \param id		The identifier for the \ref arbiter.
 		 *
 		 * \note		The infinite loop must be stopped by
 		 * 			calling \ref stop (from the outside)
 		 * 			when all the accesses have been completed.
 		 */
-		void run_core(T * const main_mem, arbiter_type * const arbiter,
-				const bool arbitrate, const unsigned int id) {
+		void run_core(T * const main_mem) {
 #pragma HLS inline off
 			// invalidate all cache lines
 			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
@@ -344,10 +332,8 @@ class cache {
 
 			m_raw_cache_core.init();
 
-			if (!MEM_IF_PROCESS) {
-				if (!arbitrate)
-					m_raw_cache_mem_if.init();
-			}
+			if (!MEM_IF_PROCESS)
+				m_raw_cache_mem_if.init();
 
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline II=PORTS
@@ -413,7 +399,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						const mem_req_type req = {op, addr.m_addr_main,
 									write_back_addr.m_addr_main, line};
 
-						manage_mem_if_req(main_mem, arbiter, arbitrate, id, req, line);
+						manage_mem_if_req(main_mem, req, line);
 
 						m_tag[addr.m_addr_line] = addr.m_tag;
 						m_valid[addr.m_addr_line] = true;
@@ -462,11 +448,6 @@ core_end:
 			ap_wait();
 
 			stop_mem_if();
-
-			if (!MEM_IF_PROCESS) {
-				if ((arbiter != nullptr) && (id == 0))
-					arbiter->stop();
-			}
 		}
 
 		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
@@ -486,8 +467,7 @@ core_end:
 
 		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
 			typename std::enable_if<MEM_IF_PROC, void>::type
-			manage_mem_if_req(T * const main_mem, arbiter_type * const arbiter,
-					const bool arbitrate, const unsigned int id,
+			manage_mem_if_req(T * const main_mem,
 					const mem_req_type &req, line_type &line) {
 #pragma HLS inline
 				// send read request to memory interface and
@@ -504,16 +484,10 @@ core_end:
 
 		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
 			typename std::enable_if<(!MEM_IF_PROC), void>::type
-			manage_mem_if_req(T * const main_mem, arbiter_type * const arbiter,
-					const bool arbitrate, const unsigned int id,
+			manage_mem_if_req(T * const main_mem,
 					const mem_req_type &req, line_type &line) {
 #pragma HLS inline
-				if (arbitrate) {
-					arbiter->get_line(req.load_addr, id, line);
-				} else {
-					execute_mem_if_req(main_mem, arbiter, arbitrate,
-							id, req, line);
-				}
+				execute_mem_if_req(main_mem, req, line);
 			}
 
 		/**
@@ -551,8 +525,7 @@ MEM_IF_LOOP:		while (1) {
 					break;
 
 				line_type line;
-				execute_mem_if_req(main_mem, nullptr, false,
-						0, req, line);
+				execute_mem_if_req(main_mem, req, line);
 
 				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
 					// send the response to the read request
@@ -570,31 +543,19 @@ MEM_IF_LOOP:		while (1) {
 		 * 			\p req.
 		 *
 		 * \param main_mem	The pointer to the main memory.
-		 * \param arbiter	The pointer to the AXI arbiter.
-		 * \param arbitrate	The boolean value set to \c true if the
-		 * 			access to main memory must pass through
-		 * 			\ref arbiter.
-		 * \param id		The identifier for the \ref arbiter.
 		 * \param req		The request to be executed.
 		 * \param line		The buffer to store the read line.
 		 *
 		 * \note		\p main_mem must be associated with
 		 * 			a dedicated AXI port.
 		 */
-		void execute_mem_if_req(T * const main_mem, arbiter_type * const arbiter,
-				const bool arbitrate, const unsigned int id,
+		void execute_mem_if_req(T * const main_mem,
 				const mem_req_type &req, line_type &line) {
 #pragma HLS inline
-#pragma HLS function_instantiate variable=id
-#pragma HLS function_instantiate variable=arbitrate
 			if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
 				// read line from main memory
-				if (arbitrate) {
-					arbiter->get_line(req.load_addr, id, line);
-				} else {
-					m_raw_cache_mem_if.get_line(main_mem,
-							req.load_addr, line);
-				}
+				m_raw_cache_mem_if.get_line(main_mem,
+						req.load_addr, line);
 			}
 
 			if (WR_ENABLED && ((req.op == WRITE_OP) ||
