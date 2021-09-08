@@ -361,7 +361,9 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 
 					// in case of write request, read data to be written
 					const auto addr_main = m_core_req_addr[port].read();
-					const auto data = read ? 0 : m_core_req_data[port].read();
+					T data;
+					if (!read)
+						data = m_core_req_data[port].read();
 
 					// extract information from address
 					address_type addr(addr_main);
