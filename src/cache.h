@@ -48,16 +48,17 @@ class cache {
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
 
 		static_assert((RD_ENABLED || WR_ENABLED),
-				"Cache must be read-enabled or write-enabled");
+				"RD_ENABLED and/or WR_ENABLED must be true");
+		static_assert((PORTS > 0), "PORTS must be greater than 0");
 		static_assert(((MAIN_SIZE > 0) && ((1 << ADDR_SIZE) == MAIN_SIZE)),
 				"MAIN_SIZE must be a power of 2 greater than 0");
 		static_assert(((N_SETS > 0) && ((1 << SET_SIZE) == N_SETS)),
 				"N_SETS must be a power of 2 greater than 0");
+		static_assert(((N_WAYS > 0) && ((1 << WAY_SIZE) == N_WAYS)),
+				"N_WAYS must be a power of 2 greater than 0");
 		static_assert(((N_WORDS_PER_LINE > 0) &&
 					((1 << OFF_SIZE) == N_WORDS_PER_LINE)),
 				"N_WORDS_PER_LINE must be a power of 2 greater than 0");
-		static_assert(((N_WAYS > 0) && ((1 << WAY_SIZE) == N_WAYS)),
-				"N_WAYS must be a power of 2 greater than 0");
 		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_WORDS_PER_LINE)),
 				"N_SETS and/or N_WAYS and/or N_WORDS_PER_LINE are too big for the specified MAIN_SIZE");
 
@@ -71,7 +72,7 @@ class cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> address_type;
 		typedef array_type<T, N_WORDS_PER_LINE> line_type;
-		typedef l1_cache<T, ADDR_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
+		typedef l1_cache<T, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
 			l1_cache_type;
 		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
 			N_WORDS_PER_LINE> raw_cache_type;
