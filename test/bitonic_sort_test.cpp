@@ -7,28 +7,39 @@
 #include "cache.h"
 
 #define USE_CACHE
-#define N 128
+#define N_BITS 8
+#define N (1 << N_BITS)
 
 static const int RD_PORTS = 1;
 
 typedef int data_type;
 typedef cache<data_type, true, true, RD_PORTS, N, 1, 1, 16, false, 4> cache_a;
 
-template <typename T>
-void bitonic_sort(T a) {
+void compare_and_swap(data_type &pos0, data_type &pos1, const bool dir) {
 #pragma HLS inline
-K_LOOP:	for (auto k = 2; k <= N; k *= 2) {
-J_LOOP:		for (auto j = (k / 2); j > 0; j /= 2) {
-I_LOOP:			for (auto i = 0; i < N; i++) {
+	if ((pos0 > pos1) != dir) {
+		const data_type tmp = pos0;
+		pos0 = pos1;
+		pos1 = tmp;
+	}
+}
+
+template <typename T>
+void bitonic_sort(T a, const bool dir = true) {
+#pragma HLS inline
+BITS_LOOP:for (auto bits = 1; bits <= N_BITS; bits++) {
+STRIDE_LOOP:	for (auto stride = (bits - 1); stride >= 0; stride--) {
+I_LOOP:			for (auto i = 0; i < (N / 2); i++) {
 #pragma HLS pipeline II=1
-				const auto l = (i ^ j);
-				if (l > i) {
-					if ((((i & k) == 0) && (a[i] > a[l])) ||
-							(((i & k) != 0) && (a[i] < a[l]))) {
-						data_type tmp = a[i];
-						a[i] = a[l];
-						a[l] = tmp;
-					}
+				bool l_dir = ((i >> (bits - 1)) & 0x01);
+				l_dir = (l_dir ^ dir);
+				const int step = (1 << stride);
+				const int POS = (i * 2 - (i & (step - 1)));
+				const data_type p0 = a[POS];
+				const data_type p1 = a[POS + step];
+				if ((p0 > p1) != l_dir) {
+					a[POS] = p1;
+					a[POS + step] = p0;
 				}
 			}
 		}
@@ -92,7 +103,6 @@ int main() {
 	bitonic_sort<data_type *>(a_arr_ref);
 
 	for (auto i = 0; i < N; i++) {
-		std::cout << a_arr[i] << std::endl;
 		if (a_arr[i] != a_arr_ref[i])
 			return 1;
 	}
