@@ -41,13 +41,13 @@ class l1_cache {
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[(N_SETS > 0) ? N_SETS : 1];	// 1
 		bool m_valid[(N_SETS > 0) ? N_SETS : 1];					// 2
-		line_type m_cache_mem[(N_SETS > 0) ? N_SETS : 1];				// 3
+		T m_cache_mem[((N_SETS > 0) ? N_SETS : 1) * N_WORDS_PER_LINE];			// 3
 
 	public:
 		l1_cache() {
 #pragma HLS array_partition variable=m_tag complete
 #pragma HLS array_partition variable=m_valid complete
-#pragma HLS array_partition variable=m_cache_mem complete
+#pragma HLS array_partition variable=m_cache_mem cyclic factor=N_WORDS_PER_LINE
 		}
 
 		void init() {
@@ -62,7 +62,7 @@ class l1_cache {
 
 			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				line[off] = m_cache_mem[addr.m_set][off];
+				line[off] = m_cache_mem[addr.m_set * N_WORDS_PER_LINE + off];
 			}
 		}
 
@@ -72,7 +72,7 @@ class l1_cache {
 
 			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				m_cache_mem[addr.m_set][off] = line[off];
+				m_cache_mem[addr.m_set * N_WORDS_PER_LINE + off] = line[off];
 			}
 			m_valid[addr.m_set] = true;
 			m_tag[addr.m_set] = addr.m_tag;

@@ -22,10 +22,14 @@ class raw_cache {
 #endif /* __SYNTHESIS__ */
 
 		bool m_valid;
-		line_type m_line;
+		T m_line[N_WORDS_PER_LINE];
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag;
 
 	public:
+		raw_cache() {
+#pragma HLS array_partition variable=m_line complete
+		}
+
 		void init() {
 			m_valid = false;
 		}
