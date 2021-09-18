@@ -6,6 +6,13 @@
 \usepackage{hyperref}
 \usepackage[table]{xcolor}
 \usepackage[backend=biber, style=numeric]{biblatex}
+\usepackage{tabularx}
+\usepackage{soul}
+\usepackage{acro}
+
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+\def\tabularxcolumn#1{m{#1}}
 
 \addbibresource{bibliography.bib}
 
@@ -13,12 +20,52 @@
 	colorlinks=true,
 	linkcolor=black,
 	urlcolor=blue,
-	citecolor=black
+	citecolor=black,
 }
 
 \graphicspath{{figures/}}
 
 \setsecnumdepth{subsection}
+
+\DeclareAcronym{hdl}{
+	short=HDL,
+	long=Hardware Description Language,
+}
+
+\DeclareAcronym{hls}{
+	short=HLS,
+	long=High-Level Synthesis,
+}
+
+\DeclareAcronym{fpga}{
+	short=FPGA,
+	long=Field-Programmable Gate Array,
+}
+
+\DeclareAcronym{fifo}{
+	short=FIFO,
+	long=First-In First-Out,
+}
+
+\DeclareAcronym{ram}{
+	short=RAM,
+	long=Random Access Memory,
+}
+
+\DeclareAcronym{dram}{
+	short=DRAM,
+	long=Dynamic Random Access Memory,
+}
+
+\DeclareAcronym{bram}{
+	short=BRAM,
+	long=Block Random Access Memory,
+}
+
+\DeclareAcronym{axi}{
+	short=AXI,
+	long=Advanced eXtensible Interface,
+}
 
 \renewcommand*{\maketitle}%
 {
@@ -135,9 +182,22 @@ lower bound), to BRAM (performance higher bound) and to cache (with multiple
 configurations).
 
 \vfill
-
 \pagebreak
+
 \tableofcontents*
+\pagebreak
+
+\printacronyms[display=all,heading=chapter,name={List of Acronyms}]
+\vfill
+\pagebreak
+
+\listoffigures
+\vfill
+\pagebreak
+
+\listoftables
+\vfill
+\pagebreak
 
 \mainmatter
 \chapter{Background}
@@ -329,25 +389,20 @@ replaced before compilation, similarly to ``\texttt{\#define}'' preprocessor
 directives.
 
 \bigskip
-The \emph{SFINAE} (Substitution Failure Is Not An Error) technique allows
-to make the compiler ignore parts of code when the template substitution is
-invalid, instead of throwing an error.
-This technique is particularly effective when used together with the
-\texttt{std::enable\_if} construct which conditionally returns an invalid type.
 
 \subsection{Assertions}
 \fi
 
 \section{Previous work}\label{sec:liang}
-Liang Ma et al. proposed an inlined cache implementation \cite{liang} in the form
-of a set of \texttt{C++} classes: each of them implements an access type (read
+Liang Ma et al. proposed an inlined cache implementation \cite{liang} in the
+form of \texttt{C++} classes: each of them implements an access type (read
 only, write only and read write) and a mapping policy (direct mapped and set
 associative).
 
 Each cache is associated with a specific array stored to off-chip DRAM and
 stores its data to on-chip BRAMs and registers. Since the cache is dedicated to
 a specific array and the accesses to a single array are usually regular it is in
-general easy to setup the different parameters to get high hit ratios.
+general easy to tune the different parameters to get high hit ratios.
 
 The \texttt{operator[]} has been overloaded such that the cache can be used in
 the same way of arrays, allowing to reduce the coding efforts when integrating
@@ -357,13 +412,29 @@ During the synthesis the cache is inlined in the user algorithm: this may
 clutter the logic and limit the maximum achievable performance.
 
 \chapter{Basic architecture}
-The fundamental idea behind the basic architecture
-(Figure~\ref{fig:basic_arch}) is to keep application and cache logic into
-separate processes, in order to simplify synthesis process: the cache should
-always perform in the same manner, independently from the kernel in which it is
-used, since it is separate from it, and the kernel algorithm may get better
-performance, since it would only contain FIFO accesses instead of the entire
-cache logic.
+The \emph{Basic architecture} splits cache logic from application logic
+inserting them into separate processes (Figure~\ref{fig:basic_arch}).
+It starts from same assumptions of Ma's architecture (introduced in
+Section~\ref{sec:liang}): accelerate accesses to off-chip DRAM arrays
+associating them with dedicated caches which store their data to on-chip BRAM
+and registers.
+The acceleration is achieved by:
+\begin{itemize}
+	\item \ul{optimizing AXI accesses:} the cache aggregates DRAM accesses
+		in lines, allowing to exploit automatic port widening and burst
+		accesses.
+	\item \ul{reducing AXI accesses:} the AXI interface is accessed in case
+		of cache miss only.
+\end{itemize}
+
+The \emph{Basic architecture} is aimed at solving the main limitation of Ma's
+one: inlining the cache into application makes the logic more complex and the
+synthesis may tool may not be able to build a circuit with optimal performance.
+
+Since the cache process is isolated from the application logic, it should
+always perform in the same manner, independently from the algorithm in which it
+is used, while the algorithm may get better performance, since it would only
+contain FIFO accesses instead of the whole cache logic.
 
 \bigskip
 From the functional point of view, when application needs to access memory:
@@ -384,8 +455,8 @@ From the functional point of view, when application needs to access memory:
 	\label{fig:basic_arch}
 \end{figure}
 
-\section{Single-process basic architecture}
-This first proposed architecture is composed of a single pipelined process
+\section{Single-process}
+The single-process basic architecture is composed of a single pipelined process
 which performs all the cache functionalities.
 
 In case of Read-Only memory accesses this process can be pipelined with an
@@ -405,6 +476,38 @@ by setting the number of sets to 1 or a direct mapped policy by setting the
 number of ways to 1).
 It is also possible to select the replacement policy between Least Recently Used
 and Last-In First-Out.
+
+Similarly to Ma's implementation, the \texttt{operator[]} has been overloaded
+so that a cache object can be used as a traditional array (e.g.
+\texttt{cache[i] = val} assigns the \texttt{val} value to the \texttt{i}-th
+element of \texttt{cache} and \texttt{val = cache[i]} assigns the \texttt{i}-th
+element of \texttt{cache} value to \texttt{val}).
+
+\begin{table}
+	\begin{center}
+		\begin{tabularx}{\textwidth}{LCC}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{Single-process basic implementation} &
+			\textbf{Ma's implementation} \\
+			\hline
+			\textbf{Integration with algorithm} & Separate process &
+			Inlined \\
+			\rowcolor{gray!25}
+			\textbf{Underlying memory} & Single DRAM array &
+			Single DRAM array \\
+			\textbf{Configurability} & Template arguments &
+			Template arguments and dedicated classes \\
+			\rowcolor{gray!25}
+			\textbf{\texttt{operator[]} overload} & Array-like &
+			Array-like \\
+			\hline
+		\end{tabularx}
+	\end{center}
+	\caption{Comparison between basic single-process and Ma's
+	implementations.}
+	\label{tab:basic_vs_liang}
+\end{table}
 
 \subsubsection{Multi-process modeling}
 HLS is intended for synthesizing sequential software code, therefore it has
@@ -449,18 +552,20 @@ since the RAW cache would hit and return its line. This allows to falsify the
 RAW dependency with distance of 1 on the cache memory, making it possible to
 schedule the cache process with an II of 1.
 
-\section{Multi-processes basic architecture}
-In this architecture, the cache have been split into two processes
+\section{Multi-processes}
+The \emph{Multi-processes Basic architecture} splits cache into two processes
 (Figure~\ref{fig:basic_arch_inner}):
 \begin{itemize}
-	\item core: manage communication with application and keep cache data
-		structures up to date.
-	\item memory interface: deal with the AXI interface.
+	\item core process: manage communication with application and keep
+		cache data structures up to date.
+	\item memory interface process: deal with the AXI interface.
 \end{itemize}
 
-This solution allows to pipeline the \emph{core} process with an II of one, even
-in case of write accesses, since the AXI interfacing resides in the separate
-\emph{memory interface} process.
+This architecture is aimed at solving the performance limitations of the
+\emph{Single-process Basic architecture} in case of writable caches: it manages
+to pipeline the \emph{core} process with an II of 1, even in case of write
+accesses, since the AXI interfacing resides in the separate \emph{memory
+interface} process.
 
 The latency of the response to an hitting request depends on the \emph{core}
 process only, therefore with this solution desired performance is achieved in
@@ -472,6 +577,34 @@ case of writable caches too.
 	\caption{Multi-processes cache architecture.}
 	\label{fig:basic_arch_inner}
 \end{figure}
+
+\subsection{Implementation}
+The \emph{Multi-processes Basic architecture} has been implemented as an
+extension of the \emph{Single-process} one: the \emph{core} process coincides
+with the \emph{Single-process Basic architecture} cache process, with the only
+difference that it does not directly accesses the AXI bus, but it issues
+requests to the \emph{memory interface} process through FIFOs; the \emph{memory
+interface} process has been instead implemented from scratch.
+
+\subsubsection{Conditional code compilation}
+The \emph{Multi-processes Basic architecture} has worse performance and
+resource usage with respect to \emph{Single-process Basic architecture}, when
+dealing with read-only caches: in this case the latter architecture is
+automatically instantiated.
+
+Alternatively executing the \emph{Multi-processes} or the \emph{Single-process}
+code with traditional \texttt{if} statements would generate errors during the
+synthesis, particularly in the \emph{Dataflow check} step (which checks that
+each \texttt{hls::stream} having a writer/reader also has a reader/writer):
+the compiler builds both branches of the \texttt{if} statements, independently
+from the fact that one of them is never executed.
+
+The problem can be solved through the \emph{SFINAE} (Substitution Failure Is
+Not An Error) pattern, which allows to make the compiler ignore parts of code
+when the template substitution is invalid, instead of throwing an error.
+This technique can be easily implemented by using the \texttt{std::enable\_if}
+structure which conditionally returns an invalid type, triggering the
+\emph{SFINAE} pattern.
 
 \chapter{Optimized architectures}
 \section{L1 cache}
@@ -497,6 +630,8 @@ write accesses, therefore the optimization efforts has been focused on them.
 	\label{fig:l1_arch}
 \end{figure}
 
+\subsection{Implementation}
+
 \section{Multiple ports}
 The vast majority of algorithms access memory inside loops, which in HLS can be
 optimized in two main ways: pipelining, which perfectly fits the single-port
@@ -507,6 +642,9 @@ To solve this problem a multi-port architecture is proposed: each port has
 dedicated FIFOs and the cache process serves each request in order.
 Each port has also a dedicated L1 cache, which can be used without any
 coherency problem, since they follow the write-through consistency policy.
+
+\subsection{Implementation}
+\subsubsection{Port binding}
 
 
 \chapter{Results}
