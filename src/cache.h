@@ -34,12 +34,15 @@
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
+#define MAX_AXI_BITWIDTH 512
+
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
 	 bool LRU, size_t L1_CACHE_LINES>
 class cache {
 	private:
-		static const bool MEM_IF_PROCESS = (WR_ENABLED || (PORTS > 1));
+		static const bool MEM_IF_PROCESS = (WR_ENABLED || (PORTS > 1) ||
+				((sizeof(T) * N_WORDS_PER_LINE) > MAX_AXI_BITWIDTH));
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
