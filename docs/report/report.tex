@@ -5,7 +5,7 @@
 \usepackage{float}
 \usepackage{hyperref}
 \usepackage[table]{xcolor}
-\usepackage[backend=biber, style=numeric]{biblatex}
+\usepackage[backend=biber,style=numeric,maxnames=4]{biblatex}
 \usepackage{tabularx}
 \usepackage{acro}
 \usepackage{textcomp}
@@ -26,6 +26,8 @@
 \graphicspath{{figures/}}
 
 \setsecnumdepth{subsection}
+
+%\setcounter{tocdepth}{2}
 
 \acsetup{make-links}
 
@@ -120,6 +122,11 @@
 	long=Level 2,
 }
 
+\DeclareAcronym{api}{
+	short=API,
+	long=Application Programming Interface,
+}
+
 \renewcommand*{\maketitle}%
 {
 	\newgeometry{left=2cm,right=2cm,top=3cm,bottom=3.5cm}
@@ -143,7 +150,7 @@
 		\begin{flushleft}
 			{\Large
 				\textbf{Supervisor}\\
-				Prof. Luciano Lavagno
+				Prof.\ Luciano Lavagno
 			}
 		\end{flushleft}
 	\end{minipage}
@@ -178,7 +185,7 @@ problem from a different point of view: application-specific \acl{hw} can
 provide higher performance and lower power consumption, while requiring higher
 design efforts and higher deployment costs.
 
-The problem of the high design efforts can be mitigated by the \ac{hls}, since
+The problem of the high design efforts can be mitigated by the \acf{hls}, since
 it helps improving designer productivity thanks to convenient \acl{sw}-like
 tools.
 
@@ -243,21 +250,21 @@ multiple configurations).
 \vfill
 \pagebreak
 
-\listoffigures*
+\listoffigures
 \vfill
 \pagebreak
 
-\listoftables*
+\listoftables
 \vfill
 \pagebreak
 
-\printacronyms[heading=chapter*,name={List of Acronyms}]
+\printacronyms[heading=chapter,name={List of Acronyms}]
 \vfill
 \pagebreak
 
 \mainmatter
 \chapter{Background}
-\section{Cache memory}
+\section{Cache}
 Memory devices are usually the performance bottleneck in the execution of
 memory-bound algorithms.
 The ideal memory should be fast, large and cheap, but current technology forces
@@ -367,8 +374,8 @@ The most common solutions to this problem are:
 		whole hierarchy.
 \end{itemize}
 
-\section{\acp{fpga}}
-\acl{fpga} are integrated circuits able to implement special purpose circuits
+\section{\acl{fpga}}
+\aclp{fpga} are integrated circuits able to implement special purpose circuits
 described in \ac{hdl}, thanks to their programmable logic blocks and
 interconnections.
 \subsection{Memory system}
@@ -389,52 +396,77 @@ and C++) into an \ac{hdl} description.
 
 \ac{hls} allows to design more complex systems in less time, compared to
 \ac{hdl} design, moreover makes the \acl{hw} and \acl{sw} co-design much
-easier, at the cost of less expressiveness.
+easier, at the cost of less low-level control.
+
+
+\emph{Vitis\texttrademark HLS}~\cite{vitisug} is one of the available \ac{hls}
+commercial tools.
 
 \subsection{Workflow}
 The typical \ac{hls} workflow consists of:
 \begin{enumerate}
-	\item \ac{sw} implementation: the top level entity is a C function:
-		the function arguments are the entity ports and the
+	\item \emph{\ac{sw} implementation}: the top level entity is a C
+		function: the function arguments are the entity ports and the
 		functionality is implemented in \ac{sw}; in order to guarantee
-		synthesizability some constraints should be respected (e.g. no
+		synthesizability some constraints should be respected (e.g.\ no
 		dynamic memory allocation).
-	\item \ac{sw} verification: the testbench can be developed as a simple
-		main function which calls the top level entity function,
+	\item \emph{\ac{sw} verification}: the testbench can be developed as a
+		simple main function which calls the top level entity function,
 		therefore the functionality is verified like any \ac{sw}: it is
-		possible to exploit traditional tools (e.g. debuggers, print
-		statements...).
-	\item \ac{hw} synthesis: the synthesizer generates a \ac{rtl}
+		possible to exploit traditional tools (e.g.\ debuggers, print
+		statements\ldots).
+	\item \emph{\ac{hw} synthesis}: the synthesizer generates a \ac{rtl}
 		description of the top level entity. It is possible to generate
 		different architectures by setting up some parameters through
 		dedicated directives.
-	\item \ac{hw} verification: the \ac{rtl} description is simulated, to
-		make sure that \ac{sw} and \ac{hw} outputs match.
+	\item \emph{\ac{hw} verification}: the \ac{rtl} description is
+		simulated, to make sure that \ac{sw} and \ac{hw} outputs match.
 \end{enumerate}
 
 \subsection{Optimization techniques}
 Typical optimization techniques used by \ac{hls} for improving performance
 include:
 \begin{itemize}
-	\item pipelining: loops and functions logic can be pipelined so that
-		successive iterations/calls can start while previous ones are
-		still running. The introduced parallelism allows to increase
-		the throughput at a limited additional area cost (only pipeline
-		registers and a \acs{fsm} are required).
-	\item dataflow: different functions composing the design are called in
-		a pipelined fashion (similarly to pipelining, but at task level,
-		instead of instruction level).
-	\item loop unrolling: the loop logic is instantiated multiple times,
-		to execute multiple loop iterations in parallel, reducing
-		latency and improving throughput.
-	\item memory optimizations
+	\item \textbf{Pipelining}: loops and functions logic can be pipelined
+		so that successive iterations/calls can start while previous
+		ones are still running. The introduced parallelism allows to
+		increase the throughput at a limited additional area cost (only
+		pipeline registers and a \acs{fsm} are required).
+	\item \textbf{Dataflow}: different functions composing the design are
+		called in a pipelined fashion (similarly to pipelining, but at
+		task level, instead of instruction level).
+	\item \textbf{Loop unrolling}: the loop logic is instantiated multiple
+		times, to execute multiple loop iterations in parallel,
+		reducing latency and improving throughput.
+	\item \textbf{Memory optimizations}:
 		\begin{itemize}
-			\item bursting: multiple memory accesses are aggregated
-				to reduce overall latency and improving
-				throughput.
-			\item interface widening: multiple data elements are
-				packed into a single bigger word, to perform
-				multiple accesses at the same time.
+			\item \underline{On-chip memory:}
+				\begin{itemize}
+					\item \emph{Array partitioning}:
+						given a factor $f$, an array is
+						split into $f$ portions, each
+						one mapped to a dedicated
+						memory element, allowing more
+						accesses to the same array at
+						the same time, at the cost of
+						higher memory elements usage.
+						It can be block: each portion
+						contains contiguous elements;
+						cyclic: each portion contains
+						interleaved elements.
+				\end{itemize}
+			\item \underline{Off-chip memory}:
+				\begin{itemize}
+					\item \emph{Bursting}: multiple memory
+						accesses are aggregated to
+						reduce overall latency and
+						improving throughput.
+					\item \emph{Interface widening}:
+						multiple data elements are
+						packed into a single bigger
+						word, to perform multiple
+						accesses at the same time.
+				\end{itemize}
 		\end{itemize}
 \end{itemize}
 
@@ -454,7 +486,7 @@ directives.
 \fi
 
 \section{Previous work}\label{sec:liang}
-Liang Ma et al. proposed an inlined cache implementation \cite{liang} in the
+Liang Ma et al.\ proposed an inlined cache implementation~\cite{liang} in the
 form of \texttt{C++} classes: each of them implements an access type (read
 only, write only and read write) and a mapping policy (direct mapped and set
 associative).
@@ -473,12 +505,14 @@ During the synthesis the cache is inlined in the user algorithm: this may
 clutter the logic and limit the maximum achievable performance.
 
 \chapter{Basic architecture}
-The \emph{Basic architecture} splits cache logic from application logic
-inserting them into separate processes (Figure~\ref{fig:basic_arch}).
+The \emph{Basic architecture} consists in a cache whose logic is separate from
+application logic since it runs in a distinct process
+(Figure~\ref{fig:single_proc_basic_arch}).
 It starts from same assumptions of Ma's architecture (introduced in
 Section~\ref{sec:liang}): accelerate accesses to off-chip \ac{dram} arrays
 associating them with dedicated caches which store their data to on-chip
 \ac{bram} and registers.
+
 The acceleration is achieved by:
 \begin{itemize}
 	\item \underline{optimizing \ac{axi} accesses:} the cache aggregates
@@ -490,60 +524,207 @@ The acceleration is achieved by:
 
 The \emph{Basic architecture} is aimed at solving the main limitation of Ma's
 one: inlining the cache into application makes the logic more complex and the
-synthesis may tool may not be able to build a circuit with optimal performance.
+synthesis may not be able to generate a circuit with optimal performance.
 
 Since the cache process is isolated from the application logic, it should
 always perform in the same manner, independently from the algorithm in which it
 is used, while the algorithm may get better performance, since it would only
 contain \ac{fifo} accesses instead of the whole cache logic.
 
-\bigskip
-From the functional point of view, when application needs to access memory:
+\begin{figure}
+	\centering
+	\includegraphics[width=.3\textwidth]{single_proc_basic_arch}
+	\caption{\emph{Single-process Basic architecture} overview.}
+	\label{fig:single_proc_basic_arch}
+\end{figure}
+
+\paragraph{Functionality}
+If application $A$ needs to access the array associated with the cache $C$:
 \begin{enumerate}
-	\item application writes the request to the request \ac{fifo}.
-	\item cache reads the request \ac{fifo} and checks if it causes a miss
-	\item in case of miss, cache issues a request to the \ac{axi} interface
+	\item $A$ writes the request to the request \ac{fifo}.
+	\item $C$ reads the request \ac{fifo} and checks if the requested
+		address causes a miss.
+	\item (in case of miss) $C$ issues a request to the \ac{axi} interface
 		to prepare its own memory (mapped to \ac{bram}) for fulfilling
 		the requested access.
-	\item cache performs the access to \ac{bram} and writes the outcome to
-		the response \ac{fifo} (in case of a read request).
+	\item $C$ performs the access to \ac{bram} and (in case of read
+		request) writes requested data to the response \ac{fifo}.
+	\item (in case of read request) $A$ reads requested data from the
+		response \ac{fifo}.
 \end{enumerate}
+
+\paragraph{Characteristics}
+The \emph{Basic architecture} is compliant with the set associative mapping
+policy and the write-back consistency policy.
+It is configurable in terms of:
+\begin{itemize}
+	\item Word type and number of words per line.
+	\item Number of sets and ways (therefore it is possible to obtain a
+		fully associative policy by setting the number of sets to 1 or
+		a direct mapped policy by setting the number of ways to 1).
+	\item Replacement policy (\acl{lru} or \acl{fifo}).
+\end{itemize}
+
+\paragraph{Single-process and Multi-processes Basic architectures}
+The \emph{Single-process Basic architecture} is composed of a single pipelined
+process which performs all the cache functionalities.
+
+This process can be pipelined with an \ac{ii} of 1 when memory accesses are
+Read-Only and a cache line is not bigger than the maximum \ac{axi} interface
+width (512 or 1024 bits typically, depending on the specific device).
+
+Write accesses generate some dependencies on the \ac{axi} interface, while large
+cache lines require multiple \ac{axi} transactions since they do not fit a
+single one: both of these increase the process \ac{ii}, worsening cache
+performance.
+
+\bigskip
+The \emph{Multi-processes Basic architecture} splits cache into two processes
+(Figure~\ref{fig:multi_proc_basic_arch}):
+\begin{itemize}
+	\item \emph{core} process: manages communication with application and
+		keeps cache data structures up to date.
+	\item \emph{memory interface} process: deals with the \ac{axi}
+		interface.
+\end{itemize}
+
+This architecture is aimed at solving the performance limitations of the
+\emph{Single-process Basic architecture} in case of writable caches: it manages
+to pipeline the \emph{core} process with an \ac{ii} of 1, even in case of write
+accesses or long lines, since the \ac{axi} interfacing resides in the separate
+\emph{memory interface} process.
+
+The latency of the response to an hitting request depends on the \emph{core}
+process only, therefore with this solution best performance is achieved in case
+of writable caches too.
 
 \begin{figure}
 	\centering
-	\includegraphics[width=.3\textwidth]{basic_arch}
-	\caption{Single-process cache architecture.}
-	\label{fig:basic_arch}
+	\includegraphics[width=.3\textwidth]{multi_proc_basic_arch}
+	\caption{\emph{Multi-processes Basic architecture} overview.}
+	\label{fig:multi_proc_basic_arch}
 \end{figure}
 
-\section{Single-process}
-The single-process basic architecture is composed of a single pipelined process
-which performs all the cache functionalities.
+\section{Implementation}
+The \emph{Basic architecture} is implemented in the form of a
+\texttt{C++14}~\cite{cpp14} class, compatible with
+\emph{Vitis\texttrademark~HLS~2021.1}.
+All the configurable parameters are set through class template arguments.
 
-In case of Read-Only memory accesses this process can be pipelined with an
-Initiation Interval of 1, while write accesses generate some dependencies on the
-\ac{axi} interface which cause the process \ac{ii} to increase, dropping cache
-performance.
+The cache class is logically split into two parts:
+\begin{itemize}
+	\item \emph{Internals}: cache functionalities.
+	\item \emph{Interface}: \acsp{api} for managing requests and responses
+		from application side.
+\end{itemize}
 
-\subsection{Implementation}
-The single-process basic architecture has been implemented in the form of a
-\texttt{C++14} class, compatible with \emph{Vitis\texttrademark HLS 2021.1}.
+\subsection{Internals}
+The \emph{Internals} implementation differs between the \emph{Single-process}
+and the \emph{Multi-processes} implementations:
+\begin{itemize}
+	\item \emph{Single-process Basic architecture}: single process which
+		implements all the cache functionalities.
+	\item \emph{Multi-processes Basic architecture}:
+		\begin{itemize}
+			\item \emph{core} process: same as \emph{Single-process
+				Basic architecture} process, but it does not
+				directly accesses the \ac{axi} bus: it issues
+				requests to the \emph{memory interface} process
+				through \acp{fifo}.
+			\item \emph{memory interface} process: it accesses the
+				\ac{axi} bus as requested by the \emph{core}
+				process.
+		\end{itemize}
+\end{itemize}
 
-It is compliant with the set associative mapping policy and the write-back
-consistency policy.
-Template parameters allow to select word type, number of words per line, number
-of sets and ways (therefore it is possible to obtain a fully associative policy
-by setting the number of sets to 1 or a direct mapped policy by setting the
-number of ways to 1).
-It is also possible to select the replacement policy between \acl{lru} and
-\acl{fifo}.
+\subsubsection{Array partitioning}
+Cache memory (which stores the actual data) must be accessed one line per clock
+cycle: it is mapped to a \ac{bram} array cyclically partitioned with a factor
+equal to the number of lines.
 
-Similarly to Ma's implementation, the \texttt{operator[]} has been overloaded
-so that a cache object can be used as a traditional array (e.g.
-\texttt{cache[i] = val} assigns the \texttt{val} value to the \texttt{i}-th
-element of \texttt{cache} and \texttt{val = cache[i]} assigns the \texttt{i}-th
-element of \texttt{cache} value to \texttt{val}).
+Helper data (e.g. \texttt{tag}, \texttt{valid}, \texttt{dirty}\ldots) is stored
+to completely partitioned arrays, mapped to registers, in order to avoid
+dependencies as much as possible and get best performance.
 
+\subsubsection{Process modeling}
+\ac{hls} is intended for synthesizing sequential \acl{sw} code, therefore it has
+been necessary to develop a novel technique for modeling multi-process designs.
+
+A process is modeled as an infinite loop and their parallelism is modeled
+differently depending on the compilation target:
+\begin{itemize}
+	\item \emph{\ac{sw} simulation}: each process is mapped to an
+		\texttt{std::thread}.
+	\item \emph{\ac{hw} synthesis}: each process is a dataflow function, in
+		a dataflow region with the \texttt{disable\_start\_propagation}
+		option disabled (which allow each function to run in parallel,
+		without waiting for the completion of previous ones).
+\end{itemize}
+The distinction between simulation and synthesis code can be performed through
+the ``\texttt{\#ifdef \_\_SYNTHESIS\_\_}'' preprocessor directive.
+
+Different processes can communicate by means of \acp{fifo} (\texttt{hls::stream}
+provided by Vitis\texttrademark HLS), which allow unidirectional point-to-point
+communication between two processes. It is possible to insert multiple
+\acp{fifo} between each process, in both directions, therefore allowing to
+setup duplex communication.
+
+Since \texttt{hls::stream} provides blocking operations, these \acp{fifo} can
+be also used for synchronization purposes.
+
+\subsubsection{\acl{raw} dependencies}
+The cache process \ac{ii} is limited by the \ac{raw} dependencies on the cache
+lines, therefore the \emph{\ac{raw} cache} has been developed: it is a
+single-line cache which provides the functions:
+\begin{itemize}
+	\item \texttt{get\_line}: in case of hit, read the \emph{\ac{raw}
+		cache} line; in case of miss, read the cache line.
+	\item \texttt{set\_line}: write both the \emph{\ac{raw} cache} line and
+		the cache line.
+\end{itemize}
+
+Cache memory is always accessed through the \emph{\ac{raw} cache} and the
+\texttt{set\_line} function is called once per iteration at most: if a cache
+line has been written it is impossible that it is read in the next iteration,
+since the \ac{raw} cache would hit and return its line. This allows to falsify
+the \ac{raw} dependency of distance of 1 on the cache memory, making it
+possible to schedule the cache process with an \ac{ii} of 1.
+
+\subsubsection{Conditional code compilation}
+\emph{Single-process Basic architecture} provides better performance and lower
+resource usage (with respect to the \emph{Multi-processes} one) when it is
+possible to schedule its process with an \ac{ii} of 1 (read-only accesses with
+line not larger than the maximum \ac{axi} interface bitwidth): therefore it is
+automatically instantiated whenever it is convenient.
+
+Alternatively executing the \emph{Multi-processes} or the \emph{Single-process}
+code with traditional \texttt{if} statements would generate errors during the
+synthesis, particularly in the \emph{Dataflow check} step (which checks that
+each \texttt{hls::stream} has a single reader and a single writer): the
+compiler builds both branches of the \texttt{if} statements, independently from
+the fact that one of them is never executed.
+
+The problem can be solved through the \ac{sfinae} pattern, which allows to make
+the compiler ignore parts of code when the template substitution is invalid,
+instead of throwing an error.
+This technique can be easily implemented by using the \texttt{std::enable\_if}
+structure which conditionally returns an invalid type, triggering the
+\ac{sfinae} pattern.
+
+\subsection{Interface}
+Provide \acsp{api} for managing requests and responses from application to
+cache:
+\begin{itemize}
+	\item \texttt{get}: send a read request and read the response.
+	\item \texttt{set}: send a write request.
+\end{itemize}
+To improve user friendliness, similarly to Ma's implementation, the
+\texttt{operator[]} has been overloaded so that a cache object can be used as a
+traditional array (e.g. \texttt{val~=~cache[i]} calls
+\texttt{val~=~cache.get(i)} and \texttt{cache[i]~=~val} calls
+\texttt{cache.set(i,~val)}).
+
+\iffalse
 \begin{table}
 	\begin{center}
 		\begin{tabularx}{\textwidth}{LCC}
@@ -569,104 +750,7 @@ element of \texttt{cache} value to \texttt{val}).
 	implementations.}
 	\label{tab:basic_vs_liang}
 \end{table}
-
-\subsubsection{Multi-process modeling}
-\ac{hls} is intended for synthesizing sequential \acl{sw} code, therefore it has
-been necessary to develop a novel technique for modeling multi-process designs.
-
-A process is modeled as an infinite loop and their parallelism is modeled
-differenlty depending on the compilation target:
-\begin{itemize}
-	\item \emph{\ac{sw} simulation}: each process is mapped to an
-		\texttt{std::thread}.
-	\item \emph{\ac{hw} synthesis}: each process is a dataflow function, in
-		a dataflow region with the \texttt{disable\_start\_propagation}
-		option disabled (which allow each function to run in parallel,
-		without waiting for the completion of previous ones).
-\end{itemize}
-The distinction between simulation and synthesis code can be performed through
-the ``\texttt{\#ifdef \_\_SYNTHESIS\_\_}'' preprocessor directive.
-
-Different processes can communicate by means of \acp{fifo} (\texttt{hls::stream}
-provided by Vitis\texttrademark HLS), which allow unidirectional point-to-point
-communication between two processes. It is possible to insert multiple
-\acp{fifo} between each process, in both directions, therefore allowing to
-setup duplex communication.
-
-Since \texttt{hls::stream} provides blocking operations, these \acp{fifo} can
-be also used for synchronization purposes.
-
-\subsubsection{\ac{raw} dependencies}
-The cache process \ac{ii} is limited by the \ac{raw} dependencies on the cache
-lines, therefore the \ac{raw} cache has been developed: it is a single-line
-cache which provides the functions:
-\begin{itemize}
-	\item \texttt{get\_line}: in case of hit, read the \ac{raw} cache line;
-		in case of miss, read the cache line.
-	\item \texttt{set\_line}: write both the \ac{raw} cache line and the
-		cache line.
-\end{itemize}
-
-The cache process always accesses cache memory through the \ac{raw} cache and it
-calls the \texttt{set\_line} function once per iteration at most: if a cache
-line has been written it is impossible that it is read in the next iteration,
-since the \ac{raw} cache would hit and return its line. This allows to falsify
-the \ac{raw} dependency with distance of 1 on the cache memory, making it
-possible to schedule the cache process with an \ac{ii} of 1.
-
-\section{Multi-processes}
-The \emph{Multi-processes Basic architecture} splits cache into two processes
-(Figure~\ref{fig:basic_arch_inner}):
-\begin{itemize}
-	\item core process: manage communication with application and keep
-		cache data structures up to date.
-	\item memory interface process: deal with the \ac{axi} interface.
-\end{itemize}
-
-This architecture is aimed at solving the performance limitations of the
-\emph{Single-process Basic architecture} in case of writable caches: it manages
-to pipeline the \emph{core} process with an \ac{ii} of 1, even in case of write
-accesses, since the \ac{axi} interfacing resides in the separate \emph{memory
-interface} process.
-
-The latency of the response to an hitting request depends on the \emph{core}
-process only, therefore with this solution desired performance is achieved in
-case of writable caches too.
-
-\begin{figure}
-	\centering
-	\includegraphics[width=.3\textwidth]{basic_arch_inner}
-	\caption{Multi-processes cache architecture.}
-	\label{fig:basic_arch_inner}
-\end{figure}
-
-\subsection{Implementation}
-The \emph{Multi-processes Basic architecture} has been implemented as an
-extension of the \emph{Single-process} one: the \emph{core} process coincides
-with the \emph{Single-process Basic architecture} cache process, with the only
-difference that it does not directly accesses the \ac{axi} bus, but it issues
-requests to the \emph{memory interface} process through \acp{fifo}; the
-\emph{memory interface} process has been instead implemented from scratch.
-
-\subsubsection{Conditional code compilation}
-The \emph{Multi-processes Basic architecture} has worse performance and
-resource usage with respect to \emph{Single-process Basic architecture}, when
-dealing with read-only caches: in this case the latter architecture is
-automatically instantiated.
-
-Alternatively executing the \emph{Multi-processes} or the \emph{Single-process}
-code with traditional \texttt{if} statements would generate errors during the
-synthesis, particularly in the \emph{Dataflow check} step (which checks that
-each \texttt{hls::stream} having a writer/reader also has a reader/writer):
-the compiler builds both branches of the \texttt{if} statements, independently
-from the fact that one of them is never executed.
-
-The problem can be solved through the \ac{sfinae} pattern, which allows to make
-the compiler ignore parts of code when the template substitution is invalid,
-instead of throwing an error.
-This technique can be easily implemented by using the \texttt{std::enable\_if}
-structure which conditionally returns an invalid type, triggering the
-\ac{sfinae} pattern.
+\fi
 
 \chapter{Optimized architectures}
 \section{\ac{l1} cache}
@@ -731,6 +815,8 @@ coherency problem, since they follow the write-through consistency policy.
 \section{Lucas-Kanade}
 
 \chapter{Conclusion}
+
+\backmatter
 
 \printbibliography
 
