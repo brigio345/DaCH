@@ -29,8 +29,8 @@
      fit-margin-right="5"
      fit-margin-bottom="5"
      inkscape:zoom="1.3887671"
-     inkscape:cx="205.57803"
-     inkscape:cy="108.72954"
+     inkscape:cx="205.218"
+     inkscape:cy="108.72953"
      inkscape:window-width="1366"
      inkscape:window-height="744"
      inkscape:window-x="0"
@@ -127,7 +127,8 @@
        width="90"
        height="12"
        x="37.375313"
-       y="85.062592" />
+       y="85.062592"
+       ry="2.0699098" />
     <text
        xml:space="preserve"
        style="font-size:4.23333px;line-height:0.85;font-family:monospace;-inkscape-font-specification:monospace;fill:#ff00ff;stroke-width:0.264583"
