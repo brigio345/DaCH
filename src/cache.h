@@ -4,7 +4,7 @@
 /**
  * \file	cache.h
  *
- * \brief 	Cache module compatible with Vitis HLS 2020.2.
+ * \brief 	Cache module compatible with Vitis HLS 2021.1.
  *
  *		Cache module whose characteristics are:
  *			- address mapping: set-associative;
@@ -12,8 +12,9 @@
  *						last-in first-out;
  *			- write policy: write-back.
  *
- *		Synthesizability is guaranteed with Vitis HLS 2020.2, with II=1
- *		for CORE_LOOP.
+ *		Advanced features:
+ *			- Multi-levels: L1 cache (direct-mapped, write-through).
+ *			- Multi-ports
  */
 
 #include "address.h"
@@ -142,8 +143,7 @@ class cache {
 		/**
 		 * \brief	Initialize the cache.
 		 *
-		 * \note	Must be called before calling \ref run,
-		 * 		if \ref L1_CACHE is \c true.
+		 * \note	Must be called before calling \ref run.
 		 */
 		void init() {
 			m_core_port = 0;
@@ -154,18 +154,19 @@ class cache {
 		}
 
 		/**
-		 * \brief	Start cache internal processes.
+		 * \brief		Start cache internal processes.
 		 *
-		 * \param main_mem	The pointer to the main memory.
+		 * \param[in] main_mem	The pointer to the main memory.
 		 *
-		 * \note	In case of synthesis this must be called in a
-		 * 		dataflow region with disable_start_propagation
-		 * 		option, together with the function in which cache
-		 * 		is accesses.
+		 * \note		In case of synthesis this must be
+		 * 			called in a dataflow region with
+		 * 			disable_start_propagation option,
+		 * 			together with the function in which
+		 * 			cache is accessed.
 		 *
-		 * \note	In case of C simulation this must be executed by
-		 * 		a thread separated from the thread in which
-		 * 		cache is accessed.
+		 * \note		In case of C simulation this must be
+		 * 			executed by a thread separated from the
+		 * 			thread in which cache is accessed.
 		 */
 		void run(T * const main_mem) {
 #pragma HLS inline
@@ -201,9 +202,9 @@ class cache {
 		/**
 		 * \brief		Request to read a whole cache line.
 		 *
-		 * \param addr_main	The address in main memory belonging to
+		 * \param[in] addr_main	The address in main memory belonging to
 		 * 			the cache line to be read.
-		 * \param line		The buffer to store the read line.
+		 * \param[out] line	The buffer to store the read line.
 		 */
 		void get_line(const ap_uint<ADDR_SIZE> addr_main, line_type &line) {
 #pragma HLS inline
@@ -245,7 +246,7 @@ class cache {
 		/**
 		 * \brief		Request to read a data element.
 		 *
-		 * \param addr_main	The address in main memory referring to
+		 * \param[in] addr_main	The address in main memory referring to
 		 * 			the data element to be read.
 		 *
 		 * \return		The read data element.
@@ -266,9 +267,9 @@ class cache {
 		/**
 		 * \brief		Request to write a data element.
 		 *
-		 * \param addr_main	The address in main memory referring to
+		 * \param[in] addr_main	The address in main memory referring to
 		 * 			the data element to be written.
-		 * \param data		The data to be written.
+		 * \param[in] data	The data to be written.
 		 */
 		void set(const ap_uint<ADDR_SIZE> addr_main, const T data) {
 #pragma HLS inline
@@ -320,7 +321,8 @@ class cache {
 		 * \brief		Infinite loop managing the cache access
 		 * 			requests (sent from the outside).
 		 *
-		 * \param main_mem	The pointer to the main memory.
+		 * \param[in] main_mem	The pointer to the main memory (ignored
+		 * 			if \ref MEM_IF_PROCESS is \c true).
 		 *
 		 * \note		The infinite loop must be stopped by
 		 * 			calling \ref stop (from the outside)
@@ -500,7 +502,7 @@ core_end:
 		 * \brief		Infinite loop managing main memory
 		 * 			access requests (sent from \ref run_core).
 		 *
-		 * \param main_mem	The pointer to the main memory.
+		 * \param[in] main_mem	The pointer to the main memory.
 		 *
 		 * \note		\p main_mem must be associated with
 		 * 			a dedicated AXI port.
@@ -548,9 +550,9 @@ MEM_IF_LOOP:		while (1) {
 		 * \brief		Execute memory access(es) specified in
 		 * 			\p req.
 		 *
-		 * \param main_mem	The pointer to the main memory.
-		 * \param req		The request to be executed.
-		 * \param line		The buffer to store the read line.
+		 * \param[in] main_mem	The pointer to the main memory.
+		 * \param[in] req	The request to be executed.
+		 * \param[out] line	The buffer to store the read line.
 		 *
 		 * \note		\p main_mem must be associated with
 		 * 			a dedicated AXI port.
@@ -573,12 +575,12 @@ MEM_IF_LOOP:		while (1) {
 		}
 
 		/**
-		 * \brief	Check if \p addr causes an HIT or a MISS.
+		 * \brief		Check if \p addr causes an HIT or a MISS.
 		 *
-		 * \param addr	The address to be checked.
+		 * \param[in] addr	The address to be checked.
 		 *
-		 * \return	hitting way on HIT.
-		 * \return	-1 on MISS.
+		 * \return		hitting way on HIT.
+		 * \return		-1 on MISS.
 		 */
 		inline int hit(const address_type &addr) const {
 #pragma HLS inline
@@ -596,10 +598,11 @@ MEM_IF_LOOP:		while (1) {
 		}
 
 		/**
-		 * \brief	Request to write back a cache line to main memory.
+		 * \brief		Request to write back a cache line to
+		 * 			main memory.
 		 *
-		 * \param addr	The address belonging to the cache line to be
-		 * 		written back.
+		 * \param[in] addr	The address belonging to the cache line
+		 * 			to be written back.
 		 */
 		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
 			typename std::enable_if<MEM_IF_PROC, void>::type
