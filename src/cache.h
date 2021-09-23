@@ -23,10 +23,10 @@
 #include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
+#include "stream_cond.h"
 #include "ap_utils.h"
 #include "ap_int.h"
 #include "utils.h"
-#include <type_traits>
 #ifdef __SYNTHESIS__
 #include "hls_vector.h"
 #else
@@ -113,8 +113,8 @@ class cache {
 		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];	// 6
 		hls::stream<T, 4> m_core_req_data[PORTS];			// 7
 		hls::stream<line_type, 4> m_core_resp[PORTS];			// 8
-		hls::stream<mem_req_type, 2> m_mem_req;				// 9
-		hls::stream<line_type, 2> m_mem_resp;				// 10
+		stream_cond<mem_req_type, 2, (!MEM_IF_PROCESS)> m_mem_req;	// 9
+		stream_cond<line_type, 2, (!MEM_IF_PROCESS)> m_mem_resp;	// 10
 		l1_cache_type m_l1_cache_get[PORTS];				// 11
 		raw_cache_type m_raw_cache_core;				// 12
 		raw_cache_type m_raw_cache_mem_if;				// 13
@@ -407,7 +407,27 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						const mem_req_type req = {op, addr.m_addr_main,
 									write_back_addr.m_addr_main, line};
 
-						manage_mem_if_req(main_mem, req, line);
+						if (MEM_IF_PROCESS) {
+							// send read request to
+							// memory interface and
+							// write request if
+							// write-back is necessary
+							m_mem_req.write(req);
+
+							// force FIFO write and
+							// FIFO read to separate
+							// pipeline stages to
+							// avoid deadlock due to
+							// the blocking read
+							ap_wait();
+
+							// read response from
+							// memory interface
+							m_mem_resp.read(line);
+						} else {
+							execute_mem_if_req(main_mem,
+									req, line);
+						}
 
 						m_tag[addr.m_addr_line] = addr.m_tag;
 						m_valid[addr.m_addr_line] = true;
@@ -455,48 +475,12 @@ core_end:
 			// memory interface
 			ap_wait();
 
-			stop_mem_if();
-		}
-
-		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
-			typename std::enable_if<MEM_IF_PROC, void>::type
-			stop_mem_if() {
-#pragma HLS inline
+			if (MEM_IF_PROCESS) {
 				// stop memory interface
 				line_type dummy;
 				m_mem_req.write({STOP_OP, 0, 0, dummy});
 			}
-
-		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
-			inline typename std::enable_if<(!MEM_IF_PROC), void>::type
-			stop_mem_if() {
-#pragma HLS inline
-			}
-
-		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
-			typename std::enable_if<MEM_IF_PROC, void>::type
-			manage_mem_if_req(T * const main_mem,
-					const mem_req_type &req, line_type &line) {
-#pragma HLS inline
-				// send read request to memory interface and
-				// write request if write-back is necessary
-				m_mem_req.write(req);
-
-				// force FIFO write and FIFO read to separate pipeline
-				// stages to avoid deadlock due to the blocking read
-				ap_wait();
-
-				// read response from memory interface
-				m_mem_resp.read(line);
-			}
-
-		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
-			typename std::enable_if<(!MEM_IF_PROC), void>::type
-			manage_mem_if_req(T * const main_mem,
-					const mem_req_type &req, line_type &line) {
-#pragma HLS inline
-				execute_mem_if_req(main_mem, req, line);
-			}
+		}
 
 		/**
 		 * \brief		Infinite loop managing main memory
@@ -598,35 +582,6 @@ MEM_IF_LOOP:		while (1) {
 		}
 
 		/**
-		 * \brief		Request to write back a cache line to
-		 * 			main memory.
-		 *
-		 * \param[in] addr	The address belonging to the cache line
-		 * 			to be written back.
-		 */
-		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
-			typename std::enable_if<MEM_IF_PROC, void>::type
-			write_back(const address_type &addr) {
-#pragma HLS inline
-				line_type line;
-
-				// read line
-				m_raw_cache_core.get_line(m_cache_mem,
-						addr.m_addr_cache, line);
-
-				// send write request to memory interface
-				m_mem_req.write({WRITE_OP, 0, addr.m_addr_main, line});
-
-				m_dirty[addr.m_addr_line] = false;
-			}
-
-		template <bool MEM_IF_PROC = MEM_IF_PROCESS>
-			inline typename std::enable_if<(!MEM_IF_PROC), void>::type
-			write_back(const address_type &addr) {
-#pragma HLS inline
-			}
-
-		/**
 		 * \brief	Write back all valid dirty cache lines to main memory.
 		 */
 		void flush() {
@@ -640,7 +595,21 @@ MEM_IF_LOOP:		while (1) {
 					if (m_valid[addr.m_addr_line] &&
 							m_dirty[addr.m_addr_line]) {
 						// write line back
-						write_back(addr);
+						line_type line;
+
+						// read line
+						m_raw_cache_core.get_line(
+								m_cache_mem,
+								addr.m_addr_cache,
+								line);
+
+						// send write request to memory
+						// interface
+						m_mem_req.write({WRITE_OP, 0,
+								addr.m_addr_main,
+								line});
+
+						m_dirty[addr.m_addr_line] = false;
 					}
 				}
 			}
