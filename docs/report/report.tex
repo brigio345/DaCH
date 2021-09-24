@@ -203,22 +203,22 @@ provide higher performance and lower power consumption, while requiring higher
 design efforts and higher deployment costs.
 
 The problem of the high design efforts can be mitigated by the \acf{hls}, since
-it helps improving designer productivity thanks to convenient \acl{sw}-like
+it helps improve designer productivity thanks to convenient \acl{sw}-like
 tools.
 
 The problem of high deployment costs can be tackled with \acp{fpga}, which allow
-to implement special-purpose \acl{hw} modules on general-purpose underlying
+implementing special-purpose \acl{hw} modules on general-purpose underlying
 physical architectures.
 
 \bigskip
 One of the open issues of \ac{hls} is the memory bandwidth bottleneck which
 limits performance, especially critical in case of memory-bound algorithms.
 
-\acp{fpga} memory system is composed of three main kind of resources: registers,
+\acp{fpga} memory system is composed of three main kinds of resources: registers,
 \acp{bram} and external \acp{dram}.
 Current \ac{hls} tools allow to exploit this memory hierarchy manually, in a
 scratchpad-like fashion: the objective of this thesis work is to automate the
-memory management by providing a easily integrable and fully customizable cache
+memory management by providing an easily integrable and fully customizable cache
 system for \ac{hls}.
 
 \bigskip
@@ -229,13 +229,13 @@ The first development phase produced a single-port cache module, in the form of
 a C++ class configurable through templates in terms of number of sets, ways,
 words per line and replacement policy.
 The cache lines have been mapped to \acp{bram}.
-To obtain the desired performance an unconventional (for \ac{hls}) multi-process
+To obtain the desired performance, an unconventional (for \ac{hls}) multiprocess
 architecture has been developed: the cache module is a separate process with
 respect to the algorithm using it: the algorithm logic sends a memory access
 request to the cache and reads its response, communicating through \acsp{fifo}.
 
 \bigskip
-In the second development phase the focus was put on performance optimization,
+In the second development phase, the focus was put on performance optimization,
 in two dimensions: increasing the memory hierarchy depth by introducing a
 \ac{l1} cache and increasing parallelism by enabling multiple ports.
 
@@ -250,7 +250,7 @@ The multi-port solution provides a single \ac{l2} cache accessible from multiple
 \acp{fifo} ports, each of which can be associated with a dedicated \ac{l1}
 cache.
 It is possible to specify the number of ports through a template parameter and
-it typically corresponds to the unroll factor of the loop in which the cache
+it typically corresponds to the unrolling factor of the loop in which the cache
 is accessed.
 
 \bigskip
@@ -283,17 +283,21 @@ multiple configurations).
 \pagestyle{centerruled}
 
 \mainmatter
-\chapter{Introduction}
-\section{Background}
-\subsection{Cache}
-Memory devices are usually the performance bottleneck in the execution of
-memory-bound algorithms.
+\chapter{Background}
+The literature about cache systems, the \acl{hls} state of the art and an
+analysis of the resources available on board modern \acp{fpga} are the
+fundamental background for this thesis work.
+
+\section{Cache}
+Memory devices are crucial components of computing systems as they can pose an
+higher bound in terms of performance, especially when executing memory-intensive
+algorithms.
 The ideal memory should be fast, large and cheap, but current technology forces
 the designer to choose a trade-off between the metrics.
 
-A common solution to this problem is to setup a memory hierarchy in
+A common solution to this problem is to set up a memory hierarchy in
 which fast but small memories are paired with large but slow memories, which
-allows to get good performance on average while containing costs.
+allows getting good performance on average while containing costs.
 
 This hierarchy can be managed by two main approaches:
 \begin{itemize}
@@ -302,14 +306,14 @@ This hierarchy can be managed by two main approaches:
 		what memory to access: this approach allows to optimally
 		exploit the hierarchy at the cost of high design effort.
 	\item \emph{Cache}: different memories belongs to the same addressing
-		space: the system automatically uses the whole hierarchy
+		space: the system automatically uses the whole hierarchy,
 		exploiting spatial locality (accessed data is likely physically
 		close to previously accessed data) and temporal locality
 		(accessed data has likely recently been accessed), which are
 		typical of many algorithms.
 \end{itemize}
 
-\subsubsection{Structure}
+\subsection{Structure}
 A cache memory is logically split into \emph{sets} containing \emph{lines} (or
 \emph{ways}) which are in turn made up of \emph{words}, as shown in
 Figure~\ref{fig:cache_logic_structure}.
@@ -321,7 +325,7 @@ Figure~\ref{fig:cache_logic_structure}.
 	\label{fig:cache_logic_structure}
 \end{figure}
 
-Whenever a word $w$ is requested there are two possibilities:
+Whenever a word $w$ is requested, there are two possibilities:
 \begin{itemize}
 	\item \emph{Hit}: $w$ is present in the cache: the request can be
 		immediately fulfilled.
@@ -329,15 +333,15 @@ Whenever a word $w$ is requested there are two possibilities:
 		retrieve it from lower level memory before fulfilling the
 		request.
 \end{itemize}
-During the data retrieving a cache line is filled with a block of contiguous
+During the data retrieving, a cache line is filled with a block of contiguous
 words loaded from the lower level memory, trying to exploit spatial locality of
 future accesses, while mapping policies and replacement policies determine which
 cache line to overwrite, trying to exploit temporal locality.
 
 If the cache memory is writable, data consistency is ensured by a consistency
 policy.
-\subsubsection{Policies}
-\paragraph{Mapping policy}
+\subsection{Policies}
+\subsubsection{Mapping policy}
 The mapping policy is in charge of statically associating a lower level memory
 line to a cache set.
 
@@ -348,7 +352,7 @@ Figure~\ref{fig:address_partitioning}):
 \begin{enumerate}
 	\item $\log_2(w)$: offset of the word in the line.
 	\item $\log_2(s)$: set.
-	\item remaining \acsp{msb}: tag identifying the specific line.
+	\item Remaining \acsp{msb}: tag identifying the specific line.
 \end{enumerate}
 
 \begin{figure}[!htb]
@@ -368,7 +372,7 @@ Special cases of this policy are:
 		policy.
 \end{itemize}
 
-\paragraph{Replacement policy}
+\subsubsection{Replacement policy}
 The replacement policy is in charge of dynamically associating a lower level
 memory line to a cache line of a set.
 
@@ -382,7 +386,7 @@ Among the most commonly used solutions there are:
 		that has least recently been accessed.
 \end{itemize}
 
-\paragraph{Consistency policy}
+\subsubsection{Consistency policy}
 The consistency policy is in charge of ensuring data consistency between
 memories belonging to different hierarchy levels.
 
@@ -395,7 +399,7 @@ The most common solutions to this problem are:
 		whole hierarchy.
 \end{itemize}
 
-\subsubsection{Benefits}
+\subsection{Benefits}
 A two-level memory hierarchy is composed of a \ac{l1} cache memory (access time:
 $t_{L1}$; access energy: $E_{L1}$) and a \ac{l2} memory (access time: $t_{L2}$;
 access energy: $E_{L2}$), with $t_{L1} << t_{L2}$ and $E_{L1} << E_{L2}$.
@@ -421,59 +425,59 @@ Equation~\ref{eq:avg_acc} shows the criticality of the \emph{hit ratio}: the
 performance and power consumption advantages provided by the cache are
 significant if and only if $H$ is sufficiently near to 1.
 
-\subsection{\acl{fpga}}
+\section{\acl{fpga}}
 \aclp{fpga} are integrated circuits able to implement special purpose circuits
 described in \ac{hdl}, thanks to their programmable logic blocks and
 interconnections.
-\subsubsection{Memory system}
-An \ac{fpga} memory system is typically made up of:
+\subsection{Memory system}
+A \ac{fpga} memory system is typically made up of:
 \begin{itemize}
-	\item registers: the fastest but most expensive memories, therefore
+	\item Registers: the fastest but most expensive memories, therefore
 		they are only a few.
 	\item \acp{bram}: on chip \acp{ram} accessible through simple and fast
 		interface.
-	\item external \acp{dram}: off chip \acp{dram} accessible through
+	\item External \acp{dram}: off chip \acp{dram} accessible through
 		complex and slow interface (e.g.\ \acs{axi}).
 \end{itemize}
 
-\subsection{\acl{hls}}
+\section{\acl{hls}}
 \acf{hls} is an Electronic Design Automation technique aimed at translating an
-algorithm description in an high-level \acl{sw} programming language (such as C
-and C++) into an \ac{hdl} description.
+algorithm description in a high-level \acl{sw} programming language (such as C
+and C++) into a \ac{hdl} description.
 
-\ac{hls} allows to design more complex systems in less time, compared to
+\ac{hls} allows designing more complex systems in less time, compared to
 \ac{hdl} design, moreover makes the \acl{hw} and \acl{sw} co-design easier, at
 the cost of limited low-level control.
 
-This Subsection is mainly referred to
+This Section is mainly referred to
 \emph{Vitis\texttrademark~HLS}~\cite{vitisug}, but most currently available
 \ac{hls} commercial tools provide equivalent features.
 
-\subsubsection{Workflow}
+\subsection{Workflow}
 The typical \ac{hls} workflow consists of:
 \begin{enumerate}
-	\item \emph{\ac{sw} implementation}: the top level entity is a C
+	\item \emph{\ac{sw} implementation}: the top-level entity is a C
 		function: the function arguments are the entity ports and the
 		functionality is implemented in \ac{sw}; in order to guarantee
 		synthesizability some constraints should be respected (e.g.\ no
 		dynamic memory allocation).
 	\item \emph{\ac{sw} verification}: the testbench can be developed as a
-		simple main function which calls the top level entity function,
+		simple main function which calls the top-level entity function,
 		therefore the functionality is verified like any \ac{sw}: it is
 		possible to exploit traditional tools (e.g.\ debuggers, print
 		statements\ldots).
 	\item \emph{\ac{hw} synthesis}: the synthesizer generates a \ac{rtl}
-		description of the top level entity. It is possible to generate
+		description of the top-level entity. It is possible to generate
 		different architectures by setting up some parameters through
 		dedicated directives.
 	\item \emph{\ac{hw} verification}: the \ac{rtl} description is
 		simulated, to make sure that \ac{sw} and \ac{hw} outputs match.
 \end{enumerate}
 
-\subsubsection{Optimization techniques}
+\subsection{Optimization techniques}
 \ac{hls} tools provide different optimization techniques which can be set up by
 means of compiler directives.
-\paragraph{Pipelining}
+\subsubsection{Pipelining}
 Given a set of sequential stages (e.g.\ A, B and C of Figure~\ref{fig:pipeline})
 which compose an operation (e.g.\ A + B + C of Figure~\ref{fig:pipeline}) which
 has to be executed multiple times, the pipelining technique inserts pipeline
@@ -486,11 +490,11 @@ additional area cost (only pipeline registers and a \acs{fsm} are required).
 The throughput is determined by the interval (expressed in number of clock
 cycles) between the beginning of two consecutive executions of the operation,
 which is called \ac{ii}.
-The optimal pipeline has an \ac{ii} equal to one: at the steady state one output
+The optimal pipeline has an \ac{ii} equal to one: at the steady state, one output
 per clock cycle is produced.
 
 \bigskip
-The pipelining can be performed at instruction level, whithin a loop or a
+The pipelining can be performed at instruction level, within a loop or a
 function, or at function level (in \ac{hls} terminology this particular kind of
 pipelining is called \emph{Dataflow}).
 
@@ -501,14 +505,14 @@ pipelining is called \emph{Dataflow}).
 	\label{fig:pipeline}
 \end{figure}
 
-\paragraph{Loop unrolling}
+\subsubsection{Loop unrolling}
 The logic of a rolled loop allows the execution of one iteration at a time: if
 the loop iterates $N$ times and each iteration has a latency $L_{it}$, the
 total loop latency is equal to ${L_{loop, rolled} := N \cdot L_{it}}$.
 
 The loop unrolling technique instantiates the logic for executing $f$ iterations
-at a time (where $f$ is the unroll factor).
-If there are no dependencies between different iterations the latency of the
+at a time (where $f$ is the unrolling factor).
+If there are no dependencies between different iterations, the latency of the
 unrolled loop is: ${L_{loop, unrolled}(f) := \frac{N}{f} \cdot L_{it}}$.
 
 \bigskip
@@ -521,7 +525,7 @@ terms of resource usage, since they are multiplied by $f$.
 	\caption{Loop unrolling example.}
 \end{figure}
 
-\paragraph{Memory optimizations}
+\subsubsection{Memory optimizations}
 \begin{itemize}
 	\item \underline{On-chip memory:}
 		\begin{itemize}
@@ -560,36 +564,35 @@ terms of resource usage, since they are multiplied by $f$.
 				\end{figure}
 		\end{itemize}
 \end{itemize}
-\clearpage
 
-\section{Methodology}
+\chapter{Development}
 \ac{hls} tools are currently unable to automatically exploit the memory
 hierarchy present on \acp{fpga}: the only way to take advantage of
 them is the manual management in a \emph{scratchpad}-like manner, which
 requires additional design and verification efforts.
 
-The proposed solution aims at \textbf{automating the low-level memory
-management} through a cache module for \ac{hls}, which works as an interface
-with the off-chip \ac{dram} (accessible through an \ac{axi} bus) and stores its
-data to on-chip \acp{bram} and registers.
+The proposed solution \textbf{automates the low-level memory management}
+through a cache module for \ac{hls}, which works as an interface with the
+off-chip \ac{dram} (accessible through an \ac{axi} bus) and stores its data to
+on-chip \acp{bram} and registers.
 
-\bigskip
-This module has the \textbf{dual purpose} of:
+\section{Overview}
+The proposed cache module has the \textbf{dual purpose} of:
 \begin{itemize}
 	\item \emph{Reducing the number of \ac{dram} accesses}: misses only
 		needs to access \ac{dram}.
 	\item \emph{Optimizing \ac{dram} accesses}: lines are accessed in
-		bursts through widened memory interface.
+		bursts through a widened memory interface.
 \end{itemize}
 
 \acp{fpga} provide multiple \ac{dram} ports and \ac{hls} can assign each array
-to a different port: this allows to implement \textbf{array-specific} caches,
+to a different port: this allows implementing \textbf{array-specific} caches,
 which in general can be easily tuned to reach high hit ratios, since access
 patterns to a single array are usually regular and there is no interference
 between accesses to different arrays.
 
 \bigskip
-A special attention has been put on \textbf{user friendliness}:
+A special attention has been put on \textbf{user-friendliness}:
 \begin{itemize}
 	\item \emph{Configurability}: cache characteristics can be set through
 		parameters.
@@ -600,7 +603,7 @@ A special attention has been put on \textbf{user friendliness}:
 		parameters tuning.
 \end{itemize}
 
-\subsection{Ma's cache}\label{sec:liang}
+\subsection{Ma's cache}
 Liang Ma et al.\ proposed a \texttt{C++} cache implementation~\cite{liang}
 compatible with the \emph{SDAccel\texttrademark} \ac{hls} tool.
 
@@ -620,38 +623,34 @@ inserted in the algorithm may make it too complex and worsen the generated
 circuit performance.
 
 \subsection{Proposed solution}
-\paragraph{Basic cache}
-The \emph{Basic cache} is aimed at solving the main limitation of Ma's cache:
-the application logic cluttering due to the inlining.
-For this reason it is composed of a process which is separate from the
-application logic.
+The primary goal is to develop the \emph{Basic cache}, a cache architecture
+which runs in a separate process with respect to the application using it,
+trying to solve the main limitation of \emph{Ma's cache}: the application logic
+cluttering due to the inlining.
 
-\paragraph{Multi-levels cache}
-The \emph{Multi-levels cache} is aimed at improving the cache performance: a
-\ac{l1} cache has been inserted above the \emph{Basic cache} (\ac{l2} cache).
-The \ac{l1} cache is inlined in the application logic, therefore it is kept as
-simple as possible (direct-mapped, write-through), to reduce the cluttering to
-a minimum extent.
+This architecture has been then optimized in two dimensions:
+\begin{itemize}
+	\item \emph{Multi-levels cache}: a \ac{l1} cache are added to the cache
+		hierarchy, with the objective of further reducing memory access
+		latency.
+	\item \emph{Multi-ports cache}: multiple cache access points are added
+		to the cache, each one with a dedicated \ac{l1} cache, so that
+		multiple requests can be served in parallel.
+\end{itemize}
 
-\paragraph{Multi-ports cache}
-The \emph{Multi-ports cache} is aimed at improving the application performance,
-allowing it to be unrolled without getting dependencies on the cache: multiple
-access points have been added to the \ac{l2} cache, each of which is associated
-with a \ac{l1} cache: all requests hitting the \ac{l1} caches are served in
-parallel, while requests hitting \ac{l2} cache are served one after the other.
+\clearpage
 
-\chapter{Contribution}
 \section{Basic cache}
-\subsection{Architecture}
-The \emph{Basic cache} proposed in this thesis work is aimed at solving the
-main limitation of Ma's one: application logic cluttering due to inlining.
+The \emph{Basic cache} is aimed at solving the main limitation of \emph{Ma's
+cache}: application logic cluttering due to inlining.
 
-The fundamental idea is that the cache logic is inserted in a separate process
-with respect to the application logic accessing it
-(Figure~\ref{fig:single_proc_basic_arch}): this isolation should make the cache
-always perform in the same manner, while keeping the application logic as clean
-as possible, since it would only have to write requests to cache and read its
-responses, instead of integrating its whole logic.
+\subsection{Architecture}
+The fundamental idea behind the \emph{Basic cache} is that the cache logic is
+inserted in a separate process with respect to the application logic accessing
+it (Figure~\ref{fig:single_proc_basic_arch}): this isolation should make the
+cache always perform in the same manner, while keeping the application logic as
+clean as possible, since it would only have to write requests to cache and read
+its responses, instead of integrating its whole logic.
 
 \begin{figure}[!htb]
 	\centering
@@ -663,7 +662,7 @@ responses, instead of integrating its whole logic.
 \subsubsection{Functionality}
 If application $A$ needs to access the array associated with the cache $C$:
 \begin{enumerate}
-	\item $A$ sends to $C$ the access request: operation (i.e.\ read or
+	\item $A$ sends the access request to $C$: operation (i.e.\ read or
 		write), address and (in case of write access) data.
 	\item $C$ receives the request and checks if the requested address
 		causes a miss.
@@ -685,7 +684,7 @@ the write-back consistency policy.
 It is configurable in terms of:
 \begin{itemize}
 	\item Word type and number of words per line.
-	\item Number of sets and ways (therefore it is possible to obtain a
+	\item Number of sets and ways (therefore, it is possible to obtain a
 		fully associative policy by setting the number of sets to 1 or
 		a direct mapped policy by setting the number of ways to 1).
 	\item Replacement policy (\acl{lru} or \acl{fifo}).
@@ -695,9 +694,9 @@ It is configurable in terms of:
 The \emph{Single-process Basic cache} is composed of a single pipelined process
 which performs all the cache functionalities.
 
-This process can be pipelined with an \ac{ii} of 1 when memory accesses are
-Read-Only and a cache line can fit a single \ac{axi} transaction (i.e.\ line is
-not bigger than the maximum \ac{axi} interface width: 512 or 1024 bits
+This process can be pipelined with an \ac{ii} equal to 1 when memory accesses
+are Read-Only and a cache line can fit a single \ac{axi} transaction (i.e.\
+line is not bigger than the maximum \ac{axi} interface width: 512 or 1024 bits
 typically, depending on the specific device).
 
 Write accesses generate some dependencies on the \ac{axi} interface, while large
@@ -708,20 +707,20 @@ increase of the process \ac{ii}, ruining cache performance.
 The \emph{Multi-processes Basic cache} splits cache into two processes
 (Figure~\ref{fig:multi_proc_basic_arch}):
 \begin{itemize}
-	\item \emph{core} process: manages communication with application and
+	\item \emph{Core} process: manages communication with application and
 		keeps cache data structures up to date.
-	\item \emph{memory interface} process: deals with the \ac{axi}
+	\item \emph{Memory interface} process: deals with the \ac{axi}
 		interface.
 \end{itemize}
 
 This architecture is aimed at solving the performance limitations of the
 \emph{Single-process Basic cache}: it manages to pipeline the \emph{core}
-process with an \ac{ii} of 1, even in case of write accesses or long lines,
-since the \ac{axi} interfacing resides in the separate \emph{memory interface}
-process.
+process with an \ac{ii} equal to 1, even in case of write accesses or long
+lines, since the \ac{axi} interfacing resides in the separate \emph{memory
+interface} process.
 
-The latency of the response to an hitting request depends on the \emph{core}
-process only, therefore with this solution best performance is achieved in case
+The latency of the response to a hitting request depends on the \emph{core}
+process only, therefore with this solution the best performance is achieved in case
 of writable caches too.
 
 \begin{figure}[!htb]
@@ -752,29 +751,26 @@ and the \emph{Multi-processes} implementations:
 		implements all the cache functionalities.
 	\item \emph{Multi-processes Basic cache}:
 		\begin{itemize}
-			\item \emph{core} process: same as \emph{Single-process
+			\item \emph{Core} process: same as \emph{Single-process
 				Basic cache} process, but it does not
-				directly accesses the \ac{axi} bus: it issues
+				directly access the \ac{axi} bus: it issues
 				requests to the \emph{memory interface} process
 				through \acp{fifo}.
-			\item \emph{memory interface} process: it accesses the
+			\item \emph{Memory interface} process: it accesses the
 				\ac{axi} bus as requested by the \emph{core}
 				process.
 		\end{itemize}
 \end{itemize}
 
-\paragraph{Arrays partitioning}
-Cache memory (which stores the actual data) must be accessed one line per clock
-cycle: it is mapped to a \ac{bram} array cyclically partitioned with a factor
-equal to the number of lines.
-
-Helper data (e.g.\ \texttt{tag}, \texttt{valid}, \texttt{dirty}\ldots) is stored
-to completely partitioned arrays, mapped to registers, in order to avoid
-dependencies as much as possible and get best performance.
+\emph{Single-process Basic cache}, with respect to the \emph{Multi-processes}
+one, requires lower resource usage and better performance, when it is possible
+to schedule its process with an \ac{ii} equal to 1 (read-only accesses with
+line not larger than the maximum \ac{axi} interface bitwidth): therefore it is
+automatically instantiated whenever it is convenient.
 
 \paragraph{Process modeling}
 \ac{hls} is intended for synthesizing sequential \acl{sw} code, therefore it has
-been necessary to develop a novel technique for modeling multi-process designs.
+been necessary to develop a novel technique for modeling multiprocess designs.
 
 A process is modeled as an infinite loop and the parallelism between multiple
 processes is modeled differently depending on the compilation target:
@@ -793,10 +789,32 @@ Different processes can communicate by means of \acp{fifo} (\texttt{hls::stream}
 provided by Vitis\texttrademark HLS), which allow unidirectional point-to-point
 communication between two processes. It is possible to insert multiple
 \acp{fifo} between each process, in both directions, therefore allowing to
-setup duplex communication.
+set up duplex communication.
 
 Since \texttt{hls::stream} provides blocking operations, these \acp{fifo} can
 be also used for synchronization purposes.
+
+\paragraph{Dataflow checking}
+Alternatively executing the \emph{Multi-processes} or the \emph{Single-process}
+code with traditional \texttt{if} statements would generate errors during the
+synthesis, particularly in the \emph{Dataflow check} step (which checks if each
+\texttt{hls::stream} has a single reader and a single writer): the compiler
+builds both branches of the \texttt{if} statements, independently of the fact
+that one of them is never executed.
+
+\bigskip
+The problem has been solved through a wrapper class, which conditionally
+includes a \texttt{hls::stream} object, exploiting the template specialization
+mechanism.
+
+\paragraph{Arrays partitioning}
+Cache memory (which stores the actual data) must be accessed one line per clock
+cycle: it is mapped to a \ac{bram} array cyclically partitioned with a factor
+equal to the number of lines.
+
+Helper data (e.g.\ \texttt{tag}, \texttt{valid}, \texttt{dirty}\ldots) is stored
+to completely partitioned arrays, mapped to registers, in order to avoid
+dependencies as much as possible and get the best performance.
 
 \paragraph{\acl{raw} dependencies}
 The cache process \ac{ii} is limited by the \ac{raw} dependencies on the cache
@@ -811,29 +829,10 @@ single-line cache which provides the functions:
 
 Cache memory is always accessed through the \emph{\ac{raw} cache} and the
 \texttt{set\_line} function is called once per iteration at most: if a cache
-line has been written it is impossible that it is read in the next iteration,
+line has been written, it is impossible that it is read in the next iteration,
 since the \ac{raw} cache would hit and return its line. This allows to falsify
 the \ac{raw} dependency of distance of 1 on the cache memory, making it
-possible to schedule the cache process with an \ac{ii} of 1.
-
-\paragraph{Conditional code compilation}
-\emph{Single-process Basic cache} provides better performance and lower
-resource usage (with respect to the \emph{Multi-processes} one) when it is
-possible to schedule its process with an \ac{ii} of 1 (read-only accesses with
-line not larger than the maximum \ac{axi} interface bitwidth): therefore it is
-automatically instantiated whenever it is convenient.
-
-Alternatively executing the \emph{Multi-processes} or the \emph{Single-process}
-code with traditional \texttt{if} statements would generate errors during the
-synthesis, particularly in the \emph{Dataflow check} step (which checks that
-each \texttt{hls::stream} has a single reader and a single writer): the
-compiler builds both branches of the \texttt{if} statements, independently from
-the fact that one of them is never executed.
-
-\bigskip
-The problem has been solved through a wrapper class, which conditionally
-includes an \texttt{hls::stream} object, exploiting the template specialization
-mechanism.
+possible to schedule the cache process with an \ac{ii} equal to 1.
 
 \subsubsection{Interface}
 \emph{Interface} provides \acsp{api} for managing requests and responses from
@@ -842,7 +841,7 @@ application to cache:
 	\item \texttt{get}: send a read request and read the response.
 	\item \texttt{set}: send a write request.
 \end{itemize}
-To improve user friendliness, similarly to Ma's implementation, the
+To improve user-friendliness, similarly to \emph{Ma's cache}, the
 \texttt{operator[]} has been overloaded so that a cache object can be used as a
 traditional array (e.g.\ \texttt{val~=~cache[i]} calls
 \texttt{val~=~cache.get(i)} and \texttt{cache[i]~=~val} calls
@@ -878,17 +877,16 @@ traditional array (e.g.\ \texttt{val~=~cache[i]} calls
 \clearpage
 
 \section{Multi-levels cache}
-\subsection{Architecture}
 The \emph{Multi-levels cache} purpose is to improve the memory hierarchy
 performance by adding a faster \ac{l1} cache memory on top of it.
 
-The \ac{ipc} (i.e.\ \ac{fifo} accesses) introduces an
-overhead at each memory access, therefore the \ac{l1} cache is inlined in the
-application logic (Figure~\ref{fig:l1_arch}), so that there is no need of any
-\ac{ipc} mechanism.
+\subsection{Architecture}
+The \ac{ipc} (i.e.\ \ac{fifo} accesses) introduces an overhead at each memory
+access, therefore the \ac{l1} cache is inlined in the application logic
+(Figure~\ref{fig:l1_arch}), so that there is no need of any \ac{ipc} mechanism.
 
-In order not to fall into same cluttering issues of Ma's cache, the \ac{l1}
-cache is kept as simple as possible:
+In order not to fall into the same cluttering issues of \emph{Ma's cache}, the
+\ac{l1} cache is kept as simple as possible:
 \begin{itemize}
 	\item Mapping policy: direct-mapped.
 	\item Consistency policy: write-through.
@@ -901,7 +899,7 @@ frequent than write accesses, this has been considered the best trade-off.
 \begin{figure}[!htb]
 	\centering
 	\includegraphics[width=.3\textwidth]{l1_arch}
-	\caption{\emph{Multi-level cache} architecture.}
+	\caption{\emph{Multi-levels cache} architecture.}
 	\label{fig:l1_arch}
 \end{figure}
 
@@ -922,7 +920,7 @@ has been widened accordingly).
 The \ac{l1} cache is contained in the \emph{Interface}: the newly introduced
 \texttt{get\_line} function receives an address $A$ in input and it returns the
 line to which $A$ belongs.
-In particular it first checks if $A$ hits in the \ac{l1} cache: if so it reads
+In particular, it first checks if $A$ hits in the \ac{l1} cache: if so it reads
 the data from the \ac{l1} cache, otherwise it issues the request to the \ac{l2}
 cache.
 
@@ -930,7 +928,7 @@ cache.
 It is still possible to use the same \emph{Basic cache} \acp{api}, which have
 been updated to support the \ac{l1} cache:
 \begin{itemize}
-	\item \texttt{get}: it calls \texttt{get\_line} function and then
+	\item \texttt{get}: it calls the \texttt{get\_line} function and then
 		returns the requested word.
 	\item \texttt{set}: it sets \ac{l1} cache line to dirty, if it hits, and
 		it issues the request to the \ac{l2} cache.
@@ -939,17 +937,36 @@ been updated to support the \ac{l1} cache:
 \clearpage
 
 \section{Multi-ports cache}
-\subsection{Architecture}
-The vast majority of algorithms accesses memory inside loops, which in \ac{hls}
-can be optimized in two main ways: pipelining, which perfectly fits the
-single-port cache architecture, and unrolling, with which the \ac{ii} would
-increase, since each unrolled iteration should access the same \ac{fifo} at the
-same time.
+Most algorithms contain a loop which performs different operations, including
+memory accesses.
+\ac{hls} provides two main ways for optimizing loops: \emph{Pipelining} and
+\emph{Unrolling}.
 
-To solve this problem a multi-port architecture is proposed: each port has
-dedicated \acp{fifo} and the cache process serves each request in order.
-Each port has also a dedicated \ac{l1} cache, which can be used without any
-coherency problem, since they follow the write-through consistency policy.
+The \emph{Basic} and \emph{Multi-levels} caches complete one access per clock
+cycle, at the steady state, in case of hit, therefore thery are suitable for
+the use in pipelined loops, but not in unrolled loops, which require multiple
+concurrent accesses.
+
+The \emph{Multi-ports cache} is aimed at allowing multiple concurrent accesses
+to better support loop unrolling.
+
+\subsection{Architecture}
+The \emph{Multi-ports cache} is characterized multiple access ports
+(Figure~\ref{fig:multi_ports_arch}).
+
+Each port has dedicated logic for accessing the \ac{l2} cache and an independent
+\ac{l1} cache.
+\ac{l1} caches comply with the write-through consistency policy, therefore to
+guarantee coherency between the multiple caches it is enough to inform all the
+\ac{l1} caches about write accesses, so that they invalidate their line in case
+of hit.
+
+\begin{figure}[!htb]
+	\centering
+	\includegraphics[width=.3\textwidth]{multi_ports_arch}
+	\caption{\emph{Multi-ports cache} architecture.}
+	\label{fig:multi_ports_arch}
+\end{figure}
 
 \subsection{Implementation}
 \subsubsection{Internals}
