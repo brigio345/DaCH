@@ -87,7 +87,8 @@ class cache {
 			READ_OP,
 			WRITE_OP,
 			READ_WRITE_OP,
-			STOP_OP
+			STOP_OP,
+			NOP_OP
 		} op_type;
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
@@ -221,6 +222,9 @@ class cache {
 
 			if (l1_hit) {
 				m_l1_cache_get[port].get_line(addr_main, line);
+#ifndef __SYNTHESIS__
+				m_core_req_op[port].write(NOP_OP);
+#endif /* __SYNTHESIS__ */
 			} else {
 				// send read request to cache
 				m_core_req_op[port].write(READ_OP);
@@ -359,6 +363,11 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 					// exit the loop if request is "end-of-request"
 					if (op == STOP_OP)
 						goto core_end;
+
+#ifndef __SYNTHESIS__
+					if (op == NOP_OP)
+						continue;
+#endif /* __SYNTHESIS__ */
 
 					// check the request type
 					const auto read = ((RD_ENABLED && (op == READ_OP)) ||
