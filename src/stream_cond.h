@@ -4,11 +4,11 @@
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 
-template <typename DATA_TYPE, int DEPTH, bool DUMMY>
+template <typename DATA_TYPE, int DEPTH, bool BUILD>
 class stream_cond {};
 
 template <typename DATA_TYPE, int DEPTH>
-class stream_cond<DATA_TYPE, DEPTH, false> {
+class stream_cond<DATA_TYPE, DEPTH, true> {
 	private:
 		hls::stream<DATA_TYPE, DEPTH> m_stream;
 
@@ -30,7 +30,7 @@ class stream_cond<DATA_TYPE, DEPTH, false> {
 };
 
 template <typename DATA_TYPE, int DEPTH>
-class stream_cond<DATA_TYPE, DEPTH, true> {
+class stream_cond<DATA_TYPE, DEPTH, false> {
 	public:
 		void read(DATA_TYPE &data) {
 #pragma HLS inline

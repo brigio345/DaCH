@@ -116,8 +116,8 @@ class cache {
 		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];	// 6
 		hls::stream<T, 4> m_core_req_data[PORTS];			// 7
 		hls::stream<line_type, 4> m_core_resp[PORTS];			// 8
-		stream_cond<mem_req_type, 2, (!MEM_IF_PROCESS)> m_mem_req;	// 9
-		stream_cond<line_type, 2, (!MEM_IF_PROCESS)> m_mem_resp;	// 10
+		stream_cond<mem_req_type, 2, MEM_IF_PROCESS> m_mem_req;		// 9
+		stream_cond<line_type, 2, MEM_IF_PROCESS> m_mem_resp;		// 10
 		l1_cache_type m_l1_cache_get[PORTS];				// 11
 		raw_cache_type m_raw_cache_core;				// 12
 		raw_cache_type m_raw_cache_mem_if;				// 13
