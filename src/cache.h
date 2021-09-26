@@ -14,7 +14,7 @@
  *
  *		Advanced features:
  *			- Multi-levels: L1 cache (direct-mapped, write-through).
- *			- Multi-ports
+ *			- Multi-ports (read-only).
  */
 
 #include "address.h"
@@ -54,6 +54,8 @@ class cache {
 		static_assert((RD_ENABLED || WR_ENABLED),
 				"RD_ENABLED and/or WR_ENABLED must be true");
 		static_assert((PORTS > 0), "PORTS must be greater than 0");
+		static_assert((!(WR_ENABLED && (PORTS > 1))),
+				"PORTS must be equal to 1 when WR_ENABLED is true");
 		static_assert(((MAIN_SIZE > 0) && ((1 << ADDR_SIZE) == MAIN_SIZE)),
 				"MAIN_SIZE must be a power of 2 greater than 0");
 		static_assert(((N_SETS > 0) && ((1 << SET_SIZE) == N_SETS)),
@@ -283,17 +285,13 @@ class cache {
 
 			if (L1_CACHE) {
 				// inform L1 caches about the writing
-				for (auto port = 0; port < PORTS; port++)
-					m_l1_cache_get[port].notify_write(addr_main);
+				m_l1_cache_get[0].notify_write(addr_main);
 			}
 
-			const auto port = m_core_port;
-			m_core_port = ((m_core_port + 1) % PORTS);
-
 			// send write request to cache
-			m_core_req_op[port].write(WRITE_OP);
-			m_core_req_addr[port].write(addr_main);
-			m_core_req_data[port].write(data);
+			m_core_req_op[0].write(WRITE_OP);
+			m_core_req_addr[0].write(addr_main);
+			m_core_req_data[0].write(data);
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 			update_profiling(m_hit_status.read());
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
