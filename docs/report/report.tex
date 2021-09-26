@@ -937,21 +937,21 @@ been updated to support the \ac{l1} cache:
 \clearpage
 
 \section{Multi-ports cache}
-Most algorithms contain a loop which performs different operations, including
-memory accesses.
-\ac{hls} provides two main ways for optimizing loops: \emph{Pipelining} and
-\emph{Unrolling}.
+The computational core of many algorithms consists in a loop, which \ac{hls} can
+optimize with two techniques: \emph{Pipelining} and \emph{Unrolling}.
 
-The \emph{Basic} and \emph{Multi-levels} caches complete one access per clock
-cycle, at the steady state, in case of hit, therefore thery are suitable for
-the use in pipelined loops, but not in unrolled loops, which require multiple
-concurrent accesses.
+The \emph{Basic} and \emph{Multi-levels} caches are suitable for
+\emph{Pipelining} since they complete one access per clock cycle, at the steady
+state, in case of hit, however they are not suitable for \emph{Unrolling}, since
+they do not support concurrent accesses.
 
-The \emph{Multi-ports cache} is aimed at allowing multiple concurrent accesses
-to better support loop unrolling.
+\bigskip
+The \emph{Multi-ports cache} has been specifically designed for adding support
+to multiple concurrent accesses to the same cache memory, allowing to
+efficiently unroll application loops.
 
 \subsection{Architecture}
-The \emph{Multi-ports cache} is characterized multiple access ports
+The \emph{Multi-ports cache} is characterized by multiple access ports
 (Figure~\ref{fig:multi_ports_arch}).
 
 Each port has dedicated logic for accessing the \ac{l2} cache and an independent
@@ -969,10 +969,38 @@ of hit.
 \end{figure}
 
 \subsection{Implementation}
-\subsubsection{Internals}
-\subsubsection{Interface}
-\paragraph{Port binding}
+The \emph{Multi-ports cache} has been implemented extending the
+\emph{Multi-levels cache}.
 
+It is possible to configure the number of ports through the \texttt{PORTS}
+template parameter, therefore by setting it to 1 the resulting architecture is
+equivalent to the \emph{Multi-levels cache}.
+
+\subsubsection{Internals}
+To avoid dependencies issues, whenever \texttt{PORTS} is greater than 1, the
+\emph{Multi-process} internals architecture is generated.
+
+\bigskip
+The \emph{Core} process has been modified to serve requests coming from all the
+ports by inserting an unrolled loop which iterates over all the ports. \ac{hls}
+guaranteees all the dependencies on cache data structures, and the resulting
+\ac{ii} of the \emph{Core} process is equal to \texttt{PORTS}.
+
+\subsubsection{Interface}
+\acp{fifo} between \emph{Core} and application and \ac{l1} cache have been
+replaced with arrays of \acp{fifo} and \ac{l1} caches, completely partitioned,
+so that they are independent.
+
+Each call to \texttt{get\_line} (which is in turn called by \texttt{get}) and
+\texttt{set} is associated with a specific port by means of a member variable
+holding the port index and is updated after each access.
+
+\subsection{Limitations}
+In some particular situations (e.g.\ cache is explicitly accessed multiple times
+per iteration) the co-simulation enters a deadlock.
+The source of this problem can be probably found in the port indexing and to be
+fixed may require more control over the operations scheduling, which is not
+provided by \emph{Vitis\texttrademark~HLS 2021.1}.
 
 \chapter{Results}
 \section{Matrix multiplication}
