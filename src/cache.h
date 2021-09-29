@@ -39,7 +39,7 @@
 
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
-	 bool LRU, size_t L1_CACHE_LINES>
+	 bool LRU, size_t L1_CACHE_LINES, size_t LATENCY>
 class cache {
 	private:
 		static const bool MEM_IF_PROCESS = (WR_ENABLED || (PORTS > 1) ||
@@ -234,7 +234,7 @@ class cache {
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
-				ap_wait();
+				ap_wait_n(LATENCY);
 				// read response from cache
 				m_core_resp[port].read(line);
 
