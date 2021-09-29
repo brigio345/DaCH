@@ -576,7 +576,7 @@ through a cache module for \ac{hls}, which works as an interface with the
 off-chip \ac{dram} (accessible through an \ac{axi} bus) and stores its data to
 on-chip \acp{bram} and registers.
 
-\section{Overview}
+\bigskip
 The proposed cache module has the \textbf{dual purpose} of:
 \begin{itemize}
 	\item \emph{Reducing the number of \ac{dram} accesses}: misses only
@@ -603,7 +603,7 @@ A special attention has been put on \textbf{user-friendliness}:
 		parameters tuning.
 \end{itemize}
 
-\subsection{Ma's cache}
+\paragraph{Ma's cache}
 Liang Ma et al.\ proposed a \texttt{C++} cache implementation~\cite{liang}
 compatible with the \emph{SDAccel\texttrademark} \ac{hls} tool.
 
@@ -622,7 +622,7 @@ This is the major limitation of this solution, since the additional logic
 inserted in the algorithm may make it too complex and worsen the generated
 circuit performance.
 
-\subsection{Proposed solution}
+\paragraph{Proposed solution}
 The primary goal is to develop the \emph{Basic cache}, a cache architecture
 which runs in a separate process with respect to the application using it,
 trying to solve the main limitation of \emph{Ma's cache}: the application logic
@@ -637,8 +637,6 @@ This architecture has been then optimized in two dimensions:
 		to the cache, each one with a dedicated \ac{l1} cache, so that
 		multiple requests can be served in parallel.
 \end{itemize}
-
-\clearpage
 
 \section{Basic cache}
 The \emph{Basic cache} is aimed at solving the main limitation of \emph{Ma's
@@ -742,6 +740,40 @@ The cache class is logically split into two parts:
 	\item \emph{Interface}: \acsp{api} for managing requests and responses
 		from application side.
 \end{itemize}
+
+\emph{Internals} and \emph{Interface} communicate with each other through a
+\emph{Port} (Table~\ref{tab:port}), in a \emph{Master/Slave} fashion:
+\begin{itemize}
+	\item \emph{Interface} sends to \emph{Internals} a \emph{request}
+		(operation, address and write data).
+	\item \emph{Internals} sends to \emph{Interface} a \emph{response}
+		(read data), after executing the requested operation.
+\end{itemize}
+
+\begin{table}
+	\begin{center}
+		\begin{tabular}{ccc}
+			\hline
+			\rowcolor{gray!50}
+			\textbf{Content} & \textbf{Description} &
+			\textbf{Direction} \\
+			\hline
+			Operation & Read/Write &
+			\emph{Internals} $\rightarrow$ \emph{Interface} \\
+			\rowcolor{gray!25}
+			Address & Index to be accessed &
+			\emph{Internals} $\rightarrow$ \emph{Interface} \\
+			Write data & Data to be written to memory &
+			\emph{Internals} $\rightarrow$ \emph{Interface} \\
+			\rowcolor{gray!25}
+			Read data & Data read from memory &
+			\emph{Internals} $\leftarrow$ \emph{Interface} \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{Data exchanged through \emph{Port}.}
+	\label{tab:port}
+\end{table}
 
 \subsubsection{Internals}
 The \emph{Internals} implementation differs between the \emph{Single-process}
@@ -847,6 +879,52 @@ traditional array (e.g.\ \texttt{val~=~cache[i]} calls
 \texttt{val~=~cache.get(i)} and \texttt{cache[i]~=~val} calls
 \texttt{cache.set(i,~val)}).
 
+\paragraph{Separate request from response}
+The \ac{hls} scheduler is not aware of the dependencies between the request
+writing and the response reading in the \texttt{get} function, therefore it
+optimizes the logic by inserting both the write and the read in the same
+pipeline stage. Since the read is a blocking operation, it blocks the whole
+stage, including the request write, resulting in a deadlock.
+
+The issue has been solved by forcing the write and the read to separate pipeline
+stages, by inserting a call to \texttt{ap\_wait} in between them.
+
+\paragraph{Request scheduling}
+At the steady state, in case of hit, the cache could process one request per
+cycle, thanks to its optimal pipelining (i.e.\ \ac{ii} equal to 1), however the
+scheduler may not be able to generate a circuit which sends cache requests in
+consecutive cycles, preventing from taking full advantage of cache performance.
+
+\ac{hls} is not aware of the dependency and latency between request writing
+($W$) and response read ($R$), so it schedules $R$ just after $W$: at runtime
+this means that $R_i$ is executed in the cycle following $W_i$, but the cache
+response has a certain latency which makes $R_i$ stall (and $W_{i+1}$ too, by
+consequence), therefore the cache never receives multiple requests in
+consecutive cycles and never reaches the steady state.
+
+\bigskip
+To mitigate this issue the \texttt{ap\_wait} between request write and response
+read has been replaced with a \texttt{ap\_wait\_n(LATENCY)}, where
+\texttt{LATENCY} is an integer value set through a template parameter.
+This forces the scheduler to insert \texttt{LATENCY} clock cycles between $W$
+and $R$, so that at runtime \texttt{LATENCY} requests are sent to cache before
+stalling.
+
+\texttt{LATENCY} is not set to a constant because its optimal value highly
+depends on memory access pattern and cache configuration, and can be determined
+by means of design exploration.
+
+This is a partial solution: the \texttt{ap\_wait} forces all the subsequent
+operations to wait: when there are multiple calls to \texttt{get} per
+iteration, $W_{i+1}$ has to wait \texttt{LATENCY} cycles before being
+scheduled. This situation not only breaks the proposed solution, but it also
+makes the \ac{ii} of the loop accessing the cache to increase. 
+In this case it is convenient to set \texttt{LATENCY} to 1.
+
+To actually solve this problem it is probably needed to have more control on the
+scheduler behaviour, which is not possible with
+\emph{Vitis\texttrademark~HLS~2021.1}.
+
 \iffalse
 \begin{table}
 	\begin{center}
@@ -947,19 +1025,25 @@ they do not support concurrent accesses.
 
 \bigskip
 The \emph{Multi-ports cache} has been specifically designed for adding support
-to multiple concurrent accesses to the same cache memory, allowing to
-efficiently unroll application loops.
+to multiple \textbf{concurrent accesses} to the same cache memory, allowing to
+efficiently \textbf{unroll} application loops.
 
 \subsection{Architecture}
-The \emph{Multi-ports cache} is characterized by multiple access ports
-(Figure~\ref{fig:multi_ports_arch}).
+The \emph{Multi-ports cache} is characterized by multiple ports accessed in
+parallel (Figure~\ref{fig:multi_ports_arch}).
 
-Each port has dedicated logic for accessing the \ac{l2} cache and an independent
-\ac{l1} cache.
-\ac{l1} caches comply with the write-through consistency policy, therefore to
-guarantee coherency between the multiple caches it is enough to inform all the
-\ac{l1} caches about write accesses, so that they invalidate their line in case
-of hit.
+Each port has dedicated logic for communicating with the \ac{l2} cache and an
+independent \ac{l1} cache.
+
+\bigskip
+Multiple independent ports allow to \textbf{remove dependencies} between
+different accesses to the cache.
+This brings the advantage of achieving better performance, making it possible
+to schedule multiple requests at the same time, without increasing the
+application loop \ac{ii}, but it also brings the disadvantage of not
+guaranteeing the expected ordering between different accesses.
+To guarantee the correct functionality the \emph{Multi-ports} architecture is
+compatible with \textbf{read-only} accesses.
 
 \begin{figure}[!htb]
 	\centering
@@ -978,12 +1062,12 @@ equivalent to the \emph{Multi-levels cache}.
 
 \subsubsection{Internals}
 To avoid dependencies issues, whenever \texttt{PORTS} is greater than 1, the
-\emph{Multi-process} internals architecture is generated.
+\emph{Multi-process} \emph{Internals} architecture is generated.
 
 \bigskip
 The \emph{Core} process has been modified to serve requests coming from all the
 ports by inserting an unrolled loop which iterates over all the ports. \ac{hls}
-guaranteees all the dependencies on cache data structures, and the resulting
+guarantees all the dependencies on cache data structures, and the resulting
 \ac{ii} of the \emph{Core} process is equal to \texttt{PORTS}.
 
 \subsubsection{Interface}
@@ -991,8 +1075,8 @@ guaranteees all the dependencies on cache data structures, and the resulting
 replaced with arrays of \acp{fifo} and \ac{l1} caches, completely partitioned,
 so that they are independent.
 
-Each call to \texttt{get\_line} (which is in turn called by \texttt{get}) and
-\texttt{set} is associated with a specific port by means of a member variable
+Each call to \texttt{get\_line} (which is in turn called by \texttt{get}) is
+automatically associated with a specific port by means of a member variable
 holding the port index and is updated after each access.
 
 \subsection{Limitations}
