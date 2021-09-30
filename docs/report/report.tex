@@ -13,6 +13,8 @@
 \usepackage{tabularx}
 \usepackage{acro}
 \usepackage{amsmath}
+\usepackage{caption}
+\usepackage{subcaption}
 
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
 \newcolumntype{C}{>{\centering\arraybackslash}X}
@@ -728,7 +730,7 @@ of writable caches too.
 	\label{fig:multi_proc_basic_arch}
 \end{figure}
 
-\subsection{Implementation}
+\subsection{Implementation}\label{subsec:basic_impl}
 The \emph{Basic cache} is implemented in the form of a
 \texttt{C++14}~\cite{cpp14} class, compatible with
 \emph{Vitis\texttrademark~HLS~2021.1}.
@@ -775,6 +777,43 @@ The cache class is logically split into two parts:
 	\label{tab:port}
 \end{table}
 
+\paragraph{Process modeling}
+\ac{hls} is intended for synthesizing sequential \acl{sw} code, therefore it has
+been necessary to develop a novel technique for modeling multiprocess designs.
+
+The proposed model follows the \emph{Master/Slave} paradigm:
+\begin{enumerate}
+	\item \emph{Master} sends a request to \emph{Slave}.
+	\item \emph{Slave} executes the requested operation and optionally sends
+		a response to \emph{Master}.
+\end{enumerate}
+
+\emph{Slave} must be modeled as an infinite loop which waits for requests from
+\emph{Master} before executing its functionality, while \emph{Master} can be
+modeled as standard sequential code (or it can be in turn a \emph{Slave} of
+another \emph{Master}).
+
+The parallelism between \emph{Master} and \emph{Slave} is modeled differently
+depending on the compilation target:
+\begin{itemize}
+	\item \emph{\ac{sw} simulation}: each process is mapped to a
+		\texttt{std::thread}.
+	\item \emph{\ac{hw} synthesis}: each process is a dataflow function, in
+		a dataflow region with the \texttt{disable\_start\_propagation}
+		option disabled (which allow each function to run in parallel,
+		without waiting for the completion of previous ones).
+\end{itemize}
+The distinction between simulation and synthesis code can be performed through
+the ``\texttt{\#ifdef \_\_SYNTHESIS\_\_}'' preprocessor directive.
+
+The communication between the two processes is performed through a \emph{port},
+which contains data flowing from \emph{Master} to \emph{Slave} (request) and
+from \emph{Slave} to \emph{Master} (response).
+Request and response are mapped to one or more \acp{fifo} which are written
+from the transmitter and read from the receiver.
+\texttt{hls::stream} class by \emph{Vitis\texttrademark~HLS} can be used as
+\ac{fifo} implementation.
+
 \subsubsection{Internals}
 The \emph{Internals} implementation differs between the \emph{Single-process}
 and the \emph{Multi-processes} implementations:
@@ -799,32 +838,6 @@ one, requires lower resource usage and better performance, when it is possible
 to schedule its process with an \ac{ii} equal to 1 (read-only accesses with
 line not larger than the maximum \ac{axi} interface bitwidth): therefore it is
 automatically instantiated whenever it is convenient.
-
-\paragraph{Process modeling}
-\ac{hls} is intended for synthesizing sequential \acl{sw} code, therefore it has
-been necessary to develop a novel technique for modeling multiprocess designs.
-
-A process is modeled as an infinite loop and the parallelism between multiple
-processes is modeled differently depending on the compilation target:
-\begin{itemize}
-	\item \emph{\ac{sw} simulation}: each process is mapped to a
-		\texttt{std::thread}.
-	\item \emph{\ac{hw} synthesis}: each process is a dataflow function, in
-		a dataflow region with the \texttt{disable\_start\_propagation}
-		option disabled (which allow each function to run in parallel,
-		without waiting for the completion of previous ones).
-\end{itemize}
-The distinction between simulation and synthesis code can be performed through
-the ``\texttt{\#ifdef \_\_SYNTHESIS\_\_}'' preprocessor directive.
-
-Different processes can communicate by means of \acp{fifo} (\texttt{hls::stream}
-provided by Vitis\texttrademark HLS), which allow unidirectional point-to-point
-communication between two processes. It is possible to insert multiple
-\acp{fifo} between each process, in both directions, therefore allowing to
-set up duplex communication.
-
-Since \texttt{hls::stream} provides blocking operations, these \acp{fifo} can
-be also used for synchronization purposes.
 
 \paragraph{Dataflow checking}
 Alternatively executing the \emph{Multi-processes} or the \emph{Single-process}
@@ -896,19 +909,60 @@ scheduler may not be able to generate a circuit which sends cache requests in
 consecutive cycles, preventing from taking full advantage of cache performance.
 
 \ac{hls} is not aware of the dependency and latency between request writing
-($W$) and response read ($R$), so it schedules $R$ just after $W$: at runtime
-this means that $R_i$ is executed in the cycle following $W_i$, but the cache
-response has a certain latency which makes $R_i$ stall (and $W_{i+1}$ too, by
-consequence), therefore the cache never receives multiple requests in
-consecutive cycles and never reaches the steady state.
+($W$) and response read ($R$), so it schedules $R$ just after $W$
+(Figure~\ref{subfig:actual_sched_static}): at runtime this means that $R_i$ is
+executed in the cycle following $W_i$, but the cache response has a certain
+latency which makes $R_i$ stall (and $W_{i+1}$ too, by
+consequence) (Figure~\ref{subfig:actual_sched_run}), therefore the cache never
+receives multiple requests in consecutive cycles and never reaches the steady
+state.
+
+\begin{figure}[!htb]
+	\centering
+	\begin{subfigure}[b]{.3\textwidth}
+		\centering
+		\includegraphics[height=2.5cm]{actual_schedule_static}
+		\caption{Static schedule.}
+		\label{subfig:actual_sched_static}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{.68\textwidth}
+		\centering
+		\includegraphics[height=2.5cm]{actual_schedule_run}
+		\caption{Runtime.}
+		\label{subfig:actual_sched_run}
+	\end{subfigure}
+	\caption{Stalling schedule of request writing and response reading.}
+	\label{fig:actual_sched}
+\end{figure}
 
 \bigskip
 To mitigate this issue the \texttt{ap\_wait} between request write and response
 read has been replaced with a \texttt{ap\_wait\_n(LATENCY)}, where
-\texttt{LATENCY} is an integer value set through a template parameter.
-This forces the scheduler to insert \texttt{LATENCY} clock cycles between $W$
-and $R$, so that at runtime \texttt{LATENCY} requests are sent to cache before
-stalling.
+\texttt{LATENCY} is an integer value set through a template parameter.  This
+forces the scheduler to insert \texttt{LATENCY} clock cycles between $W$ and
+$R$ (Figure~\ref{subfig:desired_sched_static}), so that at runtime stalls are
+avoided (in case of hit) and one request per cycle is sent to cache
+(Figure~\ref{subfig:desired_sched_run}).
+
+\begin{figure}[!htb]
+	\centering
+	\begin{subfigure}[b]{.3\textwidth}
+		\centering
+		\includegraphics[height=3cm]{desired_schedule_static}
+		\caption{Static schedule.}
+		\label{subfig:desired_sched_static}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{.68\textwidth}
+		\centering
+		\includegraphics[height=3cm]{desired_schedule_run}
+		\caption{Runtime.}
+		\label{subfig:desired_sched_run}
+	\end{subfigure}
+	\caption{Optimal schedule of request writing and response reading.}
+	\label{fig:desired_sched}
+\end{figure}
 
 \texttt{LATENCY} is not set to a constant because its optimal value highly
 depends on memory access pattern and cache configuration, and can be determined
@@ -917,51 +971,52 @@ by means of design exploration.
 This is a partial solution: the \texttt{ap\_wait} forces all the subsequent
 operations to wait: when there are multiple calls to \texttt{get} per
 iteration, $W_{i+1}$ has to wait \texttt{LATENCY} cycles before being
-scheduled. This situation not only breaks the proposed solution, but it also
-makes the \ac{ii} of the loop accessing the cache to increase. 
-In this case it is convenient to set \texttt{LATENCY} to 1.
+scheduled (Figure~\ref{subfig:fixed_sched_issue}).
+This situation makes the application loop \ac{ii} to increase, since it must
+guarantee the order of accesses to \acp{fifo}.
 
-To actually solve this problem it is probably needed to have more control on the
-scheduler behaviour, which is not possible with
+\bigskip
+To actually solve this problem (with the schedule shonw in
+Figure~\ref{subfig:fixed_sched_desired}), fine control over the scheduler is
+probably needed, but this is not possible with
 \emph{Vitis\texttrademark~HLS~2021.1}.
 
-\iffalse
-\begin{table}
-	\begin{center}
-		\begin{tabularx}{\textwidth}{LCC}
-			\hline
-			\rowcolor{gray!50}
-			& \textbf{Single-process basic implementation} &
-			\textbf{Ma's implementation} \\
-			\hline
-			\textbf{Integration with algorithm} & Separate process &
-			Inlined \\
-			\rowcolor{gray!25}
-			\textbf{Underlying memory} & Single \ac{dram} array &
-			Single \ac{dram} array \\
-			\textbf{Configurability} & Template arguments &
-			Template arguments and dedicated classes \\
-			\rowcolor{gray!25}
-			\textbf{\texttt{operator[]} overload} & Array-like &
-			Array-like \\
-			\hline
-		\end{tabularx}
-	\end{center}
-	\caption{Comparison between basic single-process and Ma's
-	implementations.}
-	\label{tab:basic_vs_liang}
-\end{table}
-\fi
+\begin{figure}[!htb]
+	\centering
+	\begin{subfigure}[b]{.4\textwidth}
+		\centering
+		\includegraphics[height=1.6cm]{fixed_schedule_issue}
+		\caption{Achieved static schedule.}
+		\label{subfig:fixed_sched_issue}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{.4\textwidth}
+		\centering
+		\includegraphics[height=1.6cm]{fixed_schedule_desired}
+		\caption{Optimal static schedule.}
+		\label{subfig:fixed_sched_desired}
+	\end{subfigure}
+	\caption{Static schedules with in case of multiple accesses per
+	iteration.}
+	\label{fig:fixed_sched_issue}
+\end{figure}
+
 \clearpage
 
 \section{Multi-levels cache}
-The \emph{Multi-levels cache} purpose is to improve the memory hierarchy
-performance by adding a faster \ac{l1} cache memory on top of it.
+Since it is impossible, especially in some critical situations (i.e.\ when
+cache is accessed in read mode multiple times in the same pipeline iteration),
+to fully exploit the optimal pipeline of the \emph{Basic cache}, due to the
+scheduler unawareness about the latency between request writing and response
+reading (as explained in~\ref{subsec:basic_impl}), the \emph{Multi-levels
+cache} is aimed at improving performance with a different approach: by making
+the memory hierarchy deeper, adding a faster \ac{l1} cache memory on top of it.
 
 \subsection{Architecture}
-The \ac{ipc} (i.e.\ \ac{fifo} accesses) introduces an overhead at each memory
-access, therefore the \ac{l1} cache is inlined in the application logic
-(Figure~\ref{fig:l1_arch}), so that there is no need of any \ac{ipc} mechanism.
+The \emph{Multi-levels cache} introduces a \ac{l1} cache inlined in the
+application logic (Figure~\ref{fig:l1_arch}): this way the scheduler exactly
+knows the latency of each operation and can build an application pipeline which
+stalls in case of \ac{l1} miss only.
 
 In order not to fall into the same cluttering issues of \emph{Ma's cache}, the
 \ac{l1} cache is kept as simple as possible:
@@ -971,8 +1026,10 @@ In order not to fall into the same cluttering issues of \emph{Ma's cache}, the
 \end{itemize}
 
 The write-through consistency policy discards any advantage for write accesses,
-but given that simplicity is a priority and read accesses are usually much more
-frequent than write accesses, this has been considered the best trade-off.
+but given that simplicity is a priority and read accesses are usually more
+frequent than writes and they suffer the most from the scheduling issues which
+lead to the introduction of the \ac{l1} cache, this has been considered the
+best trade-off.
 
 \begin{figure}[!htb]
 	\centering
@@ -1087,6 +1144,9 @@ fixed may require more control over the operations scheduling, which is not
 provided by \emph{Vitis\texttrademark~HLS 2021.1}.
 
 \chapter{Results}
+The proposed cache architecture has been included in multiple \emph{Vitis~HLS}
+kernels implementing different algorithms each one with specific memory access
+patterns.
 \section{Matrix multiplication}
 \section{Bitonic sorting}
 \section{Lucas-Kanade}
