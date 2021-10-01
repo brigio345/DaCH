@@ -892,30 +892,37 @@ traditional array (e.g.\ \texttt{val~=~cache[i]} calls
 \texttt{val~=~cache.get(i)} and \texttt{cache[i]~=~val} calls
 \texttt{cache.set(i,~val)}).
 
-\paragraph{Separate request from response}
-The \ac{hls} scheduler is not aware of the dependencies between the request
-writing and the response reading in the \texttt{get} function, therefore it
-optimizes the logic by inserting both the write and the read in the same
-pipeline stage. Since the read is a blocking operation, it blocks the whole
-stage, including the request write, resulting in a deadlock.
+\paragraph{Deadlock prevention}
+The \ac{hls} scheduler is not able to infer the dependency between the request
+writing ($W$) and the response reading ($R$) in the \texttt{get} function
+(i.e.\ it is not aware that first the request has to be written, then it is
+necessary to wait for the cache latency and finally the response has to be
+read).
 
-The issue has been solved by forcing the write and the read to separate pipeline
-stages, by inserting a call to \texttt{ap\_wait} in between them.
+For that reason the scheduler optimizes the logic by inserting both $W$ and $R$
+into the same pipeline stage.
+This leads to a deadlock: $R$ is blocked since it reads from an empty \ac{fifo}
+(it cannot contain the response yet) and it blocks the whole stage, including
+$W$, making $R$ wait for the response to a request which cannot be sent.
 
-\paragraph{Request scheduling}
-At the steady state, in case of hit, the cache could process one request per
-cycle, thanks to its optimal pipelining (i.e.\ \ac{ii} equal to 1), however the
-scheduler may not be able to generate a circuit which sends cache requests in
-consecutive cycles, preventing from taking full advantage of cache performance.
+The deadlock has been fixed by inserting a clock operation between $W$ and $R$
+(calling \texttt{ap\_wait}), which forces $W$ and $R$ to separate pipeline
+stages.
+
+\paragraph{Cache pipeline exploiting}
+At the steady state, in case of hit, the cache can process one request per
+cycle, thanks to its optimal pipelining (i.e.\ \ac{ii} equal to 1).
 
 \ac{hls} is not aware of the dependency and latency between request writing
 ($W$) and response read ($R$), so it schedules $R$ just after $W$
-(Figure~\ref{subfig:actual_sched_static}): at runtime this means that $R_i$ is
-executed in the cycle following $W_i$, but the cache response has a certain
-latency which makes $R_i$ stall (and $W_{i+1}$ too, by
-consequence) (Figure~\ref{subfig:actual_sched_run}), therefore the cache never
-receives multiple requests in consecutive cycles and never reaches the steady
-state.
+(Figure~\ref{subfig:actual_sched_static}): at runtime $R_i$, which should be
+executed in the cycle following $W_i$, stalls, since the cache response has a
+latency (and $W_{i+1}$ stalls too, by consequence).
+
+$W_{i+1}$ is executed after waiting for the full latency of the cache
+(Figure~\ref{subfig:actual_sched_run}) and the final result is that cache never
+receives multiple requests in consecutive cycles, it never reaches the steady
+state and its throughput is the same as if it were not pipelined.
 
 \begin{figure}[!htb]
 	\centering
@@ -970,15 +977,17 @@ by means of design exploration.
 
 This is a partial solution: the \texttt{ap\_wait} forces all the subsequent
 operations to wait: when there are multiple calls to \texttt{get} per
-iteration, $W_{i+1}$ has to wait \texttt{LATENCY} cycles before being
-scheduled (Figure~\ref{subfig:fixed_sched_issue}).
+iteration (e.g.\ $A$ and $B$), $W_B$ has to wait \texttt{LATENCY} cycles after
+$W_A$ before being scheduled (Figure~\ref{subfig:fixed_sched_issue}).
 This situation makes the application loop \ac{ii} to increase, since it must
-guarantee the order of accesses to \acp{fifo}.
+guarantee the order of accesses to \acp{fifo} (i.e.\ $W_{A, i+1}$ cannot be
+executed before $W_{B, i}$).
 
 \bigskip
-To actually solve this problem (with the schedule shonw in
-Figure~\ref{subfig:fixed_sched_desired}), fine control over the scheduler is
-probably needed, but this is not possible with
+To actually fix this problem (with the schedule shown in
+Figure~\ref{subfig:fixed_sched_desired}), a mechanism for informing the
+scheduler about dependencies and latency between specific operations is
+probably needed, but this is not available in
 \emph{Vitis\texttrademark~HLS~2021.1}.
 
 \begin{figure}[!htb]
@@ -996,27 +1005,25 @@ probably needed, but this is not possible with
 		\caption{Optimal static schedule.}
 		\label{subfig:fixed_sched_desired}
 	\end{subfigure}
-	\caption{Static schedules with in case of multiple accesses per
-	iteration.}
+	\caption{Static schedules in case of multiple accesses per iteration.}
 	\label{fig:fixed_sched_issue}
 \end{figure}
 
 \clearpage
 
 \section{Multi-levels cache}
-Since it is impossible, especially in some critical situations (i.e.\ when
-cache is accessed in read mode multiple times in the same pipeline iteration),
-to fully exploit the optimal pipeline of the \emph{Basic cache}, due to the
+The \emph{Multi-levels cache} is aimed at improving performance by making the
+memory hierarchy deeper, adding a faster \ac{l1} cache memory on top of it.
+This alternative approach has been proposed to overcome the difficulties, to
+fully exploit the optimal pipeline of the \emph{Basic cache}, due to the
 scheduler unawareness about the latency between request writing and response
-reading (as explained in~\ref{subsec:basic_impl}), the \emph{Multi-levels
-cache} is aimed at improving performance with a different approach: by making
-the memory hierarchy deeper, adding a faster \ac{l1} cache memory on top of it.
+reading (as explained in Subsection~\ref{subsec:basic_impl}).
 
 \subsection{Architecture}
 The \emph{Multi-levels cache} introduces a \ac{l1} cache inlined in the
-application logic (Figure~\ref{fig:l1_arch}): this way the scheduler exactly
-knows the latency of each operation and can build an application pipeline which
-stalls in case of \ac{l1} miss only.
+application logic (Figure~\ref{fig:l1_arch}): the scheduler exactly knows the
+latency of each \ac{l1} cache operation and can build an application pipeline
+which stalls in case of \ac{l1} miss only.
 
 In order not to fall into the same cluttering issues of \emph{Ma's cache}, the
 \ac{l1} cache is kept as simple as possible:
@@ -1042,8 +1049,9 @@ best trade-off.
 The \emph{Multi-level cache} has been implemented adding the \ac{l1} cache to
 the \emph{Basic cache}.
 It is possible to configure the number of \ac{l1} cache lines through the
-\texttt{L1\_CACHE\_LINES} template parameter, therefore by setting it to 0 the
-resulting architecture is equivalent to the \emph{Basic cache}.
+\texttt{L1\_CACHE\_LINES} template parameter.
+When it is set to 0 the resulting architecture is equivalent to the \emph{Basic
+cache}.
 
 \subsubsection{Internals}
 The only difference with respect to the \emph{Basic cache} implementation is
@@ -1066,7 +1074,7 @@ been updated to support the \ac{l1} cache:
 	\item \texttt{get}: it calls the \texttt{get\_line} function and then
 		returns the requested word.
 	\item \texttt{set}: it sets \ac{l1} cache line to dirty, if it hits, and
-		it issues the request to the \ac{l2} cache.
+		it forwards the request to the \ac{l2} cache.
 \end{itemize}
 
 \clearpage
@@ -1089,8 +1097,8 @@ efficiently \textbf{unroll} application loops.
 The \emph{Multi-ports cache} is characterized by multiple ports accessed in
 parallel (Figure~\ref{fig:multi_ports_arch}).
 
-Each port has dedicated logic for communicating with the \ac{l2} cache and an
-independent \ac{l1} cache.
+Each port has dedicated logic for communicating with the shared \ac{l2} cache
+and an independent \ac{l1} cache.
 
 \bigskip
 Multiple independent ports allow to \textbf{remove dependencies} between
@@ -1114,8 +1122,9 @@ The \emph{Multi-ports cache} has been implemented extending the
 \emph{Multi-levels cache}.
 
 It is possible to configure the number of ports through the \texttt{PORTS}
-template parameter, therefore by setting it to 1 the resulting architecture is
-equivalent to the \emph{Multi-levels cache}.
+template parameter.
+When it is set to 1 the resulting architecture is equivalent to the
+\emph{Multi-levels cache}.
 
 \subsubsection{Internals}
 To avoid dependencies issues, whenever \texttt{PORTS} is greater than 1, the
@@ -1136,9 +1145,47 @@ Each call to \texttt{get\_line} (which is in turn called by \texttt{get}) is
 automatically associated with a specific port by means of a member variable
 holding the port index and is updated after each access.
 
+\paragraph{\acp{fifo} accesses scheduling}
+Ideally the request write ($W$) and the response read ($R$) should be scheduled
+in parallel in the same cycle (Figure~\ref{subfig:multiport_des_sched}).
+Due to the scheduler limitations (described in
+Subsection~\ref{subsec:basic_impl}) it is not possible to achieve such a
+schedule, since there is a forced clock cycle between $W$ and $R$, which delays
+all the subsequent operations.
+
+The resulting schedule (Figure~\ref{subfig:multiport_actual_sched}) is almost
+equivalent to the one achieved with the \emph{Basic cache} in case of multiple
+accesses per iteration (Figure~\ref{subfig:fixed_sched_issue}), with the
+difference that request and response \acp{fifo} are distinct, since they belong
+to separate ports, therefore the scheduler does not have to ensure dependencies
+between subsequent reads and writes and application loop \ac{ii} does not
+increase.
+
+At the steady state, in case of hit, one $W$ and $R$ are executed per cycle,
+allowing to fully exploit the \ac{l2} cache pipeline.
+
+\begin{figure}[!htb]
+	\centering
+	\begin{subfigure}[b]{.4\textwidth}
+		\centering
+		\includegraphics[height=1.6cm]{multiport_actual_sched}
+		\caption{Achieved static schedule.}
+		\label{subfig:multiport_actual_sched}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{.4\textwidth}
+		\centering
+		\includegraphics[height=1.6cm]{multiport_des_sched}
+		\caption{Parallel static schedule.}
+		\label{subfig:multiport_des_sched}
+	\end{subfigure}
+	\caption{Static schedules in case of 2-ports cache.}
+	\label{fig:multiport_sched}
+\end{figure}
+
 \subsection{Limitations}
-In some particular situations (e.g.\ cache is explicitly accessed multiple times
-per iteration) the co-simulation enters a deadlock.
+In some particular situations (e.g.\ when cache is explicitly accessed multiple
+times per iteration) the simulation of the generated circuit enters a deadlock.
 The source of this problem can be probably found in the port indexing and to be
 fixed may require more control over the operations scheduling, which is not
 provided by \emph{Vitis\texttrademark~HLS 2021.1}.

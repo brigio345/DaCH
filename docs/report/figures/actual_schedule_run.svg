@@ -45,10 +45,10 @@
      fit-margin-top="2"
      showgrid="true"
      inkscape:document-rotation="0"
-     inkscape:current-layer="layer1"
+     inkscape:current-layer="g80969"
      inkscape:document-units="mm"
-     inkscape:cy="29.503147"
-     inkscape:cx="52.65177"
+     inkscape:cy="67.630291"
+     inkscape:cx="4.9928403"
      inkscape:zoom="2.2031548"
      inkscape:pageshadow="2"
      inkscape:pageopacity="0.0"
@@ -98,15 +98,17 @@
            style="fill:none;stroke:#0000ff;stroke-width:0.132292;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
         <text
            id="text852"
-           y="21.49688"
-           x="74.617668"
+           y="20.832657"
+           x="74.776413"
            style="font-size:6.35px;line-height:0.95;font-family:sans-serif;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
            xml:space="preserve"><tspan
              style="font-size:6.35px;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
-             y="21.49688"
-             x="74.617668"
+             y="20.832657"
+             x="74.776413"
              id="tspan850"
-             sodipodi:role="line">W</tspan></text>
+             sodipodi:role="line">W<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan23517">0</tspan></tspan></text>
         <rect
            y="13.231576"
            x="82.020828"
@@ -170,15 +172,17 @@
              sodipodi:role="line">STALL</tspan></text>
         <text
            id="text890"
-           y="21.496881"
-           x="125.23526"
+           y="20.832659"
+           x="123.96782"
            style="font-size:6.35px;line-height:0.95;font-family:sans-serif;stroke-width:0.264583"
            xml:space="preserve"><tspan
              style="font-size:6.35px;fill:#ff6600;stroke-width:0.264583"
-             y="21.496881"
-             x="125.23526"
+             y="20.832659"
+             x="123.96782"
              id="tspan888"
-             sodipodi:role="line">R</tspan></text>
+             sodipodi:role="line">R<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan34491">0</tspan></tspan></text>
         <rect
            y="26.45834"
            x="121.70834"
@@ -188,15 +192,17 @@
            style="fill:none;stroke:#0000ff;stroke-width:0.132292;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
         <text
            id="text80798"
-           y="34.726051"
-           x="127.53434"
+           y="34.091053"
+           x="127.74651"
            style="font-size:6.35px;line-height:0.95;font-family:sans-serif;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
            xml:space="preserve"><tspan
              style="font-size:6.35px;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
-             y="34.726051"
-             x="127.53434"
+             y="34.091053"
+             x="127.74651"
              id="tspan80796"
-             sodipodi:role="line">W</tspan></text>
+             sodipodi:role="line">W<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan25301">1</tspan></tspan></text>
         <rect
            y="39.6875"
            x="174.625"
@@ -206,15 +212,17 @@
            style="fill:none;stroke:#0000ff;stroke-width:0.132292;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
         <text
            id="text80798-9"
-           y="47.955212"
-           x="180.45099"
+           y="47.320213"
+           x="180.67928"
            style="font-size:6.35px;line-height:0.95;font-family:sans-serif;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
            xml:space="preserve"><tspan
              style="font-size:6.35px;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
-             y="47.955212"
-             x="180.45099"
+             y="47.320213"
+             x="180.67928"
              id="tspan80796-6"
-             sodipodi:role="line">W</tspan></text>
+             sodipodi:role="line">W<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan29089">2</tspan></tspan></text>
         <rect
            y="26.460747"
            x="134.93742"
@@ -278,15 +286,17 @@
              sodipodi:role="line">STALL</tspan></text>
         <text
            id="text80822"
-           y="34.726055"
-           x="178.15144"
+           y="34.091053"
+           x="176.93748"
            style="font-size:6.35px;line-height:0.95;font-family:sans-serif;stroke-width:0.264583"
            xml:space="preserve"><tspan
              style="font-size:6.35px;fill:#ff6600;stroke-width:0.264583"
-             y="34.726055"
-             x="178.15144"
+             y="34.091053"
+             x="176.93748"
              id="tspan80820"
-             sodipodi:role="line">R</tspan></text>
+             sodipodi:role="line">R<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan31825">1</tspan></tspan></text>
       </g>
     </g>
   </g>

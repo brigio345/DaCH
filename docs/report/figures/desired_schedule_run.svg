@@ -45,10 +45,10 @@
      fit-margin-top="2"
      showgrid="true"
      inkscape:document-rotation="0"
-     inkscape:current-layer="layer1"
+     inkscape:current-layer="g52816"
      inkscape:document-units="mm"
-     inkscape:cy="128.56335"
-     inkscape:cx="169.23135"
+     inkscape:cy="131.18709"
+     inkscape:cx="156.11264"
      inkscape:zoom="1.5245402"
      inkscape:pageshadow="2"
      inkscape:pageopacity="0.0"
@@ -92,15 +92,17 @@
          style="fill:none;stroke:#0000ff;stroke-width:0.132292;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
       <text
          id="text852"
-         y="21.49688"
-         x="74.617668"
+         y="20.832657"
+         x="74.776413"
          style="font-size:6.35px;line-height:0.95;font-family:sans-serif;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
          xml:space="preserve"><tspan
            style="font-size:6.35px;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
-           y="21.49688"
-           x="74.617668"
+           y="20.832657"
+           x="74.776413"
            id="tspan850"
-           sodipodi:role="line">W</tspan></text>
+           sodipodi:role="line">W<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan2879">0</tspan></tspan></text>
       <rect
          y="13.231576"
          x="82.020828"
@@ -164,15 +166,17 @@
            sodipodi:role="line">NOP</tspan></text>
       <text
          id="text890"
-         y="21.496881"
-         x="125.23526"
+         y="20.832659"
+         x="123.96782"
          style="font-size:6.35px;line-height:0.95;font-family:sans-serif;stroke-width:0.264583"
          xml:space="preserve"><tspan
            style="font-size:6.35px;fill:#ff6600;stroke-width:0.264583"
-           y="21.496881"
-           x="125.23526"
+           y="20.832659"
+           x="123.96782"
            id="tspan888"
-           sodipodi:role="line">R</tspan></text>
+           sodipodi:role="line">R<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan12141">0</tspan></tspan></text>
       <rect
          y="26.458328"
          x="82.020798"
@@ -182,15 +186,17 @@
          style="fill:none;stroke:#0000ff;stroke-width:0.132292;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
       <text
          id="text852-6"
-         y="34.72604"
-         x="87.846802"
+         y="34.091042"
+         x="88.05896"
          style="font-size:6.35px;line-height:0.95;font-family:sans-serif;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
          xml:space="preserve"><tspan
            style="font-size:6.35px;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
-           y="34.72604"
-           x="87.846802"
+           y="34.091042"
+           x="88.05896"
            id="tspan850-7"
-           sodipodi:role="line">W</tspan></text>
+           sodipodi:role="line">W<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan5109">1</tspan></tspan></text>
       <rect
          y="26.460737"
          x="95.249985"
@@ -254,15 +260,17 @@
            sodipodi:role="line">NOP</tspan></text>
       <text
          id="text890-9"
-         y="34.726044"
-         x="138.46466"
+         y="34.091042"
+         x="137.25063"
          style="font-size:6.35px;line-height:0.95;font-family:sans-serif;stroke-width:0.264583"
          xml:space="preserve"><tspan
            style="font-size:6.35px;fill:#ff6600;stroke-width:0.264583"
-           y="34.726044"
-           x="138.46466"
+           y="34.091042"
+           x="137.25063"
            id="tspan888-3"
-           sodipodi:role="line">R</tspan></text>
+           sodipodi:role="line">R<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan14727">1</tspan></tspan></text>
       <rect
          y="39.687515"
          x="95.250023"
@@ -272,15 +280,17 @@
          style="fill:none;stroke:#0000ff;stroke-width:0.132292;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
       <text
          id="text52516"
-         y="47.955231"
-         x="101.07602"
+         y="47.320229"
+         x="101.30431"
          style="font-size:6.35px;line-height:0.95;font-family:sans-serif;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
          xml:space="preserve"><tspan
            style="font-size:6.35px;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
-           y="47.955231"
-           x="101.07602"
+           y="47.320229"
+           x="101.30431"
            id="tspan52514"
-           sodipodi:role="line">W</tspan></text>
+           sodipodi:role="line">W<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan6673">2</tspan></tspan></text>
       <rect
          y="39.689922"
          x="108.47918"
@@ -344,15 +354,17 @@
            sodipodi:role="line">NOP</tspan></text>
       <text
          id="text52540"
-         y="47.955231"
-         x="151.6933"
+         y="47.320229"
+         x="150.49544"
          style="font-size:6.35px;line-height:0.95;font-family:sans-serif;stroke-width:0.264583"
          xml:space="preserve"><tspan
            style="font-size:6.35px;fill:#ff6600;stroke-width:0.264583"
-           y="47.955231"
-           x="151.6933"
+           y="47.320229"
+           x="150.49544"
            id="tspan52538"
-           sodipodi:role="line">R</tspan></text>
+           sodipodi:role="line">R<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan16273">2</tspan></tspan></text>
       <rect
          y="52.916679"
          x="108.47913"
@@ -362,15 +374,17 @@
          style="fill:none;stroke:#0000ff;stroke-width:0.132292;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
       <text
          id="text52546"
-         y="61.184399"
-         x="114.30515"
+         y="60.520168"
+         x="114.4921"
          style="font-size:6.35px;line-height:0.95;font-family:sans-serif;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
          xml:space="preserve"><tspan
            style="font-size:6.35px;text-align:center;text-anchor:middle;fill:#0000ff;stroke-width:0.264583"
-           y="61.184399"
-           x="114.30515"
+           y="60.520168"
+           x="114.4921"
            id="tspan52544"
-           sodipodi:role="line">W</tspan></text>
+           sodipodi:role="line">W<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan7833">3</tspan></tspan></text>
       <rect
          y="52.91909"
          x="121.70829"
@@ -434,15 +448,17 @@
            sodipodi:role="line">NOP</tspan></text>
       <text
          id="text52570"
-         y="61.184402"
-         x="164.92267"
+         y="60.520172"
+         x="163.68344"
          style="font-size:6.35px;line-height:0.95;font-family:sans-serif;stroke-width:0.264583"
          xml:space="preserve"><tspan
            style="font-size:6.35px;fill:#ff6600;stroke-width:0.264583"
-           y="61.184402"
-           x="164.92267"
+           y="60.520172"
+           x="163.68344"
            id="tspan52568"
-           sodipodi:role="line">R</tspan></text>
+           sodipodi:role="line">R<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan19235">3</tspan></tspan></text>
     </g>
   </g>
 </svg>
