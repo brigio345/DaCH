@@ -20,7 +20,6 @@
 #include "address.h"
 #include "replacer.h"
 #include "l1_cache.h"
-#include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 #include "stream_cond.h"
@@ -80,8 +79,6 @@ class cache {
 		typedef array_type<T, N_WORDS_PER_LINE> line_type;
 		typedef l1_cache<T, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
 			l1_cache_type;
-		typedef raw_cache<T, ADDR_SIZE, (TAG_SIZE + SET_SIZE),
-			N_WORDS_PER_LINE> raw_cache_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
 			N_WORDS_PER_LINE> replacer_type;
 
@@ -119,10 +116,8 @@ class cache {
 		stream_cond<mem_req_type, 2, MEM_IF_PROCESS> m_mem_req;		// 9
 		stream_cond<line_type, 2, MEM_IF_PROCESS> m_mem_resp;		// 10
 		l1_cache_type m_l1_cache_get[PORTS];				// 11
-		raw_cache_type m_raw_cache_core;				// 12
-		raw_cache_type m_raw_cache_mem_if;				// 13
-		replacer_type m_replacer;					// 14
-		unsigned int m_core_port;					// 15
+		replacer_type m_replacer;					// 12
+		unsigned int m_core_port;					// 13
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs = 0;
@@ -338,16 +333,9 @@ class cache {
 
 			m_replacer.init();
 
-			m_raw_cache_core.init();
-
-			if (!MEM_IF_PROCESS)
-				m_raw_cache_mem_if.init();
-
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline II=PORTS
 INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
-#pragma HLS dependence variable=m_cache_mem distance=1 inter RAW false
-#pragma HLS dependence variable=main_mem false
 					op_type op;
 #ifdef __SYNTHESIS__
 					// get request and
@@ -392,7 +380,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 					line_type line;
 					if (is_hit) {
 						// read from cache memory
-						m_raw_cache_core.get_line(m_cache_mem,
+						get_line(m_cache_mem,
 								addr.m_addr_cache,
 								line);
 					} else {
@@ -405,9 +393,10 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						if (WR_ENABLED && m_valid[addr.m_addr_line] &&
 								m_dirty[addr.m_addr_line]) {
 							// get the line to be written back
-							m_raw_cache_core.get_line(m_cache_mem,
+							get_line(m_cache_mem,
 									write_back_addr.m_addr_cache,
 									line);
+
 							op = READ_WRITE_OP;
 						}
 
@@ -444,8 +433,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 
 						if (read) {
 							// store loaded line to cache
-							m_raw_cache_core.set_line(
-									m_cache_mem,
+							set_line(m_cache_mem,
 									addr.m_addr_cache,
 									line);
 						}
@@ -456,11 +444,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						m_core_resp[port].write(line);
 					} else {
 						// modify the line
-						line[addr.m_off] = data;
-
-						// store the modified line to cache
-						m_raw_cache_core.set_line(m_cache_mem,
-								addr.m_addr_cache, line);
+						m_cache_mem[addr.m_addr_cache] = data;
 						m_dirty[addr.m_addr_line] = true;
 					}
 
@@ -504,11 +488,9 @@ core_end:
 		 */
 		void run_mem_if(T * const main_mem) {
 #pragma HLS inline off
-			m_raw_cache_mem_if.init();
-			
+
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline II=1
-#pragma HLS dependence variable=main_mem distance=1 inter RAW false
 				mem_req_type req;
 #ifdef __SYNTHESIS__
 				// get request and
@@ -553,15 +535,13 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
 				// read line from main memory
-				m_raw_cache_mem_if.get_line(main_mem,
-						req.load_addr, line);
+				get_line(main_mem, req.load_addr, line);
 			}
 
 			if (WR_ENABLED && ((req.op == WRITE_OP) ||
 						(req.op == READ_WRITE_OP))) {
 				// write line to main memory
-				m_raw_cache_mem_if.set_line(main_mem,
-						req.write_back_addr, req.line);
+				set_line(main_mem, req.write_back_addr, req.line);
 			}
 		}
 
@@ -605,8 +585,7 @@ MEM_IF_LOOP:		while (1) {
 						line_type line;
 
 						// read line
-						m_raw_cache_core.get_line(
-								m_cache_mem,
+						get_line(m_cache_mem,
 								addr.m_addr_cache,
 								line);
 
@@ -619,6 +598,30 @@ MEM_IF_LOOP:		while (1) {
 						m_dirty[addr.m_addr_line] = false;
 					}
 				}
+			}
+		}
+
+		void get_line(const T * const mem,
+				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr,
+				line_type &line) {
+#pragma HLS inline
+			const T * const mem_line = &(mem[addr & (-1U << OFF_SIZE)]);
+
+			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
+#pragma HLS unroll
+				line[off] = mem_line[off];
+			}
+		}
+
+		void set_line(T * const mem,
+				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr,
+				const line_type &line) {
+#pragma HLS inline
+			T * const mem_line = &(mem[addr & (-1U << OFF_SIZE)]);
+
+			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
+#pragma HLS unroll
+				mem_line[off] = line[off];
 			}
 		}
 
