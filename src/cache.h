@@ -490,16 +490,10 @@ core_end:
 #pragma HLS inline off
 
 MEM_IF_LOOP:		while (1) {
-#pragma HLS pipeline II=1
+#pragma HLS pipeline off
 				mem_req_type req;
-#ifdef __SYNTHESIS__
-				// get request and
-				// make pipeline flushable (to avoid deadlock)
-				if (m_mem_req.read_nb(req)) {
-#else
 				// get request
 				m_mem_req.read(req);
-#endif /* __SYNTHESIS__ */
 
 				// exit the loop if request is "end-of-request"
 				if (req.op == STOP_OP)
@@ -512,9 +506,6 @@ MEM_IF_LOOP:		while (1) {
 					// send the response to the read request
 					m_mem_resp.write(line);
 				}
-#ifdef __SYNTHESIS__
-				}
-#endif /* __SYNTHESIS__ */
 			}
 
 		}
