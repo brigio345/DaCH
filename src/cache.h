@@ -444,7 +444,14 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						m_core_resp[port].write(line);
 					} else {
 						// modify the line
-						m_cache_mem[addr.m_addr_cache] = data;
+						line[addr.m_off] = data;
+
+						// store the modified line to cache
+						set_line(m_cache_mem,
+								addr.m_addr_cache,
+								line);
+
+
 						m_dirty[addr.m_addr_line] = true;
 					}
 
