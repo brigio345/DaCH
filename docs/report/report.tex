@@ -4,6 +4,8 @@
 \copypagestyle{centerruled}{ruled}
 \makeevenfoot{centerruled}{}{\thepage}{}
 \makeoddfoot{centerruled}{}{\thepage}{}
+\makeevenhead{centerruled}{}{}{\leftmark}
+\makeoddhead{centerruled}{}{}{\leftmark}
 
 \usepackage{graphicx}
 \usepackage{geometry}
@@ -218,7 +220,7 @@ limits performance, especially critical in case of memory-bound algorithms.
 
 \acp{fpga} memory system is composed of three main kinds of resources: registers,
 \acp{bram} and external \acp{dram}.
-Current \ac{hls} tools allow to exploit this memory hierarchy manually, in a
+Current \ac{hls} tools allow exploiting this memory hierarchy manually, in a
 scratchpad-like fashion: the objective of this thesis work is to automate the
 memory management by providing an easily integrable and fully customizable cache
 system for \ac{hls}.
@@ -452,8 +454,9 @@ and C++) into a \ac{hdl} description.
 the cost of limited low-level control.
 
 This Section is mainly referred to
-\emph{Vitis\texttrademark~HLS}~\cite{vitisug}, but most currently available
-\ac{hls} commercial tools provide equivalent features.
+\emph{Vitis\texttrademark~HLS~2020.2}~\cite{vitisug202} and
+\emph{2021.1}~\cite{vitisug211}, but most currently available \ac{hls}
+commercial tools provide equivalent features.
 
 \subsection{Workflow}
 The typical \ac{hls} workflow consists of:
@@ -567,7 +570,7 @@ terms of resource usage, since they are multiplied by $f$.
 		\end{itemize}
 \end{itemize}
 
-\chapter{Development}
+\chapter{Motivation}
 \ac{hls} tools are currently unable to automatically exploit the memory
 hierarchy present on \acp{fpga}: the only way to take advantage of
 them is the manual management in a \emph{scratchpad}-like manner, which
@@ -605,7 +608,7 @@ A special attention has been put on \textbf{user-friendliness}:
 		parameters tuning.
 \end{itemize}
 
-\paragraph{Ma's cache}
+\section{Ma's cache}
 Liang Ma et al.\ proposed a \texttt{C++} cache implementation~\cite{liang}
 compatible with the \emph{SDAccel\texttrademark} \ac{hls} tool.
 
@@ -624,11 +627,11 @@ This is the major limitation of this solution, since the additional logic
 inserted in the algorithm may make it too complex and worsen the generated
 circuit performance.
 
-\paragraph{Proposed solution}
-The primary goal is to develop the \emph{Basic cache}, a cache architecture
-which runs in a separate process with respect to the application using it,
-trying to solve the main limitation of \emph{Ma's cache}: the application logic
-cluttering due to the inlining.
+\section{Proposed solution}
+The primary goal of this thesis work is to develop the \emph{Basic cache}, a
+cache architecture which runs in a separate process with respect to the
+application using it, trying to solve the main limitation of \emph{Ma's cache}:
+the application logic cluttering due to the inlining.
 
 This architecture has been then optimized in two dimensions:
 \begin{itemize}
@@ -640,17 +643,18 @@ This architecture has been then optimized in two dimensions:
 		multiple requests can be served in parallel.
 \end{itemize}
 
-\section{Basic cache}
+\chapter{Basic cache}
 The \emph{Basic cache} is aimed at solving the main limitation of \emph{Ma's
 cache}: application logic cluttering due to inlining.
 
-\subsection{Architecture}
+\section{Architecture}
 The fundamental idea behind the \emph{Basic cache} is that the cache logic is
 inserted in a separate process with respect to the application logic accessing
-it (Figure~\ref{fig:single_proc_basic_arch}): this isolation should make the
-cache always perform in the same manner, while keeping the application logic as
-clean as possible, since it would only have to write requests to cache and read
-its responses, instead of integrating its whole logic.
+it (Figure~\ref{fig:single_proc_basic_arch}): this isolation makes the cache
+always perform in the same manner, independently of the algorithm accessing it,
+while keeping the application logic as clean as possible, since application
+only has to write requests to cache and read responses, instead of integrating
+the whole cache logic.
 
 \begin{figure}[!htb]
 	\centering
@@ -659,7 +663,7 @@ its responses, instead of integrating its whole logic.
 	\label{fig:single_proc_basic_arch}
 \end{figure}
 
-\subsubsection{Functionality}
+\subsection{Functionality}
 If application $A$ needs to access the array associated with the cache $C$:
 \begin{enumerate}
 	\item $A$ sends the access request to $C$: operation (i.e.\ read or
@@ -678,7 +682,7 @@ If application $A$ needs to access the array associated with the cache $C$:
 		read request) sends requested data to $A$.
 \end{enumerate}
 
-\subsubsection{Characteristics}
+\subsection{Characteristics}
 The \emph{Basic cache} is compliant with the set associative mapping policy and
 the write-back consistency policy.
 It is configurable in terms of:
@@ -690,20 +694,23 @@ It is configurable in terms of:
 	\item Replacement policy (\acl{lru} or \acl{fifo}).
 \end{itemize}
 
-\subsubsection{Single-process Basic cache}
+\subsection{Single-process Basic cache}
 The \emph{Single-process Basic cache} is composed of a single pipelined process
 which performs all the cache functionalities.
 
-This process can be pipelined with an \ac{ii} equal to 1 when memory accesses
-are Read-Only and a cache line can fit a single \ac{axi} transaction (i.e.\
-line is not bigger than the maximum \ac{axi} interface width: 512 or 1024 bits
-typically, depending on the specific device).
+This process can be pipelined with an \ac{ii} equal to 1 when:
+\begin{itemize}
+	\item Memory accesses are Read-Only.
+	\item A cache line can fit a single \ac{axi} transaction (i.e.\ line is
+		not bigger than the maximum \ac{axi} interface width: 512 or
+		1024 bits typically, depending on the specific device).
+\end{itemize}
 
 Write accesses generate some dependencies on the \ac{axi} interface, while large
 cache lines require multiple \ac{axi} transactions: both of them cause an
-increase of the process \ac{ii}, ruining cache performance.
+increase of the cache process \ac{ii}, reducing cache performance.
 
-\subsubsection{Multi-processes Basic cache}
+\subsection{Multi-processes Basic cache}
 The \emph{Multi-processes Basic cache} splits cache into two processes
 (Figure~\ref{fig:multi_proc_basic_arch}):
 \begin{itemize}
@@ -715,13 +722,20 @@ The \emph{Multi-processes Basic cache} splits cache into two processes
 
 This architecture is aimed at solving the performance limitations of the
 \emph{Single-process Basic cache}: it manages to pipeline the \emph{core}
-process with an \ac{ii} equal to 1, even in case of write accesses or long
+process with an \ac{ii} equal to 1, even in case of write-only accesses or long
 lines, since the \ac{axi} interfacing resides in the separate \emph{memory
 interface} process.
 
 The latency of the response to a hitting request depends on the \emph{core}
-process only, therefore with this solution the best performance is achieved in case
-of writable caches too.
+process only, therefore with this solution the best performance is achieved in
+case of write-only caches too.
+
+\bigskip
+In the case of caches which are accessed both in read and in write mode, it has
+not been possible to achieve an \ac{ii} of 1, due to dependencies on the cache
+memory.
+Given that a read-write cache implies at least one read access and one write
+access, 
 
 \begin{figure}[!htb]
 	\centering
@@ -730,7 +744,7 @@ of writable caches too.
 	\label{fig:multi_proc_basic_arch}
 \end{figure}
 
-\subsection{Implementation}\label{subsec:basic_impl}
+\section{Implementation}\label{sec:basic_impl}
 The \emph{Basic cache} is implemented in the form of a
 \texttt{C++14}~\cite{cpp14} class, compatible with
 \emph{Vitis\texttrademark~HLS~2021.1}.
@@ -814,7 +828,7 @@ from the transmitter and read from the receiver.
 \texttt{hls::stream} class by \emph{Vitis\texttrademark~HLS} can be used as
 \ac{fifo} implementation.
 
-\subsubsection{Internals}
+\subsection{Internals}
 The \emph{Internals} implementation differs between the \emph{Single-process}
 and the \emph{Multi-processes} implementations:
 \begin{itemize}
@@ -839,7 +853,7 @@ to schedule its process with an \ac{ii} equal to 1 (read-only accesses with
 line not larger than the maximum \ac{axi} interface bitwidth): therefore it is
 automatically instantiated whenever it is convenient.
 
-\paragraph{Dataflow checking}
+\subsubsection{Dataflow checking}
 Alternatively executing the \emph{Multi-processes} or the \emph{Single-process}
 code with traditional \texttt{if} statements would generate errors during the
 synthesis, particularly in the \emph{Dataflow check} step (which checks if each
@@ -852,7 +866,7 @@ The problem has been solved through a wrapper class, which conditionally
 includes a \texttt{hls::stream} object, exploiting the template specialization
 mechanism.
 
-\paragraph{Arrays partitioning}
+\subsubsection{Arrays partitioning}
 Cache memory (which stores the actual data) must be accessed one line per clock
 cycle: it is mapped to a \ac{bram} array cyclically partitioned with a factor
 equal to the number of lines.
@@ -861,9 +875,22 @@ Helper data (e.g.\ \texttt{tag}, \texttt{valid}, \texttt{dirty}\ldots) is stored
 to completely partitioned arrays, mapped to registers, in order to avoid
 dependencies as much as possible and get the best performance.
 
-\paragraph{\acl{raw} dependencies}
-The cache process \ac{ii} is limited by the \ac{raw} dependencies on the cache
-lines, therefore the \emph{\ac{raw} cache} has been developed: it is a
+\subsubsection{\ac{axi} optimizations}
+To exploit the \emph{Vitis\texttrademark~HLS} support to automatic port
+widening and burst accesses to \ac{axi} interface, every access to external
+\ac{dram} accesses a whole cache line.
+The accessed addresses \acp{lsb} are explicitly set to 0 so that synthesizer
+can infer that they are aligned to the line size.
+
+If the cache line is at most equal to the maximum \ac{axi} interface width, it
+is accessed in a single request, otherwise it is accessed in multiple burst
+requests.
+
+\subsubsection{\acl{raw} dependencies}
+In case of read-write caches, the \emph{Core} process \ac{ii} increases to 3
+due to \ac{raw} dependencies on the cache \ac{bram}.
+
+To mitigate this issue the \emph{\ac{raw} cache} has been developed: it is a
 single-line cache which provides the functions:
 \begin{itemize}
 	\item \texttt{get\_line}: in case of hit, read the \emph{\ac{raw}
@@ -876,12 +903,28 @@ Cache memory is always accessed through the \emph{\ac{raw} cache} and the
 \texttt{set\_line} function is called once per iteration at most: if a cache
 line has been written, it is impossible that it is read in the next iteration,
 since the \ac{raw} cache would hit and return its line. This allows to falsify
-the \ac{raw} dependency of distance of 1 on the cache memory, making it
-possible to schedule the cache process with an \ac{ii} equal to 1.
+the \ac{raw} dependency with distance 1 on the cache memory (by setting to
+\texttt{false} the \ac{raw} inter-iteration dependencies and to \texttt{true}
+the \ac{raw} inter-iteration dependencies with distance 1).
 
-\subsubsection{Interface}
-\emph{Interface} provides \acsp{api} for managing requests and responses from
-application to cache:
+\bigskip
+This solution allows to schedule the cache process with an \ac{ii} equal to 2.
+The \emph{\ac{raw} cache} could be extended to a fully-associative cache
+complying with the \ac{fifo} replacement policy, allowing to falsify the
+\ac{raw} dependency with distance 2 and achieving an \ac{ii} of 1.
+
+\bigskip
+A read-write cache implies that it is accessed at least two times per iteration
+(once in read mode, once in write mode), therefore, due to the issues discussed
+in Subsection~\ref{subsec:basic_impl_if} it is not possible to fully exploit the
+cache pipelining.
+In this case the cache \ac{ii} does not have a relevant impact on effective
+performance: \emph{\ac{raw} cache} could not provide real advantages and it has
+not been included in the final design, to keep it simpler.
+
+\subsection{Interface}\label{subsec:basic_impl_if}
+\emph{Interface} provides \acsp{api} for managing requests and responses between
+application and cache:
 \begin{itemize}
 	\item \texttt{get}: send a read request and read the response.
 	\item \texttt{set}: send a write request.
@@ -892,7 +935,7 @@ traditional array (e.g.\ \texttt{val~=~cache[i]} calls
 \texttt{val~=~cache.get(i)} and \texttt{cache[i]~=~val} calls
 \texttt{cache.set(i,~val)}).
 
-\paragraph{Deadlock prevention}
+\subsubsection{Deadlock prevention}
 The \ac{hls} scheduler is not able to infer the dependency between the request
 writing ($W$) and the response reading ($R$) in the \texttt{get} function
 (i.e.\ it is not aware that first the request has to be written, then it is
@@ -909,7 +952,7 @@ The deadlock has been fixed by inserting a clock operation between $W$ and $R$
 (calling \texttt{ap\_wait}), which forces $W$ and $R$ to separate pipeline
 stages.
 
-\paragraph{Cache pipeline exploiting}
+\subsubsection{Cache pipeline exploiting}
 At the steady state, in case of hit, the cache can process one request per
 cycle, thanks to its optimal pipelining (i.e.\ \ac{ii} equal to 1).
 
@@ -945,11 +988,11 @@ state and its throughput is the same as if it were not pipelined.
 
 \bigskip
 To mitigate this issue the \texttt{ap\_wait} between request write and response
-read has been replaced with a \texttt{ap\_wait\_n(LATENCY)}, where
-\texttt{LATENCY} is an integer value set through a template parameter.  This
-forces the scheduler to insert \texttt{LATENCY} clock cycles between $W$ and
-$R$ (Figure~\ref{subfig:desired_sched_static}), so that at runtime stalls are
-avoided (in case of hit) and one request per cycle is sent to cache
+read has been replaced with \texttt{ap\_wait\_n(LATENCY)}, where
+\texttt{LATENCY} is an integer value set through a template parameter.
+This forces the scheduler to insert \texttt{LATENCY} clock cycles between $W$
+and $R$ (Figure~\ref{subfig:desired_sched_static}), so that at runtime stalls
+are avoided (in case of hit) and one request per cycle is sent to cache
 (Figure~\ref{subfig:desired_sched_run}).
 
 \begin{figure}[!htb]
@@ -1009,17 +1052,15 @@ probably needed, but this is not available in
 	\label{fig:fixed_sched_issue}
 \end{figure}
 
-\clearpage
-
-\section{Multi-levels cache}
+\chapter{Multi-levels cache}
 The \emph{Multi-levels cache} is aimed at improving performance by making the
 memory hierarchy deeper, adding a faster \ac{l1} cache memory on top of it.
 This alternative approach has been proposed to overcome the difficulties, to
 fully exploit the optimal pipeline of the \emph{Basic cache}, due to the
 scheduler unawareness about the latency between request writing and response
-reading (as explained in Subsection~\ref{subsec:basic_impl}).
+reading (as explained in Section~\ref{sec:basic_impl}).
 
-\subsection{Architecture}
+\section{Architecture}
 The \emph{Multi-levels cache} introduces a \ac{l1} cache inlined in the
 application logic (Figure~\ref{fig:l1_arch}): the scheduler exactly knows the
 latency of each \ac{l1} cache operation and can build an application pipeline
@@ -1034,7 +1075,7 @@ In order not to fall into the same cluttering issues of \emph{Ma's cache}, the
 
 The write-through consistency policy discards any advantage for write accesses,
 but given that simplicity is a priority and read accesses are usually more
-frequent than writes and they suffer the most from the scheduling issues which
+frequent than writes, and they suffer the most from the scheduling issues which
 lead to the introduction of the \ac{l1} cache, this has been considered the
 best trade-off.
 
@@ -1045,21 +1086,21 @@ best trade-off.
 	\label{fig:l1_arch}
 \end{figure}
 
-\subsection{Implementation}
+\section{Implementation}
 The \emph{Multi-level cache} has been implemented adding the \ac{l1} cache to
 the \emph{Basic cache}.
 It is possible to configure the number of \ac{l1} cache lines through the
 \texttt{L1\_CACHE\_LINES} template parameter.
-When it is set to 0 the resulting architecture is equivalent to the \emph{Basic
+When it is set to 0, the resulting architecture is equivalent to the \emph{Basic
 cache}.
 
-\subsubsection{Internals}
+\subsection{Internals}
 The only difference with respect to the \emph{Basic cache} implementation is
 that the response to a read request does not send a single word, but a whole
 cache line (therefore the data \ac{fifo} flowing from cache to application
 has been widened accordingly).
 
-\subsubsection{Interface}
+\subsection{Interface}
 The \ac{l1} cache is contained in the \emph{Interface}: the newly introduced
 \texttt{get\_line} function receives an address $A$ in input and it returns the
 line to which $A$ belongs.
@@ -1077,9 +1118,7 @@ been updated to support the \ac{l1} cache:
 		it forwards the request to the \ac{l2} cache.
 \end{itemize}
 
-\clearpage
-
-\section{Multi-ports cache}
+\chapter{Multi-ports cache}
 The computational core of many algorithms consists in a loop, which \ac{hls} can
 optimize with two techniques: \emph{Pipelining} and \emph{Unrolling}.
 
@@ -1093,7 +1132,7 @@ The \emph{Multi-ports cache} has been specifically designed for adding support
 to multiple \textbf{concurrent accesses} to the same cache memory, allowing to
 efficiently \textbf{unroll} application loops.
 
-\subsection{Architecture}
+\section{Architecture}
 The \emph{Multi-ports cache} is characterized by multiple ports accessed in
 parallel (Figure~\ref{fig:multi_ports_arch}).
 
@@ -1101,7 +1140,7 @@ Each port has dedicated logic for communicating with the shared \ac{l2} cache
 and an independent \ac{l1} cache.
 
 \bigskip
-Multiple independent ports allow to \textbf{remove dependencies} between
+Multiple independent ports allow \textbf{removing dependencies} between
 different accesses to the cache.
 This brings the advantage of achieving better performance, making it possible
 to schedule multiple requests at the same time, without increasing the
@@ -1117,16 +1156,16 @@ compatible with \textbf{read-only} accesses.
 	\label{fig:multi_ports_arch}
 \end{figure}
 
-\subsection{Implementation}
+\section{Implementation}
 The \emph{Multi-ports cache} has been implemented extending the
 \emph{Multi-levels cache}.
 
 It is possible to configure the number of ports through the \texttt{PORTS}
 template parameter.
-When it is set to 1 the resulting architecture is equivalent to the
+When it is set to 1, the resulting architecture is equivalent to the
 \emph{Multi-levels cache}.
 
-\subsubsection{Internals}
+\subsection{Internals}
 To avoid dependencies issues, whenever \texttt{PORTS} is greater than 1, the
 \emph{Multi-process} \emph{Internals} architecture is generated.
 
@@ -1136,7 +1175,7 @@ ports by inserting an unrolled loop which iterates over all the ports. \ac{hls}
 guarantees all the dependencies on cache data structures, and the resulting
 \ac{ii} of the \emph{Core} process is equal to \texttt{PORTS}.
 
-\subsubsection{Interface}
+\subsection{Interface}
 \acp{fifo} between \emph{Core} and application and \ac{l1} cache have been
 replaced with arrays of \acp{fifo} and \ac{l1} caches, completely partitioned,
 so that they are independent.
@@ -1145,11 +1184,11 @@ Each call to \texttt{get\_line} (which is in turn called by \texttt{get}) is
 automatically associated with a specific port by means of a member variable
 holding the port index and is updated after each access.
 
-\paragraph{\acp{fifo} accesses scheduling}
+\subsubsection{\acp{fifo} accesses scheduling}
 Ideally the request write ($W$) and the response read ($R$) should be scheduled
 in parallel in the same cycle (Figure~\ref{subfig:multiport_des_sched}).
 Due to the scheduler limitations (described in
-Subsection~\ref{subsec:basic_impl}) it is not possible to achieve such a
+Subsection~\ref{sec:basic_impl}) it is not possible to achieve such a
 schedule, since there is a forced clock cycle between $W$ and $R$, which delays
 all the subsequent operations.
 
@@ -1183,7 +1222,7 @@ allowing to fully exploit the \ac{l2} cache pipeline.
 	\label{fig:multiport_sched}
 \end{figure}
 
-\subsection{Limitations}
+\section{Limitations}
 In some particular situations (e.g.\ when cache is explicitly accessed multiple
 times per iteration) the simulation of the generated circuit enters a deadlock.
 The source of this problem can be probably found in the port indexing and to be
@@ -1191,14 +1230,78 @@ fixed may require more control over the operations scheduling, which is not
 provided by \emph{Vitis\texttrademark~HLS 2021.1}.
 
 \chapter{Results}
-The proposed cache architecture has been included in multiple \emph{Vitis~HLS}
-kernels implementing different algorithms each one with specific memory access
+The proposed cache architecture has been embedded in multiple \emph{Vitis~HLS}
+kernels implementing different algorithms, to check both the performance gain
+and the resource usage of different cache configurations.
+
+The results have been compared with the performance lower bound (algorithm
+accesses data directly from external \ac{dram}), with the higher bound
+(algorithm accesses data from local \acp{bram}) and with the Ma's cache.
+
+The different algorithms has been chosen for their specific memory access
 patterns.
+
+\paragraph{Simulation environment}
+Kernels have been synthesized by the C Synthesis in
+\emph{Vitis\texttrademark~HLS~2021.1}, targeting the
+\texttt{xcvu9p-flgb2104-2-e} part, running at a clock frequency of $250 MHz$.
+
+\emph{Vitis\texttrademark~2021.1} provides two main kind of simulation:
+\begin{itemize}
+	\item \acl{hw} Emulation: accurate, but slow.
+	\item C/RTL Co-Simulation: fast, but not very accurate (especially for
+		what concerns the \ac{axi} interface model).
+\end{itemize}
+
+\ac{hw} Emulation has been used only for determining the delay of the \ac{axi}
+interface (around 4 clock cycles), then all the simulations have been performed
+by using Co-Simulation, with \ac{axi} latency set to 3, to match the results by
+\ac{hw} emulation as much as possible.
+
+\bigskip
+A summary of the simulation environment configuration shown in
+Table~\ref{tab:sim_config}.
+
+\begin{table}
+	\begin{center}
+		\begin{tabular}{ll}
+			\hline
+			\rowcolor{gray!25}
+			\textbf{Synthesizer} & C Synthesis in
+			\emph{Vitis\texttrademark~HLS~2021.1} \\
+			\textbf{Simulator} & C/RTL Co-Simulation in
+			\emph{Vitis\texttrademark~HLS~2021.1} \\
+			\rowcolor{gray!25}
+			\textbf{Flow target} & \texttt{vitis} \\
+			\textbf{Part codename} & \texttt{xcvu9p-flgb2104-2-e} \\
+			\rowcolor{gray!25}
+			\textbf{Clock period} & $4 ns$ \\
+			\textbf{\ac{axi} latency} & 3 \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{Simulation environment configuration.}
+	\label{tab:sim_config}
+\end{table}
+
+\paragraph{Ma's cache}
+To make a fair comparison with \emph{Ma's cache}, it should be synthesized and
+simulated in the exact same environment.
+Since it was designed for the \emph{Vivado\texttrademark~HLS~2016.2}, it is not
+getting good performance when synthesized (after some adaptations) in
+\emph{Vitis\texttrademark~HLS~2021.1}.
+
+The most comparable results are therefore the ones reported in the
+\citetitle{liang} paper and in the \citetitle{liangthesis} thesis, both by Ma.
+
 \section{Matrix multiplication}
 \section{Bitonic sorting}
 \section{Lucas-Kanade}
 
-\chapter{Conclusion}
+\chapter{Conclusions}
+
+\appendix
+\chapter{Cache integration}
 
 \backmatter
 
