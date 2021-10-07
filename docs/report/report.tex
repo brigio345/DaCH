@@ -15,8 +15,11 @@
 \usepackage{tabularx}
 \usepackage{acro}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
 \newcolumntype{C}{>{\centering\arraybackslash}X}
@@ -143,6 +146,26 @@
 \DeclareAcronym{msb}{
 	short=MSB,
 	long=Most Significant Bit,
+}
+
+\DeclareAcronym{dsp}{
+	short=DSP,
+	long=Digital Signal Processor,
+}
+
+\DeclareAcronym{lut}{
+	short=LUT,
+	long=Lookup Table,
+}
+
+\DeclareAcronym{ff}{
+	short=FF,
+	long=Flip-flop,
+}
+
+\DeclareAcronym{cc}{
+	short=CC,
+	long=Clock Cycle,
 }
 
 \renewcommand*{\maketitle}%
@@ -766,7 +789,7 @@ The cache class is logically split into two parts:
 		(read data), after executing the requested operation.
 \end{itemize}
 
-\begin{table}
+\begin{table}[!htb]
 	\begin{center}
 		\begin{tabular}{ccc}
 			\hline
@@ -1262,7 +1285,7 @@ by using Co-Simulation, with \ac{axi} latency set to 3, to match the results by
 A summary of the simulation environment configuration shown in
 Table~\ref{tab:sim_config}.
 
-\begin{table}
+\begin{table}[!htb]
 	\begin{center}
 		\begin{tabular}{ll}
 			\hline
@@ -1287,7 +1310,7 @@ Table~\ref{tab:sim_config}.
 \paragraph{Ma's cache}
 To make a fair comparison with \emph{Ma's cache}, it should be synthesized and
 simulated in the exact same environment.
-Since it was designed for the \emph{Vivado\texttrademark~HLS~2016.2}, it is not
+Since it was designed for the \emph{Vivado\texttrademark~HLS 2016.2}, it is not
 getting good performance when synthesized (after some adaptations) in
 \emph{Vitis\texttrademark~HLS~2021.1}.
 
@@ -1295,8 +1318,234 @@ The most comparable results are therefore the ones reported in the
 \citetitle{liang} paper and in the \citetitle{liangthesis} thesis, both by Ma.
 
 \section{Matrix multiplication}
+The standard row-by-column \emph{Matrix multiplication} algorithm
+(Algorithm~\ref{alg:matmul}) include two memory access patterns: $A$ and $C$
+matrices are accessed by rows, while $B$ matrix is accessed by columns.
+
+\begin{algorithm}
+	\caption{\emph{Matrix multiplication} algorithm.}\label{alg:matmul}
+	\begin{algorithmic}
+		\Require $A \in \mathbb{R}^{N \times M},
+		B \in \mathbb{R}^{M \times P}, C \in \mathbb{R}^{N \times P}$
+		\Ensure $C = A \times B$
+		\Procedure{Multiply}{$A, B, C$}
+			\For{$i = 0, \dots, N$}
+				\For{$j = 0, \dots, P$}
+					\State $C[i][j] \gets 0$
+					\For{$k = 0, \dots, M$}
+						\State $C[i][j] \gets C[i][j] +
+						A[i][k] \cdot B[k][j]$
+					\EndFor
+				\EndFor
+			\EndFor
+		\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
+
+\subsection{\texttt{get} latency exploration}
+\begin{table}[!htb]
+	\begin{center}
+		\begin{tabular}{cccccc}
+			\hline
+			\rowcolor{gray!50}
+			\textbf{Matrix} & \textbf{Rows} & \textbf{Columns} &
+			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line} \\
+			\hline
+			$A$ & 16 & 16 & 1 & 1 & 16 \\
+			\rowcolor{gray!25}
+			$B$ & 16 & 16 & 16 & 1 & 16 \\
+			$C$ & 16 & 16 & 1 & 1 & 16 \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{\emph{Matrix multiplication} setup $A$.}
+	\label{tab:matmul_setup_a}
+\end{table}
+
+\begin{figure}[!htb]
+	\centering
+	\includegraphics[width=.8\textwidth]{matmul_latency_exploration}
+	\caption{Execution time with respect to \texttt{get} latency of
+	\emph{Matrix multiplication}.}
+	\label{fig:matmul_latency_exploration}
+\end{figure}
+
+\subsection{Comparisons}
+\subsubsection{Setup $A$}
+\begin{table}[!htb]
+	\begin{center}
+		\begin{tabular}{ccccccc}
+			\hline
+			\rowcolor{gray!50}
+			\textbf{Matrix} & \textbf{Rows} & \textbf{Columns} &
+			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line}
+			& \textbf{\texttt{get} latency} \\
+			\hline
+			$A$ & 16 & 16 & 1 & 1 & 16 & 14 \\
+			\rowcolor{gray!25}
+			$B$ & 16 & 16 & 16 & 1 & 16 & 14 \\
+			$C$ & 16 & 16 & 1 & 1 & 16 & - \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{\emph{Matrix multiplication} setup $A$.}
+	\label{tab:matmul_setup_a}
+\end{table}
+
+\begin{table}[!htb]
+	\begin{center}
+		\begin{tabularx}{\textwidth}{CCCCC}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{Global memory} & \textbf{Local memory} &
+			\textbf{Proposed cache} & \textbf{Ma's cache} \\
+			\hline
+			\textbf{Execution time} [$ms$] & & & & $0.031$ \\
+			\rowcolor{gray!25}
+			\textbf{\ac{bram}} & & & & $31$ \\
+			\textbf{\acs{dsp}} & & & & $3$ \\
+			\rowcolor{gray!25}
+			\textbf{\acs{lut}} & & & & $5699$ \\
+			\textbf{\acs{ff}} & & & & $17794$ \\
+			\hline
+		\end{tabularx}
+	\end{center}
+	\caption{Performance and resource usage of \emph{Matrix multiplication}
+	with setup $A$.}
+	\label{tab:matmul_report_a}
+\end{table}
+
+\subsubsection{Setup $B$}
+\begin{table}[!htb]
+	\begin{center}
+		\begin{tabular}{ccccccc}
+			\hline
+			\rowcolor{gray!50}
+			\textbf{Matrix} & \textbf{Rows} & \textbf{Columns} &
+			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line}
+			& \textbf{\texttt{get} latency} \\
+			\hline
+			$A$ & 32 & 32 & 1 & 1 & 32 & 7 \\
+			\rowcolor{gray!25}
+			$B$ & 32 & 32 & 32 & 1 & 32 & 7 \\
+			$C$ & 32 & 32 & 1 & 1 & 32 & - \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{\emph{Matrix multiplication} setup $B$.}
+	\label{tab:matmul_setup_b}
+\end{table}
+
+\begin{table}[!htb]
+	\begin{center}
+		\begin{tabularx}{\textwidth}{CCCCC}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{Global memory} & \textbf{Local memory} &
+			\textbf{Proposed cache} & \textbf{Ma's cache} \\
+			\hline
+			\textbf{Execution time} [$ms$] & & & & $0.031$ \\
+			\rowcolor{gray!25}
+			\textbf{\ac{bram}} & & & & $31$ \\
+			\textbf{\acs{dsp}} & & & & $3$ \\
+			\rowcolor{gray!25}
+			\textbf{\acs{lut}} & & & & $5699$ \\
+			\textbf{\acs{ff}} & & & & $17794$ \\
+			\hline
+		\end{tabularx}
+	\end{center}
+	\caption{Performance and resource usage of \emph{Matrix multiplication}
+	with setup $B$.}
+	\label{tab:matmul_report_b}
+\end{table}
+
 \section{Bitonic sorting}
+\emph{Bitonic sorting} (shown in Algorithm~\ref{alg:bitonic}) is a sorting
+algorithm which provides an high degree of parallelism, therefore it is
+suitable for \acl{hw} implementations.
+
+\begin{algorithm}
+	\caption{\emph{Bitonic sorting} algorithm.}\label{alg:bitonic}
+	\begin{algorithmic}
+		\Require $a \in \mathbb{R}^N, N = 2^n$; $dir$: sorting direction
+		\Ensure $a[i] \geq a[j], \forall i \geq j \wedge dir = true \vee
+			a[i] \leq a[j], \forall i \geq j \wedge dir = false$
+		\Procedure{Sort}{$a$, $dir$}
+			\For{$b = 1, \dots, n$}
+				\For{$s = i - 1, \dots, 0$}
+					\For{$i = 0, \dots, N/2 - 1$}
+						\State $dir_0 \gets
+							(i/2^{b - 1}) \& 1$
+						\State $dir_0 \gets dir_0 | dir$
+						\State $step \gets 2^s$
+						\State $pos \gets 2 i -
+							(i \& (s - 1))$
+						\If{$a_{pos} > a[pos + step] \neq dir_0$}
+							\State $swap(a[pos],
+								a[pos + step])$
+						\EndIf
+					\EndFor
+				\EndFor
+			\EndFor
+		\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
+
+\subsection{Comparisons}
+\subsubsection{Setup $A$}
+\begin{itemize}
+	\item $n$: 10.
+	\item Sets: 1.
+	\item Ways: 2.
+	\item Words per line: 16.
+	\item \texttt{get} latency: 2.
+\end{itemize}
+
+\begin{table}[!htb]
+	\begin{center}
+		\begin{tabularx}{\textwidth}{CCCCC}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{Global memory} & \textbf{Local memory} &
+			\textbf{Proposed cache} & \textbf{Ma's cache} \\
+			\hline
+			\textbf{Execution time} [$ms$] & $3.385$ & $0.347$ &
+			$2.827$ & $1.388$ \\
+			\rowcolor{gray!25}
+			\textbf{\ac{bram}} & $4$ & $60$ & $58$ & $31$ \\
+			\textbf{\acs{dsp}} & $0$ & $0$ & $0$ & $0$ \\
+			\rowcolor{gray!25}
+			\textbf{\acs{ff}} & $1150$ & $3445$ & $15397$ & $31101$ \\
+			\textbf{\acs{lut}} & $1710$ & $3508$ & $44590$ & $22142$ \\
+			\hline
+		\end{tabularx}
+	\end{center}
+	\caption{Performance and resource usage of \emph{Bitonic sorting}
+	with setup $A$.}
+	\label{tab:bitonic_report_a}
+\end{table}
+
+
 \section{Lucas-Kanade}
+\begin{algorithm}
+	\caption{\emph{Lucas-Kanade} algorithm.}\label{alg:lk}
+	\begin{algorithmic}
+		\Require $A \in \mathbb{R}^{N \times M},
+		B \in \mathbb{R}^{M \times P}, C \in \mathbb{R}^{N \times P}$
+		\Ensure $C = A \times B$
+		\Procedure{Multiply}{$A, B, C$}
+			\For{$i = 0, \dots, N$}
+				\For{$j = 0, \dots, P$}
+					\State $C[i][k] \gets 0$
+					\For{$k = 0, \dots, M$}
+						\State $C[i][j] \gets C[i][j] +
+						A[i][k] \cdot B[k][j]$
+					\EndFor
+				\EndFor
+			\EndFor
+		\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
 
 \chapter{Conclusions}
 
