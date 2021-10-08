@@ -1254,17 +1254,13 @@ provided by \emph{Vitis\texttrademark~HLS 2021.1}.
 
 \chapter{Results}
 The proposed cache architecture has been embedded in multiple \emph{Vitis~HLS}
-kernels implementing different algorithms, to check both the performance gain
+kernels implementing different algorithms, to evaluate both the performance gain
 and the resource usage of different cache configurations.
 
-The results have been compared with the performance lower bound (algorithm
-accesses data directly from external \ac{dram}), with the higher bound
-(algorithm accesses data from local \acp{bram}) and with the Ma's cache.
+Each algorithm has been selected for its memory intensiveness and for its
+specific memory access patterns.
 
-The different algorithms has been chosen for their specific memory access
-patterns.
-
-\paragraph{Simulation environment}
+\section{Simulation environment}
 Kernels have been synthesized by the C Synthesis in
 \emph{Vitis\texttrademark~HLS~2021.1}, targeting the
 \texttt{xcvu9p-flgb2104-2-e} part, running at a clock frequency of $250 MHz$.
@@ -1276,14 +1272,11 @@ Kernels have been synthesized by the C Synthesis in
 		what concerns the \ac{axi} interface model).
 \end{itemize}
 
-\ac{hw} Emulation has been used only for determining the delay of the \ac{axi}
-interface (around 4 clock cycles), then all the simulations have been performed
-by using Co-Simulation, with \ac{axi} latency set to 3, to match the results by
-\ac{hw} emulation as much as possible.
-
-\bigskip
-A summary of the simulation environment configuration shown in
-Table~\ref{tab:sim_config}.
+\ac{hw} Emulation has been used for determining the delay of the \ac{axi}
+interface (which is around 4 clock cycles). 
+The \ac{axi} latency has been accordingly set to 3, so that the synthesizer can
+better optimize the circuit and Co-Simulation results match \ac{hw} emulation as
+much as possible.
 
 \begin{table}[!htb]
 	\begin{center}
@@ -1307,21 +1300,63 @@ Table~\ref{tab:sim_config}.
 	\label{tab:sim_config}
 \end{table}
 
-\paragraph{Ma's cache}
-To make a fair comparison with \emph{Ma's cache}, it should be synthesized and
-simulated in the exact same environment.
-Since it was designed for the \emph{Vivado\texttrademark~HLS 2016.2}, it is not
-getting good performance when synthesized (after some adaptations) in
-\emph{Vitis\texttrademark~HLS~2021.1}.
+\subsection{Reference memory models}
+The results have been compared with the output of synthesis and simulation of
+same algorithms implemented with different data access mechanisms: \emph{global
+memory} (performance lower bound), \emph{local memory} (performance higher
+bound) and \emph{Ma's cache}.
 
-The most comparable results are therefore the ones reported in the
-\citetitle{liang} paper and in the \citetitle{liangthesis} thesis, both by Ma.
+\subsubsection{Global memory}
+The algorithms access data directly from external \ac{dram} through \ac{axi}
+interface, without any optimization: this is the straightforward but slowest
+solution, therefore it determines the performance lower bound.
+
+\subsubsection{Local memory}
+All the data required by algorithms is stored to local \acp{bram}: it determines
+the performance higher bound, but it is unfeasible in general, due to the
+limited amount of \acp{bram}.
+
+With this solution the kernel:
+\begin{enumerate}
+	\item Moves all the input data from \ac{dram} to \acp{bram}.
+	\item Performs all the computations accessing data to and from
+		\acp{bram}. 
+	\item Moves all the output data from \acp{bram} to \ac{dram}.
+\end{enumerate}
+
+The execution time of \ac{dram} accesses is not of interest, therefore it has
+been subtracted from reported results.
+
+\subsubsection{Ma's cache}
+\emph{Ma's cache} was designed for \emph{Vivado\texttrademark~HLS~2016.2}:
+with some minor changes it is possible to synthesize it with
+\emph{Vitis~HLS~2021.1}, but it would need some more optimizations to achieve
+the original performance in the new environment.
+
+The most fair comparison should have been done by using results generated in
+the exact same environment, but since this was not possible, all the results
+about Ma's cache have been collected from Ma's paper \citetitle{liang} and PhD
+thesis \citetitle{liangthesis}.
 
 \section{Matrix multiplication}
 The standard row-by-column \emph{Matrix multiplication} algorithm
-(Algorithm~\ref{alg:matmul}) include two memory access patterns: $A$ and $C$
-matrices are accessed by rows, while $B$ matrix is accessed by columns.
+(Algorithm~\ref{alg:matmul}) includes two memory access patterns: by rows ($A$
+and $C$) and by columns ($B$).
 
+Each row of $A$ matrix is accessed $P$ times and then it is not accessed
+anymore: the most convenient $A$ cache is composed of a single line which fits a
+matrix row, which is filled each time a new row is accessed and it hits until
+the next row is accessed.
+
+Each column of $B$ matrix is accessed $P$ times: the $B$ cache, to get an hit
+ratio greater than 0 needs to contain at least $M$ lines and comply with the
+fully-associative mapping policy.
+The results reported by Ma used a direct-mapped cache with $M$ lines each one
+containing $P$ elements (so that it is as big as the $B$ matrix).
+
+$C$ elements are accessed sequentially and only once.
+
+\subsection{16x16 matrices}
 \begin{algorithm}
 	\caption{\emph{Matrix multiplication} algorithm.}\label{alg:matmul}
 	\begin{algorithmic}
@@ -1329,69 +1364,71 @@ matrices are accessed by rows, while $B$ matrix is accessed by columns.
 		B \in \mathbb{R}^{M \times P}, C \in \mathbb{R}^{N \times P}$
 		\Ensure $C = A \times B$
 		\Procedure{Multiply}{$A, B, C$}
-			\For{$i = 0, \dots, N$}
-				\For{$j = 0, \dots, P$}
-					\State $C[i][j] \gets 0$
-					\For{$k = 0, \dots, M$}
-						\State $C[i][j] \gets C[i][j] +
-						A[i][k] \cdot B[k][j]$
+			\For{$i = 0, \dots, N - 1$}
+				\For{$j = 0, \dots, P - 1$}
+					\State $tmp \gets 0$
+					\For{$k = 0, \dots, M - 1$}
+						\State $tmp \gets tmp +
+							A[i][k] \cdot B[k][j]$
 					\EndFor
+					\State $C[i][j] \gets tmp$
 				\EndFor
 			\EndFor
 		\EndProcedure
 	\end{algorithmic}
 \end{algorithm}
 
-\subsection{\texttt{get} latency exploration}
-\begin{table}[!htb]
-	\begin{center}
-		\begin{tabular}{cccccc}
-			\hline
-			\rowcolor{gray!50}
-			\textbf{Matrix} & \textbf{Rows} & \textbf{Columns} &
-			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line} \\
-			\hline
-			$A$ & 16 & 16 & 1 & 1 & 16 \\
-			\rowcolor{gray!25}
-			$B$ & 16 & 16 & 16 & 1 & 16 \\
-			$C$ & 16 & 16 & 1 & 1 & 16 \\
-			\hline
-		\end{tabular}
-	\end{center}
-	\caption{\emph{Matrix multiplication} setup $A$.}
-	\label{tab:matmul_setup_a}
-\end{table}
-
-\begin{figure}[!htb]
-	\centering
-	\includegraphics[width=.8\textwidth]{matmul_latency_exploration}
-	\caption{Execution time with respect to \texttt{get} latency of
-	\emph{Matrix multiplication}.}
-	\label{fig:matmul_latency_exploration}
-\end{figure}
-
-\subsection{Comparisons}
-\subsubsection{Setup $A$}
+\subsubsection{Single-level cache configuration}
 \begin{table}[!htb]
 	\begin{center}
 		\begin{tabular}{ccccccc}
 			\hline
 			\rowcolor{gray!50}
 			\textbf{Matrix} & \textbf{Rows} & \textbf{Columns} &
-			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line}
-			& \textbf{\texttt{get} latency} \\
+			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line} &
+			\textbf{\ac{l1} lines} \\
 			\hline
-			$A$ & 16 & 16 & 1 & 1 & 16 & 14 \\
+			$A$ & 16 & 16 & 1 & 1 & 16 & 0 \\
 			\rowcolor{gray!25}
-			$B$ & 16 & 16 & 16 & 1 & 16 & 14 \\
-			$C$ & 16 & 16 & 1 & 1 & 16 & - \\
+			$B$ & 16 & 16 & 16 & 1 & 16 & 0 \\
+			$C$ & 16 & 16 & 1 & 1 & 16 & 0 \\
 			\hline
 		\end{tabular}
 	\end{center}
-	\caption{\emph{Matrix multiplication} setup $A$.}
-	\label{tab:matmul_setup_a}
+	\caption{Single-level cache configuration for \emph{Matrix
+	multiplication 16x16}.}
+	\label{tab:matmul_16_no_l1_config}
 \end{table}
 
+\paragraph{Design space exploration}
+\begin{figure}[!htb]
+	\centering
+	\includegraphics[width=.8\textwidth]{matmul_16_multiport_latency}
+	\caption{Design space of \emph{Matrix multiplication 16x16}
+	(single-level).}
+	\label{fig:matmul_16_no_l1_space}
+\end{figure}
+
+\begin{figure}[!htb]
+	\centering
+	\begin{subfigure}[b]{\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{matmul_latency_1}
+		\caption{\texttt{get} lantency of 1.}
+		\label{subfig:matmul_wf_latency_1}
+	\end{subfigure}
+	\begin{subfigure}[b]{\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{matmul_latency_15}
+		\caption{\texttt{get} latency of 15.}
+		\label{subfig:matmul_wf_latency_15}
+	\end{subfigure}
+	\caption{\acp{fifo} signals waveforms for \emph{Matrix multiplication}
+	with different latencies.}
+	\label{fig:matmul_wf}
+\end{figure}
+
+\paragraph{Comparison with other memory models}
 \begin{table}[!htb]
 	\begin{center}
 		\begin{tabularx}{\textwidth}{CCCCC}
@@ -1415,7 +1452,39 @@ matrices are accessed by rows, while $B$ matrix is accessed by columns.
 	\label{tab:matmul_report_a}
 \end{table}
 
-\subsubsection{Setup $B$}
+\subsubsection{Multi-levels cache configuration}
+\begin{table}[!htb]
+	\begin{center}
+		\begin{tabular}{ccccccc}
+			\hline
+			\rowcolor{gray!50}
+			\textbf{Matrix} & \textbf{Rows} & \textbf{Columns} &
+			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line} &
+			\textbf{\ac{l1} lines} \\
+			\hline
+			$A$ & 16 & 16 & 1 & 1 & 16 & 0 \\
+			\rowcolor{gray!25}
+			$B$ & 16 & 16 & 16 & 1 & 16 & 0 \\
+			$C$ & 16 & 16 & 1 & 1 & 16 & 0 \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{Multi-levels cache configuration for \emph{Matrix
+	multiplication 16x16}.}
+	\label{tab:matmul_16_l1_config}
+\end{table}
+
+\paragraph{Design space exploration}
+\begin{figure}[!htb]
+	\centering
+	\includegraphics[width=.8\textwidth]{matmul_16_multiport_L1_latency}
+	\caption{Design space of \emph{Matrix multiplication 16x16}
+	(multi-levels).}
+	\label{fig:matmul_16_l1_space}
+\end{figure}
+
+\subsection{32x32 matrices}
+\subsubsection{Cache configuration $A$}
 \begin{table}[!htb]
 	\begin{center}
 		\begin{tabular}{ccccccc}
@@ -1432,8 +1501,8 @@ matrices are accessed by rows, while $B$ matrix is accessed by columns.
 			\hline
 		\end{tabular}
 	\end{center}
-	\caption{\emph{Matrix multiplication} setup $B$.}
-	\label{tab:matmul_setup_b}
+	\caption{\emph{Matrix multiplication 32x32}, cache configuration $A$.}
+	\label{tab:matmul_32_config_a}
 \end{table}
 
 \begin{table}[!htb]
@@ -1481,8 +1550,11 @@ suitable for \acl{hw} implementations.
 						\State $pos \gets 2 i -
 							(i \& (s - 1))$
 						\If{$a_{pos} > a[pos + step] \neq dir_0$}
-							\State $swap(a[pos],
-								a[pos + step])$
+							\State $tmp \gets a[pos]$
+							\State $a[pos] \gets
+								a[pos + step]$
+							\State $a[pos + step]
+								\gets tmp$
 						\EndIf
 					\EndFor
 				\EndFor
@@ -1493,13 +1565,22 @@ suitable for \acl{hw} implementations.
 
 \subsection{Comparisons}
 \subsubsection{Setup $A$}
-\begin{itemize}
-	\item $n$: 10.
-	\item Sets: 1.
-	\item Ways: 2.
-	\item Words per line: 16.
-	\item \texttt{get} latency: 2.
-\end{itemize}
+\begin{table}[!htb]
+	\begin{center}
+		\begin{tabular}{ccccc}
+			\hline
+			\rowcolor{gray!50}
+			\textbf{$n$} & \textbf{Sets} & \textbf{Ways} &
+			\textbf{Words per line} & \textbf{\texttt{get} latency} \\
+			\hline
+			$10$ & $1$ & $2$ & $16$ & $2$ \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{Performance and resource usage of \emph{Bitonic sorting}
+	with setup $A$.}
+	\label{tab:bitonic_setup_a}
+\end{table}
 
 \begin{table}[!htb]
 	\begin{center}
