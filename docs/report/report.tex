@@ -160,7 +160,7 @@
 
 \DeclareAcronym{ff}{
 	short=FF,
-	long=Flip-flop,
+	long=Flip-Flop,
 }
 
 \DeclareAcronym{cc}{
@@ -1268,8 +1268,8 @@ Kernels have been synthesized by the C Synthesis in
 \emph{Vitis\texttrademark~2021.1} provides two main kind of simulation:
 \begin{itemize}
 	\item \acl{hw} Emulation: accurate, but slow.
-	\item C/RTL Co-Simulation: fast, but not very accurate (especially for
-		what concerns the \ac{axi} interface model).
+	\item C/\acs{rtl} Co-Simulation: fast, but not very accurate
+		(especially for what concerns the \ac{axi} interface model).
 \end{itemize}
 
 \ac{hw} Emulation has been used for determining the delay of the \ac{axi}
@@ -1353,6 +1353,19 @@ The additional degrees of freedom provided by the proposed cache (\texttt{get}
 latency, multiple cache levels, multiple ports) have been exploited to further
 explore the design space.
 
+\subsection{Collected data}
+The most relevant collected data concerns:
+\begin{itemize}
+	\item Performance: evaluated in terms of execution time (i.e.\ the time
+		at which the simulation of the algorithm terminates).
+	\item Resource usage: evaluated in terms of number of used \acp{bram},
+		\acp{dsp}, \acp{lut} and \acp{ff}.
+\end{itemize}
+
+These values are approximate, since they come from the simple C/\ac{rtl}
+Co-Simulation and from the estimations performed by the C Synthesis, but in any
+case they can be meaningful for identifying some trends.
+
 \section{Matrix multiplication}
 The standard row-by-column \emph{Matrix multiplication} algorithm
 (Algorithm~\ref{alg:matmul}) includes two memory access patterns: by rows ($A$
@@ -1411,17 +1424,17 @@ of ports have been determined through design space exploration.
 
 \begin{table}[H]
 	\begin{center}
-		\begin{tabular}{ccccc}
+		\begin{tabular}{cccccc}
 			\hline
 			\rowcolor{gray!50}
 			\textbf{Matrix} &
 			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line} &
-			\textbf{\ac{l1} lines} \\
+			\textbf{\ac{l1} lines} & \textbf{Hit ratio} \\
 			\hline
-			$A$ & 1 & 1 & 16 & 0 \\
+			$A$ & 1 & 1 & 16 & 0 & 99.6 \% \\
 			\rowcolor{gray!25}
-			$B$ & 16 & 1 & 16 & 0 \\
-			$C$ & 1 & 1 & 16 & 0 \\
+			$B$ & 16 & 1 & 16 & 0 & 99.6 \% \\
+			$C$ & 1 & 1 & 16 & 0 & 93.8 \% \\
 			\hline
 		\end{tabular}
 	\end{center}
@@ -1443,6 +1456,14 @@ Increasing the number of ports can provide significant advantages when the
 \texttt{get} latency is not optimal, because multi-port allow to schedule some
 cache requests in consecutive clock cycles.
 
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.7\textwidth]{matmul_16_multiport_latency}
+	\caption{Design space of \emph{Matrix multiplication 16x16}
+	(single-level).}
+	\label{fig:matmul_16_no_l1_space}
+\end{figure}
+
 The best performance is achieved by the single-port, since in this case the
 caches \emph{core} process has an \ac{ii} of 1: with a \texttt{get} latency of
 1 it is not possible to take full advantage of the \texttt{core} pipelining (as
@@ -1455,21 +1476,13 @@ read (Figure~\ref{subfig:matmul_wf_latency_15}).
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=.8\textwidth]{matmul_16_multiport_latency}
-	\caption{Design space of \emph{Matrix multiplication 16x16}
-	(single-level).}
-	\label{fig:matmul_16_no_l1_space}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\begin{subfigure}[b]{\textwidth}
+	\begin{subfigure}[b]{.85\textwidth}
 		\centering
 		\includegraphics[width=\textwidth]{matmul_latency_1}
 		\caption{Sub-optimal \texttt{get} latency of 1.}
 		\label{subfig:matmul_wf_latency_1}
 	\end{subfigure}
-	\begin{subfigure}[b]{\textwidth}
+	\begin{subfigure}[b]{.85\textwidth}
 		\centering
 		\includegraphics[width=\textwidth]{matmul_latency_15}
 		\caption{Optimal \texttt{get} latency of 15.}
@@ -1480,6 +1493,14 @@ read (Figure~\ref{subfig:matmul_wf_latency_15}).
 	\label{fig:matmul_wf}
 \end{figure}
 
+Table~\ref{tab:matmul_16_no_l1_ports_report} reports the data for the
+single-level cache configuration of different port numbers, each one set to its
+optimal \texttt{get} latency value (15 for the 1-port, 3 for the 2-ports and 2
+for the 4-ports).
+
+It is not clear why the estimated required \acp{bram} in the 2-ports case is much
+higher than the other cases.
+
 \begin{table}[H]
 	\begin{center}
 		\begin{tabular}{cccc}
@@ -1487,7 +1508,7 @@ read (Figure~\ref{subfig:matmul_wf_latency_15}).
 			\rowcolor{gray!50}
 			& \textbf{1-port} & \textbf{2-ports} & \textbf{4-ports} \\
 			\hline
-			\textbf{Execution time} [$\mu s$] & 17 & 39 & 47 \\
+			\textbf{Execution time} [$ns$] & 17438 & 38570 & 49694 \\
 			\rowcolor{gray!25}
 			\textbf{\ac{bram}} & 90 & 165 & 90 \\
 			\textbf{\acs{dsp}} & 3 & 6 & 12 \\
@@ -1502,40 +1523,6 @@ read (Figure~\ref{subfig:matmul_wf_latency_15}).
 	\label{tab:matmul_16_no_l1_ports_report}
 \end{table}
 
-\paragraph{Comparison with other memory models}
-Table~\ref{tab:matmul_16_no_l1_report} reports most relevant figures about
-performance and resource usage of \emph{Matrix multiplication 16x16}.
-
-The proposed cache requires significantly more resources than Ma's cache
-(especially in terms of \acsp{lut}), but allows to get performance which are
-equivalent to the performance higher bound.
-
-\begin{table}[H]
-	\begin{center}
-		\begin{tabularx}{\textwidth}{CCCCC}
-			\hline
-			\rowcolor{gray!50}
-			& \textbf{Global memory} & \textbf{Local memory} &
-			\textbf{Ma's cache} \footnotemark &
-			\textbf{Proposed cache} \\
-			\hline
-			\textbf{Execution time} [$\mu s$] & $30$ & $17$ & $31$ & $17$ \\
-			\rowcolor{gray!25}
-			\textbf{\ac{bram}} & $34$ & $93$ & $31$ & $90$ \\
-			\textbf{\acs{dsp}} & $3$ & $3$ & $3$ & $3$ \\
-			\rowcolor{gray!25}
-			\textbf{\acs{lut}} & $4421$ & $7120$ & $5699$ & $57653$ \\
-			\textbf{\acs{ff}} & $4736$ & $7841$ & $17794$ & $26597$ \\
-			\hline
-		\end{tabularx}
-	\end{center}
-	\caption{Performance and resource usage of \emph{Matrix multiplication 16x16}.}
-	\label{tab:matmul_16_no_l1_report}
-\end{table}
-
-\footnotetext{Data collected from a different environment, not fully
-comparable.}
-
 \subsubsection{Multi-levels cache configuration}
 The cache sizes have been fixed with the values shown in
 Table~\ref{tab:matmul_16_l1_config}.
@@ -1544,17 +1531,17 @@ design space exploration.
 
 \begin{table}[H]
 	\begin{center}
-		\begin{tabular}{ccccc}
+		\begin{tabular}{cccccc}
 			\hline
 			\rowcolor{gray!50}
 			\textbf{Matrix} &
 			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line} &
-			\textbf{\ac{l1} lines} \\
+			\textbf{\ac{l1} lines} & \textbf{Hit ratio} \\
 			\hline
-			$A$ & 1 & 1 & 16 & 1 \\
+			$A$ & 1 & 1 & 16 & 1 & 99.6 \% \\
 			\rowcolor{gray!25}
-			$B$ & 1 & 1 & 16 & 16 \\
-			$C$ & 1 & 1 & 16 & 0 \\
+			$B$ & 1 & 1 & 16 & 16 & 99.6 \% \\
+			$C$ & 1 & 1 & 16 & 0 & 93.8 \% \\
 			\hline
 		\end{tabular}
 	\end{center}
@@ -1570,8 +1557,8 @@ latency is not relevant is this case, since all the cache hits are on the
 
 Increasing the number of ports allows to significantly improve performance,
 since the multiple \ac{l1} caches can run effectively in parallel, but the
-higher is the number of ports, the lower is the hit ratio of each \ac{l1}
-cache: 4 ports is the optimal configuration for what concerns performance.
+higher is the number of ports, the lower is the hit ratio of \ac{l1} caches: 4
+ports is the optimal configuration for what concerns performance.
 
 \begin{figure}[H]
 	\centering
@@ -1589,13 +1576,14 @@ cache: 4 ports is the optimal configuration for what concerns performance.
 			& \textbf{1-port} & \textbf{2-ports} & \textbf{4-ports}
 			& \textbf{8-ports} \\
 			\hline
-			\textbf{Execution time} [$ns$] & 19022 & 10274 & 6458 & \\
+			\textbf{Execution time} [$ns$] & 18986 & 10166 & 6458 &
+			7358 \\
 			\rowcolor{gray!25}
-			\textbf{\ac{bram}} & 129 & 165 & 237 & \\
-			\textbf{\acs{dsp}} & 3 & 6 & 12 & \\
+			\textbf{\ac{bram}} & 129 & 165 & 237 & 381 \\
+			\textbf{\acs{dsp}} & 3 & 6 & 12 & 24 \\
 			\rowcolor{gray!25}
-			\textbf{\acs{lut}} & 58138 & 81779 & 118794 & \\
-			\textbf{\acs{ff}} & 41961 & 101315 & 238374 & \\
+			\textbf{\acs{lut}} & 58138 & 81779 & 118794 & 198678 \\
+			\textbf{\acs{ff}} & 41961 & 101315 & 238374 & 581204 \\
 			\hline
 		\end{tabular}
 	\end{center}
@@ -1604,30 +1592,93 @@ cache: 4 ports is the optimal configuration for what concerns performance.
 	\label{tab:matmul_16_l1_ports_report}
 \end{table}
 
-\subsection{32x32 matrices}
-\subsubsection{Single-level configuration}
-\begin{table}[!htb]
+\subsubsection{Summary}
+Table~\ref{tab:matmul_16_report} reports most relevant figures about
+performance and resource usage of \emph{Matrix multiplication 16x16}.
+
+The Proposed cache data is referred to the most performant cases of the
+single-level variant (with single port and \texttt{get} latency equal to 15)
+and of the multi-levels variant (with 4 ports and \texttt{get} latency equal to
+7).
+
+The cost in terms of resource usage of the proposed cache is significant in
+terms of resource usage, particularly the number of \acp{lut} and \acp{ff} is
+one order of magnitude more for the single-level and single-port configuration
+and two orders of magnitude for the multi-levels and multi-ports configuration,
+with respect to Ma's cache.
+The single-level configuration allows to reach performance on par with the
+local memory and the multi-level configuration is more than two times faster,
+thanks to the unrolling.
+
+\begin{table}[H]
 	\begin{center}
-		\begin{tabular}{ccccccc}
+		\begin{tabularx}{\textwidth}{CCCCCC}
 			\hline
 			\rowcolor{gray!50}
-			\textbf{Matrix} & \textbf{Rows} & \textbf{Columns} &
-			\textbf{Sets} & \textbf{Ways} & \textbf{Words per line}
-			& \textbf{\texttt{get} latency} \\
+			& \textbf{Global memory} & \textbf{Local memory} &
+			\textbf{Ma's cache} \footnotemark &
+			\textbf{Proposed cache (single-level)} &
+			\textbf{Proposed cache (multi-levels)} \\
 			\hline
-			$A$ & 32 & 32 & 1 & 1 & 32 & 7 \\
+			\textbf{Execution time} [$ns$] & 30182 & 16916 & 31000
+			& 17438 & 6458 \\
 			\rowcolor{gray!25}
-			$B$ & 32 & 32 & 32 & 1 & 32 & 7 \\
-			$C$ & 32 & 32 & 1 & 1 & 32 & - \\
+			\textbf{\ac{bram}} & 34 & 90 & 31 & 90 & 237 \\
+			\textbf{\acs{dsp}} & 3 & 3 & 3 & 3 & 12 \\
+			\rowcolor{gray!25}
+			\textbf{\acs{lut}} & 4421 & 26403 & 5699 & 57653 &
+			118794 \\
+			\textbf{\acs{ff}} & 4736 & 8829 & 17794 & 26597 &
+			238374 \\
+			\hline
+		\end{tabularx}
+	\end{center}
+	\caption{Performance and resource usage of \emph{Matrix multiplication
+	16x16}.}
+	\label{tab:matmul_16_report}
+\end{table}
+
+\footnotetext{Data collected from a different environment, not fully
+comparable.}
+
+\subsection{32x32 matrices}
+To check whether the results scale with the problem size, in the case of
+\emph{Matrix multiplication 32x32}, matrices $A$, $B$ and $C$ have been sized
+$32 \times 32$ ($N = 32, M = 32, P = 32$).
+
+\subsubsection{Single-level cache configuration}
+The cache sizes have been fixed with the values shown in
+Table~\ref{tab:matmul_32_no_l1_config}. The \texttt{get} latency and the number
+of ports have been determined through design space exploration.
+
+\begin{table}[H]
+	\begin{center}
+		\begin{tabular}{cccccc}
+			\hline
+			\rowcolor{gray!50}
+			\textbf{Matrix} & \textbf{Sets} & \textbf{Ways} &
+			\textbf{Words per line} & \textbf{\ac{l1} lines} &
+			\textbf{Hit ratio} \\
+			\hline
+			$A$ & 1 & 1 & 32 & 0 & 99.9 \\
+			\rowcolor{gray!25}
+			$B$ & 32 & 1 & 32 & 0 & 99.9 \\
+			$C$ & 1 & 1 & 32 & 0 & 96.9 \\
 			\hline
 		\end{tabular}
 	\end{center}
-	\caption{\emph{Matrix multiplication 32x32}, cache configuration $A$.}
-	\label{tab:matmul_32_config_a}
+	\caption{Single-level cache configuration for \emph{Matrix
+	multiplication 32x32}.}
+	\label{tab:matmul_32_no_l1_config}
 \end{table}
 
 \paragraph{Design space exploration}
-\begin{figure}[!htb]
+From Figure~\ref{fig:matmul_32_no_l1_space} it is possible to infer that the
+shapes of the Execution time - \texttt{get} latency plot of \emph{Matrix
+multiplication 32x32} are equivalent to the ones obtained in the \emph{16x16}
+case.
+
+\begin{figure}[H]
 	\centering
 	\includegraphics[width=.8\textwidth]{matmul_32_multiport_no_L1_latency}
 	\caption{Design space of \emph{Matrix multiplication 32x32}
@@ -1635,27 +1686,78 @@ cache: 4 ports is the optimal configuration for what concerns performance.
 	\label{fig:matmul_32_no_l1_space}
 \end{figure}
 
-\begin{table}[!htb]
+Table~\ref{tab:matmul_32_no_l1_report} reports the results about 
+
+\begin{table}[H]
+	\begin{center}
+		\begin{tabular}{ccccc}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{1-port} & \textbf{2-ports} \\
+			\hline
+			\textbf{Execution time} [$ns$] & 265226 & 229190 \\
+			\rowcolor{gray!25}
+			\textbf{\ac{bram}} & 90 & 90 \\
+			\textbf{\acs{dsp}} & 3 & 6 \\
+			\rowcolor{gray!25}
+			\textbf{\acs{lut}} & 126411 & 175727 \\
+			\textbf{\acs{ff}} & 39871 & 47648 \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{Performance and resource usage of \emph{Matrix multiplication
+	32x32} (single-level).}
+	\label{tab:matmul_32_no_l1_report}
+\end{table}
+
+\subsubsection{Multi-levels cache configuration}
+\begin{table}[H]
+	\begin{center}
+		\begin{tabular}{cccccc}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{1-port} & \textbf{2-ports} & \textbf{4-ports}
+			& \textbf{8-ports} \\
+			\hline
+			\textbf{Execution time} [$ns$] & 138974 & 71618 & 39398
+			& 30362 \\
+			\rowcolor{gray!25}
+			\textbf{\ac{bram}} & 90 & 90 & 90 & 90 \\
+			\textbf{\acs{dsp}} & 3 & 6 & 12 & 24 \\
+			\rowcolor{gray!25}
+			\textbf{\acs{lut}} & 113957 & 140117 & 183947 & 291738 \\
+			\textbf{\acs{ff}} & 51004 & 75734 & 140269 & 336003 \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{Performance and resource usage of \emph{Matrix multiplication
+	32x32} (multi-levels).}
+	\label{tab:matmul_32_l1_report}
+\end{table}
+
+\subsubsection{Summary}
+\begin{table}[H]
 	\begin{center}
 		\begin{tabularx}{\textwidth}{CCCCC}
 			\hline
 			\rowcolor{gray!50}
 			& \textbf{Global memory} & \textbf{Local memory} &
-			\textbf{Proposed cache} & \textbf{Ma's cache} \\
+			\textbf{Proposed cache (single-level)} &
+			\textbf{Proposed cache (multi-levels)} \\
 			\hline
-			\textbf{Execution time} [$ms$] & & & & $0.031$ \\
+			\textbf{Execution time} [$ns$] & 389498 & 131580 & 229190 & \\
 			\rowcolor{gray!25}
-			\textbf{\ac{bram}} & & & & $31$ \\
-			\textbf{\acs{dsp}} & & & & $3$ \\
+			\textbf{\ac{bram}} & 34 & 90 & 90 &  \\
+			\textbf{\acs{dsp}} & 3 & 3 & 6 & \\
 			\rowcolor{gray!25}
-			\textbf{\acs{lut}} & & & & $5699$ \\
-			\textbf{\acs{ff}} & & & & $17794$ \\
+			\textbf{\acs{lut}} & 4106 & 30589 & 175727 & \\
+			\textbf{\acs{ff}} & 4699 & 11417 & 47648 & \\
 			\hline
 		\end{tabularx}
 	\end{center}
-	\caption{Performance and resource usage of \emph{Matrix multiplication}
-	with setup $B$.}
-	\label{tab:matmul_report_b}
+	\caption{Performance and resource usage of \emph{Matrix multiplication
+	32x32}.}
+	\label{tab:matmul_32_report}
 \end{table}
 
 \section{Bitonic sorting}
