@@ -316,7 +316,7 @@ analysis of the resources available on board modern \acp{fpga} are the
 fundamental background for this thesis work.
 
 \section{Cache}
-Memory devices are crucial components of computing systems as they can pose an
+Memory devices are crucial components of computing systems as they can pose a
 higher bound in terms of performance, especially when executing memory-intensive
 algorithms.
 The ideal memory should be fast, large and cheap, but current technology forces
@@ -633,7 +633,7 @@ A special attention has been put on \textbf{user-friendliness}:
 
 \section{Ma's cache}
 Liang Ma et al.\ proposed a \texttt{C++} cache implementation~\cite{liang}
-compatible with the \emph{SDAccel\texttrademark} \ac{hls} tool.
+compatible with \emph{Vivado\texttrademark~HLS~2016.2}.
 
 It is an array-specific cache module in the form of different \texttt{C++}
 classes: each of them implements an access type (read only/write only and read
@@ -1060,14 +1060,14 @@ probably needed, but this is not available in
 	\centering
 	\begin{subfigure}[b]{.4\textwidth}
 		\centering
-		\includegraphics[height=1.6cm]{fixed_schedule_issue}
+		\includegraphics[height=1.4cm]{fixed_schedule_issue}
 		\caption{Achieved static schedule.}
 		\label{subfig:fixed_sched_issue}
 	\end{subfigure}
 	\hfill
 	\begin{subfigure}[b]{.4\textwidth}
 		\centering
-		\includegraphics[height=1.6cm]{fixed_schedule_desired}
+		\includegraphics[height=1.4cm]{fixed_schedule_desired}
 		\caption{Optimal static schedule.}
 		\label{subfig:fixed_sched_desired}
 	\end{subfigure}
@@ -1230,14 +1230,14 @@ allowing to fully exploit the \ac{l2} cache pipeline.
 	\centering
 	\begin{subfigure}[b]{.4\textwidth}
 		\centering
-		\includegraphics[height=1.6cm]{multiport_actual_sched}
+		\includegraphics[height=1.4cm]{multiport_actual_sched}
 		\caption{Achieved static schedule.}
 		\label{subfig:multiport_actual_sched}
 	\end{subfigure}
 	\hfill
 	\begin{subfigure}[b]{.4\textwidth}
 		\centering
-		\includegraphics[height=1.6cm]{multiport_des_sched}
+		\includegraphics[height=1.4cm]{multiport_des_sched}
 		\caption{Parallel static schedule.}
 		\label{subfig:multiport_des_sched}
 	\end{subfigure}
@@ -1303,8 +1303,8 @@ much as possible.
 \subsection{Reference memory models}
 The results have been compared with the output of synthesis and simulation of
 same algorithms implemented with different data access mechanisms: \emph{global
-memory} (performance lower bound), \emph{local memory} (performance higher
-bound) and \emph{Ma's cache}.
+memory} (performance lower bound) and \emph{local memory} (performance higher
+bound).
 
 \subsubsection{Global memory}
 The algorithms access data directly from external \ac{dram} through \ac{axi}
@@ -1333,25 +1333,18 @@ with some minor changes it is possible to synthesize it with
 \emph{Vitis~HLS~2021.1}, but it would need some more optimizations to achieve
 the original performance in the new environment.
 
-The most fair comparison should have been done by using results generated in
-the exact same environment, but since this was not possible, all the results
-about Ma's cache have been collected from Ma's paper \citetitle{liang} and PhD
-thesis \citetitle{liangthesis}.
+The results reported in Ma's paper \citetitle{liang} and PhD thesis
+\citetitle{liangthesis} are not comparable with the ones obtained in
+\emph{Vitis~HLS~2021.1}: the execution times of same algorithms with same
+configurations (i.e.\ global and local memory) differ up to one order of
+magnitude (most probably due to different \ac{axi} latency values), therefore
+also cache execution times would not be reliable for making comparisons.
 
-From the comparison of the results about global and local memory reported by Ma
-with the ones obtained in the current environment it is clear that the resource
-usage figures are roughly equivalent, while the execution times differ up to
-one order of magnitude (most probably due to different \ac{axi} latency
-values), therefore they are not comparable, but they have been reported for
-completeness.
+The lack of comparable results and the impossibility to generate new ones
+prevented from directly comparing the proposed cache results with the Ma's
+ones.
 
-\subsection{Configurations}
-The reported results match the problems sizes and cache configurations proposed
-by Ma, so that it is possible to make direct comparisons.
-
-The additional degrees of freedom provided by the proposed cache (\texttt{get}
-latency, multiple cache levels, multiple ports) have been exploited to further
-explore the design space.
+\clearpage
 
 \subsection{Collected data}
 The most relevant collected data concerns:
@@ -1362,9 +1355,11 @@ The most relevant collected data concerns:
 		\acp{dsp}, \acp{lut} and \acp{ff}.
 \end{itemize}
 
-These values are approximate, since they come from the simple C/\ac{rtl}
-Co-Simulation and from the estimations performed by the C Synthesis, but in any
-case they can be meaningful for identifying some trends.
+These values are approximate, since they come from C/\ac{rtl} Co-Simulation and
+from the estimations performed by the C Synthesis, but in any case they can be
+meaningful for identifying some trends.
+
+\clearpage
 
 \section{Matrix multiplication}
 The standard row-by-column \emph{Matrix multiplication} algorithm
@@ -1376,14 +1371,14 @@ anymore: the most convenient $A$ cache is composed of a single line which fits a
 matrix row, which is filled each time a new row is accessed and it hits until
 the next row is accessed.
 
-Each column of $B$ matrix is accessed $P$ times: the $B$ cache, to get an hit
+Each column of $B$ matrix is accessed $P$ times: the $B$ cache, to get a hit
 ratio greater than 0 needs to contain at least $M$ lines and comply with the
 fully-associative mapping policy.
 The results reported by Ma used a direct-mapped cache with $M$ lines each one
 containing $P$ elements (so that it is as big as the $B$ matrix).
 
 $C$ elements are accessed sequentially and only once: any single-line cache with
-$n$ words per line would have an hit ratio of $\frac{n - 1}{n}$.
+$n$ words per line would have a hit ratio of $\frac{n - 1}{n}$.
 
 \bigskip
 The implementation used during the tests applies both pipelining and unrolling
@@ -1604,31 +1599,29 @@ The cost in terms of resource usage of the proposed cache is significant in
 terms of resource usage, particularly the number of \acp{lut} and \acp{ff} is
 one order of magnitude more for the single-level and single-port configuration
 and two orders of magnitude for the multi-levels and multi-ports configuration,
-with respect to Ma's cache.
+with respect to global memory.
 The single-level configuration allows reaching performance on par with the
 local memory and the multi-level configuration is more than two times faster,
 thanks to the unrolling.
 
 \begin{table}[H]
 	\begin{center}
-		\begin{tabularx}{\textwidth}{CCCCCC}
+		\begin{tabularx}{\textwidth}{CCCCC}
 			\hline
 			\rowcolor{gray!50}
 			& \textbf{Global memory} & \textbf{Local memory} &
-			\textbf{Ma's cache} \footnotemark &
 			\textbf{Proposed cache (single-level)} &
 			\textbf{Proposed cache (multi-levels)} \\
 			\hline
-			\textbf{Execution time} [$ns$] & 30182 & 16916 & 31000
-			& 17438 & 6458 \\
+			\textbf{Execution time} [$ns$] & 30182 & 16916 & 17438
+			& 6458 \\
 			\rowcolor{gray!25}
-			\textbf{\ac{bram}} & 34 & 90 & 31 & 90 & 237 \\
-			\textbf{\acs{dsp}} & 3 & 3 & 3 & 3 & 12 \\
+			\textbf{\ac{bram}} & 34 & 90 & 90 & 237 \\
+			\textbf{\acs{dsp}} & 3 & 3 & 3 & 12 \\
 			\rowcolor{gray!25}
-			\textbf{\acs{lut}} & 4421 & 26403 & 5699 & 57653 &
+			\textbf{\acs{lut}} & 4421 & 26403 & 57653 &
 			118794 \\
-			\textbf{\acs{ff}} & 4736 & 8829 & 17794 & 26597 &
-			238374 \\
+			\textbf{\acs{ff}} & 4736 & 8829 & 26597 & 238374 \\
 			\hline
 		\end{tabularx}
 	\end{center}
@@ -1637,8 +1630,7 @@ thanks to the unrolling.
 	\label{tab:matmul_16_report}
 \end{table}
 
-\footnotetext{Data collected from a different environment, not fully
-comparable.}
+\clearpage
 
 \subsection{32x32 matrices}
 To check whether the results scale with the problem size, in the case of
@@ -1835,10 +1827,12 @@ more resources are employed, the more performance is delivered.
 	\label{fig:matmul_32_pareto}
 \end{figure}
 
+\clearpage
+
 \section{Bitonic sorting}
 \emph{Bitonic sorting} (Algorithm~\ref{alg:bitonic}) is a sorting algorithm
-which provides an high degree of parallelism, therefore it is suitable for
-\acl{hw} implementations.
+characterized by a high degree of parallelism, therefore it is suitable for
+\acl{hw} implementation.
 
 \begin{algorithm}
 	\caption{\emph{Bitonic sorting} algorithm.}\label{alg:bitonic}
@@ -1872,12 +1866,22 @@ which provides an high degree of parallelism, therefore it is suitable for
 	\end{algorithmic}
 \end{algorithm}
 
-In the tested implementation the inner loop have been pipelined, but since the
-array $a$ is accessed four times per iteration, both in read mode and in write
-mode, there are many data dependencies which limit the pipeline performance.
+From the memory accesses point of view, each inner loop iteration:
+\begin{enumerate}
+	\item $a[pos]$ is read.
+	\item $a[pos+step]$ is read.
+	\item $a[pos]$ is written.
+	\item $a[pos+step]$ is written.
+\end{enumerate}
 
-Accesses to $a$ have been accelerated through cache with different
-configurations.
+The cache associated with $a$ array should be set-associative with at least 2
+sets, so that the interleaved accesses to $pos$ and $pos + step$ do not
+overwrite the related cache lines.
+
+In the design under test the inner loop have been pipelined, but, due to the
+data dependencies on $a$ array, the pipeline performance is limited (i.e.\
+\ac{ii} is greater than 1).
+
 Due to the multiple accesses per iteration, it is not possible to exploit:
 \begin{itemize}
 	\item Multiple ports: setting the number of ports to a number greater
@@ -1902,8 +1906,8 @@ the \ac{l2}.
 
 \subsubsection{Single-level cache configuration}
 For the \emph{Single-level cache configuration} the cache associated with $a$ is
-a fully-associative cache with two ways, so that the accesses to $pos + step$
-index do not overwrite the cache line associated with the $pos$ index.
+a fully-associative cache with two sets, so that the accesses to $pos + step$
+index do not interfere with accesses to the $pos$ index.
 The number of words per cache line has been kept free for design space
 exploration.
 
@@ -1925,6 +1929,11 @@ Table~\ref{tab:bitonic_128_no_l1_config} summarizes the cache configuration.
 	\label{tab:bitonic_128_no_l1_config}
 \end{table}
 
+Table~\ref{tab:bitonic_128_no_l1_report} shows the achieved results, with
+different number of words per cache line.
+Doubling the number of words approximately doubles the resource usage, while
+the performance grows at a much lower rate.
+
 \begin{table}[H]
 	\begin{center}
 		\begin{tabular}{cccc}
@@ -1934,7 +1943,7 @@ Table~\ref{tab:bitonic_128_no_l1_config} summarizes the cache configuration.
 			\hline
 			\textbf{Hit ratio} [\%] & 93.8 & 96.9 & 98.4 \\
 			\rowcolor{gray!25}
-			\textbf{Execution time} [$ns$] & 231538 & 201970 & 188082 \\
+			\textbf{Execution time} [$\mu s$] & 232 & 202 & 188 \\
 			\textbf{\ac{bram}} & 16 & 30 & 30 \\
 			\rowcolor{gray!25}
 			\textbf{\acs{lut}} & 20294 & 45481 & 91656 \\
@@ -1947,6 +1956,11 @@ Table~\ref{tab:bitonic_128_no_l1_config} summarizes the cache configuration.
 \end{table}
 
 \subsubsection{Multi-levels cache configuration}
+The \emph{Multi-levels cache configuration}
+(Table~\ref{tab:bitonic_128_l1_config}) matches the \emph{Single-level cache
+configuration}, with the only difference that a single-line \ac{l1} cache has
+been added on top of the memory hierarchy.
+
 \begin{table}[H]
 	\begin{center}
 		\begin{tabular}{ccccc}
@@ -1963,6 +1977,17 @@ Table~\ref{tab:bitonic_128_no_l1_config} summarizes the cache configuration.
 	\label{tab:bitonic_128_l1_config}
 \end{table}
 
+Table~\ref{tab:bitonic_128_l1_report} shows some results obtained with the
+\emph{Multi-levels cache configuration}. Comparing these data with the
+\emph{Single-level cache configuration}
+(Table~\ref{tab:bitonic_128_no_l1_report}) ones it is clear that the insertion
+of the \ac{l1} cache gives a further boost to performance, without increasing
+much the resource usage.
+
+Execution time of the 16 words case is not reported because the Co-Simulation
+deadlocks with that specific configuration; its value would be probably between
+150 $\mu s$ and 170 $\mu s$.
+
 \begin{table}[H]
 	\begin{center}
 		\begin{tabular}{cccc}
@@ -1973,7 +1998,7 @@ Table~\ref{tab:bitonic_128_no_l1_config} summarizes the cache configuration.
 			\textbf{\ac{l1} hit ratio} [\%] & 16.1 & 19.6 & 22.3 \\
 			\rowcolor{gray!25}
 			\textbf{\ac{l2} hit ratio} [\%] & 77.7 & 77.2 & 76.1 \\
-			\textbf{Execution time} [$\mu s$] & 194 & & 130 \\
+			\textbf{Execution time} [$\mu s$] & 194 & - & 130 \\
 			\rowcolor{gray!25}
 			\textbf{\ac{bram}} & 16 & 30 & 30 \\
 			\textbf{\acs{lut}} & 20745 & 46246 & 92740 \\
@@ -1987,32 +2012,47 @@ Table~\ref{tab:bitonic_128_no_l1_config} summarizes the cache configuration.
 \end{table}
 
 \subsubsection{Summary}
+Table~\ref{tab:bitonic_128_report} compares the results achieved with the most
+performant cache configuration (i.e.\ multi-levels with 32 words per line),
+with the higher and lower bounds for performance.
+
+Cache is almost two times faster than the global memory, but it's still one
+order of magnitude slower than the local memory, and the resource usage is not
+negligible.
+
 \begin{table}[H]
 	\begin{center}
-		\begin{tabularx}{\textwidth}{CCCCCC}
+		\begin{tabular}{cccc}
 			\hline
 			\rowcolor{gray!50}
 			& \textbf{Global memory} & \textbf{Local memory} &
-			\textbf{Ma's cache} \footnotemark &
-			\textbf{Proposed cache (single-level)} &
-			\textbf{Proposed cache (multi-levels)} \\
+			\textbf{Proposed cache} \\
 			\hline
-			\textbf{Execution time} [$\mu s$] & 82 & 22 & 287 & 188 & 130 \\
+			\textbf{Execution time} [$\mu s$] & 244 & 23 & 130 \\
 			\rowcolor{gray!25}
-			\textbf{\ac{bram}} & 2 & 30 & N.A. & 30 & 30 \\
-			\textbf{\acs{lut}} & 1743 & 3540 & N.A. & 91956 & 92740 \\
+			\textbf{\ac{bram}} & 2 & 30 & 30 \\
+			\textbf{\acs{lut}} & 1743 & 3540 & 92740 \\
 			\rowcolor{gray!25}
-			\textbf{\acs{ff}} & 1088 & 3464 & N.A. & 24851 & 33066 \\
+			\textbf{\acs{ff}} & 1088 & 3464 & 33066 \\
 			\hline
-		\end{tabularx}
+		\end{tabular}
 	\end{center}
 	\caption{Performance and resource usage of \emph{Bitonic sorting 128}.}
 	\label{tab:bitonic_128_report}
 \end{table}
 
-\footnotetext{Data collected from a different environment, not fully
-comparable.}
+From Figure~\ref{fig:bitonic_128_design_space} it is easy to conclude that the
+best trade-offs (between area and performance) belonging to the Pareto curve
+are the ones which include the \ac{l1} cache.
 
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.8\textwidth]{bitonic_design_space}
+	\caption{Pareto curve of \emph{Bitonic sorting 128}.}
+	\label{fig:bitonic_128_design_space}
+\end{figure}
+
+\iffalse
 \subsection{1024 elements}
 \subsubsection{Single-level cache configuration}
 \begin{table}[H]
@@ -2089,36 +2129,37 @@ comparable.}
 			\hline
 		\end{tabular}
 	\end{center}
-	\caption{Performance and resource usage of \emph{Bitonic sorting 1024} (multi-levels).}
+	\caption{Performance and resource usage of \emph{Bitonic sorting 1024}
+	(multi-levels).}
 	\label{tab:bitonic_1024_l1_report}
 \end{table}
 
 \subsubsection{Summary}
 \begin{table}[H]
 	\begin{center}
-		\begin{tabularx}{\textwidth}{CCCCCC}
+		\begin{tabularx}{\textwidth}{CCCCC}
 			\hline
 			\rowcolor{gray!50}
 			& \textbf{Global memory} & \textbf{Local memory} &
-			\textbf{Ma's cache} \footnotemark &
 			\textbf{Proposed cache (single-level)} &
 			\textbf{Proposed cache (multi-levels)} \\
 			\hline
-			\textbf{Execution time} [$\mu s$] & 3830 & 343 & 1388 & 2950 & 2212 \\
+			\textbf{Execution time} [$\mu s$] & 3830 & 343 &
+			2950 & 2212 \\
 			\rowcolor{gray!25}
-			\textbf{\ac{bram}} & 2 & 32 & N.A. & 30 & 30 \\
-			\textbf{\acs{lut}} & 1774 & 3517 & N.A. & 91613 & 92792 \\
+			\textbf{\ac{bram}} & 2 & 32 & 30 & 30 \\
+			\textbf{\acs{lut}} & 1774 & 3517 & 91613 & 92792 \\
 			\rowcolor{gray!25}
-			\textbf{\acs{ff}} & 1107 & 3477 & N.A. & 24890 & 33129 \\
+			\textbf{\acs{ff}} & 1107 & 3477 & 24890 & 33129 \\
 			\hline
 		\end{tabularx}
 	\end{center}
 	\caption{Performance and resource usage of \emph{Bitonic sorting 1024}.}
 	\label{tab:bitonic_1024_report}
 \end{table}
+\fi
 
-\footnotetext{Data collected from a different environment, not fully
-comparable.}
+\clearpage
 
 \section{2D convolution}
 Algorithm~\ref{alg:conv} is a possible implementation of \emph{2D
@@ -2151,11 +2192,15 @@ logic, reducing the \ac{hls} effort for pipelining).
 					\State $tmp \gets 0$
 					\For{$m = 0, \dots, P - 1$}
 						\For{$n = 0, \dots, Q - 1$}
-							\State $ii \gets i + (Q / 2 - m)$
-							\State $jj \gets j + (P / 2 - n)$
+							\State $ii \gets
+								i + (Q / 2 - m)$
+							\State $jj \gets
+								j + (P / 2 - n)$
 
-							\If{$ii \geq 0 \And ii < N \And
-									jj \geq 0 \And jj < M$}
+							\If{$ii \geq 0 \And
+									ii < N \And
+									jj \geq 0 \And
+									jj < M$}
 								\State $tmp \gets
 									tmp + A[ii][jj] \cdot
 									kernel[m][n]$
@@ -2173,7 +2218,7 @@ logic, reducing the \ac{hls} effort for pipelining).
 The design under test has been set such that $A, B \in \mathbb{N}^{32 \times
 32}$ and the $kernel \in \mathbb{N}^{3 \times 3}$.
 
-The cache associated with $A$ matrix is fully associative with 4 ways, to ensure
+The cache associated with $A$ matrix is fully associative with 4 sets, to ensure
 that consecutive cache accesses do not overwrite previously loaded line.
 The other parameters have been left free for design space exploration.
 
@@ -2206,6 +2251,14 @@ The full configuration of caches is shown in Table~\ref{tab:conv_cache_config}.
 \end{table}
 
 \subsubsection{Single-level cache configuration}
+With the \emph{Single-level cache configuration} the $A$ cache is configured to
+have no \ac{l1} cache, while the number of words per line is kept free.
+The \texttt{get} latency has been set to 9 for both $A$ and $kernel$ caches.
+
+Table~\ref{tab:conv_no_l1_report} reports the collected results.
+The execution time with 32 words is missing since this configuration causes a
+deadlock in Co-Simulation.
+
 \begin{table}[H]
 	\begin{center}
 		\begin{tabular}{cccc}
@@ -2231,6 +2284,13 @@ The full configuration of caches is shown in Table~\ref{tab:conv_cache_config}.
 \end{table}
 
 \subsubsection{Multi-levels cache configuration}
+The \emph{Multi-levels cache configuration} is equivalent to the
+\emph{Single-level}, but a single-line \ac{l1} cache has been added.
+
+The performance advantage with respect to the \emph{Single-level configuration}
+is negligible, therefore it is not convenient to invest in more resources in
+this case.
+
 \begin{table}[H]
 	\begin{center}
 		\begin{tabular}{cccc}
@@ -2257,6 +2317,10 @@ The full configuration of caches is shown in Table~\ref{tab:conv_cache_config}.
 \end{table}
 
 \subsubsection{Summary}
+Table~\ref{tab:conv_report} compares the most performant cache configuration
+(i.e.\ multi-levels with 32 words per line) with the performance bounds: the
+achieved performance is almost equal to the performance higher bound.
+
 \begin{table}[H]
 	\begin{center}
 		\begin{tabular}{cccc}
@@ -2265,13 +2329,13 @@ The full configuration of caches is shown in Table~\ref{tab:conv_cache_config}.
 			& \textbf{Global memory} & \textbf{Local memory} &
 			\textbf{Cache} \\
 			\hline
-			\textbf{Execution time} [$\mu s$] & 66 & 42 & 39 \\
+			\textbf{Execution time} [$\mu s$] & 66 & 37 & 39 \\
 			\rowcolor{gray!25}
-			\textbf{\ac{bram}} & 12 & 124 & 174 \\
+			\textbf{\ac{bram}} & 12 & 178 & 174 \\
 			\textbf{\acs{dsp}} & 3 & 3 & 3 \\
 			\rowcolor{gray!25}
-			\textbf{\acs{lut}} & 3504 & 6769 & 102970 \\
-			\textbf{\acs{ff}} & 3257 & 6570 & 68720 \\
+			\textbf{\acs{lut}} & 3504 & 30897 & 102970 \\
+			\textbf{\acs{ff}} & 3257 & 10672 & 68720 \\
 			\hline
 		\end{tabular}
 	\end{center}
@@ -2279,55 +2343,37 @@ The full configuration of caches is shown in Table~\ref{tab:conv_cache_config}.
 	\label{tab:conv_report}
 \end{table}
 
-\section{Stencil}
-\emph{Stencil} (Algorithm~\ref{alg:stencil}) applies a filtering which depends
-on the input $filter$ to the input matrix $orig$, generating the output matrix
-$sol$.
+The plot shown in Figure~\ref{fig:conv_design_space} suggests that the
+single-level 16 words per line configuration may be the most convenient in this
+case, since it offers almost the same performance and requires almost half of
+the \acp{ff} with respect to the multi-levels 32 words configuration.
 
-This algorithm has been chosen for 
-
-\begin{algorithm}
-	\caption{\emph{Stencil} algorithm.}\label{alg:stencil}
-	\begin{algorithmic}
-		\Require $orig \in \mathbb{R}^{N \times M},
-		filter \in \mathbb{R}^{P \times P}$
-		\Ensure $sol \in \mathbb{R}^{N \times M}$ is the result of the
-		filtering.
-		\Procedure{Stencil}{$orig, filter$}
-			\For{$i = 0, \dots, N - P$}
-				\For{$j = 0, \dots, M - P$}
-					\State $tmp \gets 0$
-					\For{$k = 0, \dots, P - 1$}
-						\For{$l = 0, \dots, P - 1$}
-							\State $tmp \gets tmp +
-								filter[k][l] *
-								orig[i + k][j + l]$
-						\EndFor
-					\EndFor
-					\State $sol \gets tmp$
-				\EndFor
-			\EndFor
-		\EndProcedure
-	\end{algorithmic}
-\end{algorithm}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.8\textwidth]{conv_design_space}
+	\caption{Pareto curve of \emph{2D convolution}.}
+	\label{fig:conv_design_space}
+\end{figure}
 
 \chapter{Conclusions}
 This thesis work proven the possibility to implement multi-process designs in
 \ac{hls}.
 
-Some issues arise from the proposed \acl{ipc} protocol, since
-\emph{Vitis~HLS~2021.1} do not provide any mechanism to inform the scheduler
-about the dependencies and latency between the request writing to a \ac{fifo}
-and the response reading from another \ac{fifo}, therefore the accesses to
-these data structures are not optimally scheduled by \ac{hls}, resulting in
-performance loss and in some cases even deadlocks.
+The cache process itself can provide high performance thanks to its optimal
+pipelining (i.e. \ac{ii} of 1), but some issues arise from the proposed
+\acl{ipc} protocol: \emph{Vitis~HLS~2021.1} do not provide any mechanism to
+inform the scheduler about the dependencies and latency between the request
+writing to a \ac{fifo} and the response reading from another \ac{fifo},
+therefore the accesses to these data structures are not optimally scheduled by
+\ac{hls}, resulting in performance loss and in some cases even deadlocks.
+
 The proposed workaround of forcing clock cycles to increase the latency between
 the \ac{fifo} write and the \ac{fifo} read allows to achieve optimal results in
 some specific situations, but it can not always work.
 
-\paragraph{Achieved results}
+\bigskip
 The collected results prove that in general the resource usage required by the
-proposed cache module is payed off in terms of performance, without requiring
+proposed cache module is paid off in terms of performance, without requiring
 high design efforts for optimizing memory interfacing: it is enough to include
 the cache in the kernel and setup the parameters according to the desired
 performance and resource usage.
@@ -2336,7 +2382,7 @@ In some cases it is possible to achieve very high performance gain (e.g.\
 \emph{Matrix multiplication} achieved a reduction of execution time of more
 than one order of magnitude).
 
-\paragraph{Future work}
+\bigskip
 To overcome the limitations posed by the \ac{hls} tool it may be worth
 implementing the interface with the cache or the whole architecture at
 \ac{rtl}, which provides full control on the operations scheduling.
