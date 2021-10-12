@@ -11,7 +11,7 @@
 \usepackage{geometry}
 \usepackage{hyperref}
 \usepackage[table]{xcolor}
-\usepackage[backend=biber,style=numeric,maxnames=4]{biblatex}
+\usepackage[backend=biber,style=numeric,maxnames=4,urldate=long]{biblatex}
 \usepackage{tabularx}
 \usepackage{acro}
 \usepackage{amsmath}
@@ -242,7 +242,7 @@ One of the open issues of \ac{hls} is the memory bandwidth bottleneck which
 limits performance, especially critical in case of memory-bound algorithms.
 
 \acp{fpga} memory system is composed of three main kinds of resources: registers,
-\acp{bram} and external \acp{dram}.
+\aclp{bram} and external \acsp{dram}.
 Current \ac{hls} tools allow exploiting this memory hierarchy manually, in a
 scratchpad-like fashion: the objective of this thesis work is to automate the
 memory management by providing an easily integrable and fully customizable cache
@@ -1308,8 +1308,8 @@ bound) and \emph{Ma's cache}.
 
 \subsubsection{Global memory}
 The algorithms access data directly from external \ac{dram} through \ac{axi}
-interface, without any optimization: this is the straightforward but slowest
-solution, therefore it determines the performance lower bound.
+interface: this is the straightforward but slowest solution, therefore it
+determines the performance lower bound.
 
 \subsubsection{Local memory}
 All the data required by algorithms is stored to local \acp{bram}: it determines
@@ -1414,8 +1414,9 @@ The implementation used during the tests applies both pipelining and unrolling
 In the case of \emph{Matrix multiplication 16x16}, matrices $A$, $B$ and $C$ are
 sized $16 \times 16$ ($N = 16, M = 16, P = 16$).
 
-This problem has been explored first with \ac{l2} caches only, and then with the
-multi-level caches.
+This problem has been explored in two configurations: \emph{Single-level cache
+configuration} (\ac{l2} caches only), and \emph{Multi-level cache
+configuration} (\ac{l2} and \ac{l1} caches).
 
 \subsubsection{Single-level cache configuration}
 The cache sizes have been fixed with the values shown in
@@ -1985,6 +1986,33 @@ Table~\ref{tab:bitonic_128_no_l1_config} summarizes the cache configuration.
 	\label{tab:bitonic_128_l1_report}
 \end{table}
 
+\subsubsection{Summary}
+\begin{table}[H]
+	\begin{center}
+		\begin{tabularx}{\textwidth}{CCCCCC}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{Global memory} & \textbf{Local memory} &
+			\textbf{Ma's cache} \footnotemark &
+			\textbf{Proposed cache (single-level)} &
+			\textbf{Proposed cache (multi-levels)} \\
+			\hline
+			\textbf{Execution time} [$\mu s$] & 82 & 22 & 287 & 188 & 130 \\
+			\rowcolor{gray!25}
+			\textbf{\ac{bram}} & 2 & 30 & N.A. & 30 & 30 \\
+			\textbf{\acs{lut}} & 1743 & 3540 & N.A. & 91956 & 92740 \\
+			\rowcolor{gray!25}
+			\textbf{\acs{ff}} & 1088 & 3464 & N.A. & 24851 & 33066 \\
+			\hline
+		\end{tabularx}
+	\end{center}
+	\caption{Performance and resource usage of \emph{Bitonic sorting 128}.}
+	\label{tab:bitonic_128_report}
+\end{table}
+
+\footnotetext{Data collected from a different environment, not fully
+comparable.}
+
 \subsection{1024 elements}
 \subsubsection{Single-level cache configuration}
 \begin{table}[H]
@@ -2066,27 +2094,189 @@ Table~\ref{tab:bitonic_128_no_l1_config} summarizes the cache configuration.
 \end{table}
 
 \subsubsection{Summary}
-\begin{table}[!htb]
+\begin{table}[H]
 	\begin{center}
-		\begin{tabularx}{\textwidth}{CCCCC}
+		\begin{tabularx}{\textwidth}{CCCCCC}
 			\hline
 			\rowcolor{gray!50}
 			& \textbf{Global memory} & \textbf{Local memory} &
-			\textbf{Proposed cache} & \textbf{Ma's cache} \\
+			\textbf{Ma's cache} \footnotemark &
+			\textbf{Proposed cache (single-level)} &
+			\textbf{Proposed cache (multi-levels)} \\
 			\hline
-			\textbf{Execution time} [$\mu s$] & $3385$ & $347$ &
-			$2827$ & $1388$ \\
+			\textbf{Execution time} [$\mu s$] & 3830 & 343 & 1388 & 2950 & 2212 \\
 			\rowcolor{gray!25}
-			\textbf{\ac{bram}} & $4$ & $60$ & $58$ & $31$ \\
-			\textbf{\acs{ff}} & $1150$ & $3445$ & $15397$ & $31101$ \\
+			\textbf{\ac{bram}} & 2 & 32 & N.A. & 30 & 30 \\
+			\textbf{\acs{lut}} & 1774 & 3517 & N.A. & 91613 & 92792 \\
 			\rowcolor{gray!25}
-			\textbf{\acs{lut}} & $1710$ & $3508$ & $44590$ & $22142$ \\
+			\textbf{\acs{ff}} & 1107 & 3477 & N.A. & 24890 & 33129 \\
 			\hline
 		\end{tabularx}
 	\end{center}
-	\caption{Performance and resource usage of \emph{Bitonic sorting}
-	with setup $A$.}
-	\label{tab:bitonic_report_a}
+	\caption{Performance and resource usage of \emph{Bitonic sorting 1024}.}
+	\label{tab:bitonic_1024_report}
+\end{table}
+
+\footnotetext{Data collected from a different environment, not fully
+comparable.}
+
+\section{2D convolution}
+Algorithm~\ref{alg:conv} is a possible implementation of \emph{2D
+convolution}~\cite{conv}.
+
+The algorithm accesses three matrices:
+\begin{itemize}
+	\item $A$: read according to a sliding window pattern.
+	\item $kernel$: read sequentially.
+	\item $B$: written sequentially.
+\end{itemize}
+
+Accesses to $kernel$ and $B$ can be optimized by single-line caches, while $A$
+cache requires a more complex cache to get a sufficiently high hit ratio.
+
+In the \acl{hw} implementation the innermost loop have been pipelined, after
+moving the assignment to $B$ in its latest iteration, to make the loop nest
+\emph{perfect} (i.e.\ a loop contains only another loop without any external
+logic, reducing the \ac{hls} effort for pipelining).
+
+\begin{algorithm}
+	\caption{\emph{2D convolution} algorithm.}\label{alg:conv}
+	\begin{algorithmic}
+		\Require $A \in \mathbb{R}^{N \times M},
+		kernel \in \mathbb{R}^{P \times Q}$
+		\Ensure $B \in \mathbb{R}^{N \times M} : B = A \ast kernel$
+		\Procedure{Conv}{$A, kernel$}
+			\For{$i = 0, \dots, N - 1$}
+				\For{$j = 0, \dots, M - 1$}
+					\State $tmp \gets 0$
+					\For{$m = 0, \dots, P - 1$}
+						\For{$n = 0, \dots, Q - 1$}
+							\State $ii \gets i + (Q / 2 - m)$
+							\State $jj \gets j + (P / 2 - n)$
+
+							\If{$ii \geq 0 \And ii < N \And
+									jj \geq 0 \And jj < M$}
+								\State $tmp \gets
+									tmp + A[ii][jj] \cdot
+									kernel[m][n]$
+							\EndIf
+						\EndFor
+					\EndFor
+					\State $B[i][j] \gets tmp$
+				\EndFor
+			\EndFor
+		\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
+
+\subsection{32x32 matrix and 9x9 kernel}
+The design under test has been set such that $A, B \in \mathbb{N}^{32 \times
+32}$ and the $kernel \in \mathbb{N}^{3 \times 3}$.
+
+The cache associated with $A$ matrix is fully associative with 4 ways, to ensure
+that consecutive cache accesses do not overwrite previously loaded line.
+The other parameters have been left free for design space exploration.
+
+$kernel$ cache has been set to work as a line buffer: it contains a single line
+which fits the whole kernel, so that the first request load the kernel to cache
+and all the subsequent accesses are \ac{l1} cache hits.
+
+$B$ cache has the purpose of gathering multiple write requests.
+
+The full configuration of caches is shown in Table~\ref{tab:conv_cache_config}.
+
+\begin{table}[H]
+	\begin{center}
+		\begin{tabular}{cccccc}
+			\hline
+			\rowcolor{gray!50}
+			\textbf{Matrix} & \textbf{Sets} & \textbf{Ways} &
+			\textbf{Words per line} & \textbf{\ac{l1} lines} &
+			\textbf{Hit ratio} [\%] \\
+			\hline
+			$A$ & 1 & 4 & Free & Free & ? \\
+			\rowcolor{gray!25}
+			$kernel$ & 1 & 1 & 16 & 1 & 100 \\
+			$B$ & 1 & 1 & 32 & 0 & 96.9 \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{$kernel$ and $B$ caches configuration for \emph{2D convolution}.}
+	\label{tab:conv_cache_config}
+\end{table}
+
+\subsubsection{Single-level cache configuration}
+\begin{table}[H]
+	\begin{center}
+		\begin{tabular}{cccc}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{8 words} & \textbf{16 words} & \textbf{32 words} \\
+			\hline
+			\textbf{$A$ hit ratio} [\%] & 89.6 & 95.8 & 99.6 \\
+			\rowcolor{gray!25}
+			\textbf{Execution time} [$\mu s$] & 45 & 40 & - \\
+			\textbf{\ac{bram}} & 146 & 174 & 174 \\
+			\rowcolor{gray!25}
+			\textbf{\ac{dsp}} & 3 & 3 & 3 \\
+			\textbf{\acs{lut}} & 85574 & 91190 & 102887 \\
+			\rowcolor{gray!25}
+			\textbf{\acs{ff}} & 33803 & 37779 & 44578 \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{Performance and resource usage of \emph{2D convolution}
+	(single-level).}
+	\label{tab:conv_no_l1_report}
+\end{table}
+
+\subsubsection{Multi-levels cache configuration}
+\begin{table}[H]
+	\begin{center}
+		\begin{tabular}{cccc}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{8 words} & \textbf{16 words} & \textbf{32 words} \\
+			\hline
+			\textbf{$A$ \ac{l1} hit ratio} [\%] & 59.6 & 63.8 & 66.0 \\
+			\rowcolor{gray!25}
+			\textbf{$A$ \ac{l2} hit ratio} [\%] & 30.1 & 32.0 & 33.7 \\
+			\textbf{Execution time} [$\mu s$] & 43 & 40 & 39 \\
+			\rowcolor{gray!25}
+			\textbf{\ac{bram}} & 146 & 174 & 174 \\
+			\textbf{\ac{dsp}} & 3 & 3 & 3 \\
+			\rowcolor{gray!25}
+			\textbf{\acs{lut}} & 85640 & 91274 & 102970 \\
+			\textbf{\acs{ff}} & 40288 & 50146 & 68720 \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{Performance and resource usage of \emph{2D convolution}
+	(multi-levels).}
+	\label{tab:conv_l1_report}
+\end{table}
+
+\subsubsection{Summary}
+\begin{table}[H]
+	\begin{center}
+		\begin{tabular}{cccc}
+			\hline
+			\rowcolor{gray!50}
+			& \textbf{Global memory} & \textbf{Local memory} &
+			\textbf{Cache} \\
+			\hline
+			\textbf{Execution time} [$\mu s$] & 66 & 42 & 39 \\
+			\rowcolor{gray!25}
+			\textbf{\ac{bram}} & 12 & 124 & 174 \\
+			\textbf{\acs{dsp}} & 3 & 3 & 3 \\
+			\rowcolor{gray!25}
+			\textbf{\acs{lut}} & 3504 & 6769 & 102970 \\
+			\textbf{\acs{ff}} & 3257 & 6570 & 68720 \\
+			\hline
+		\end{tabular}
+	\end{center}
+	\caption{Performance and resource usage of \emph{Convolution}.}
+	\label{tab:conv_report}
 \end{table}
 
 \section{Stencil}
