@@ -20,6 +20,7 @@
 \usepackage{subcaption}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{listings}
 
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
 \newcolumntype{C}{>{\centering\arraybackslash}X}
@@ -41,6 +42,31 @@
 \setcounter{tocdepth}{2}
 
 \acsetup{make-links,list/display=all}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{cppstyle}{
+	backgroundcolor=\color{backcolour},   
+	commentstyle=\color{codegreen},
+	keywordstyle=\color{magenta},
+	numberstyle=\tiny\color{codegray},
+	stringstyle=\color{codepurple},
+	basicstyle=\ttfamily\footnotesize,
+	breakatwhitespace=false,         
+	breaklines=true,                 
+	keepspaces=true,                 
+	numbers=left,                    
+	numbersep=5pt,                  
+	showspaces=false,                
+	showstringspaces=false,
+	showtabs=false,                  
+	tabsize=2
+}
+
+\lstset{style=cppstyle}
 
 \DeclareAcronym{sw}{
 	short=SW,
@@ -633,7 +659,7 @@ A special attention has been put on \textbf{user-friendliness}:
 
 \section{Ma's cache}
 Liang Ma et al.\ proposed a \texttt{C++} cache implementation~\cite{liang}
-compatible with \emph{Vivado\texttrademark~HLS~2016.2}.
+compatible with \emph{Vivado\texttrademark HLS 2016.2}.
 
 It is an array-specific cache module in the form of different \texttt{C++}
 classes: each of them implements an access type (read only/write only and read
@@ -1493,6 +1519,10 @@ single-level cache configuration of different port numbers, each one set to its
 optimal \texttt{get} latency value (15 for the 1-port, 3 for the 2-ports and 2
 for the 4-ports).
 
+The single-port configuration fully exploits the underlying single \ac{l2} cache,
+therefore adding more ports not only increase the resource usage, but it also
+reduces performance since the cache \ac{ii} increases.
+
 It is not clear why the estimated required \acp{bram} in the 2-ports case is much
 higher than the other cases.
 
@@ -1550,9 +1580,12 @@ latency is not relevant is this case, since all the cache hits are on the
 \ac{l1} cache.
 
 Increasing the number of ports allows to significantly improve performance,
-since the multiple \ac{l1} caches can run effectively in parallel, but the
-higher is the number of ports, the lower is the hit ratio of \ac{l1} caches: 4
-ports is the optimal configuration for what concerns performance.
+since the multiple \ac{l1} caches can run effectively in parallel.
+The higher is the number of ports, the lower is the hit ratio of each \ac{l1}
+cache: indefinitely increasing the number of ports is not always convenient;
+in this case 4 ports is the optimal configuration in terms of performance.
+More details about some simulated configurations are reported in
+Table~\ref{tab:matmul_16_l1_ports_report}.
 
 \begin{figure}[H]
 	\centering
@@ -1570,13 +1603,15 @@ ports is the optimal configuration for what concerns performance.
 			& \textbf{1-port} & \textbf{2-ports} & \textbf{4-ports}
 			& \textbf{8-ports} \\
 			\hline
+			\textbf{\texttt{get} latency} & 8 & 7 & 7 & 1 \\
+			\rowcolor{gray!25}
 			\textbf{Execution time} [$ns$] & 18986 & 10166 & 6458 &
 			7358 \\
-			\rowcolor{gray!25}
 			\textbf{\ac{bram}} & 129 & 165 & 237 & 381 \\
-			\textbf{\acs{dsp}} & 3 & 6 & 12 & 24 \\
 			\rowcolor{gray!25}
+			\textbf{\acs{dsp}} & 3 & 6 & 12 & 24 \\
 			\textbf{\acs{lut}} & 58138 & 81779 & 118794 & 198678 \\
+			\rowcolor{gray!25}
 			\textbf{\acs{ff}} & 41961 & 101315 & 238374 & 581204 \\
 			\hline
 		\end{tabular}
@@ -2390,6 +2425,26 @@ implementing the interface with the cache or the whole architecture at
 The cache performance could be further improved by implementing a pre-fetching
 mechanism which analyses the memory access patterns and tries to load in advance
 the data, before it is requested.
+
+\appendix
+\chapter{Source code}
+The source code produced during this thesis work is fully open source and can
+be found in the \texttt{git} repository hosted to
+\url{https://github.com/brigio345/hls_cache}.
+
+\bigskip
+The \texttt{src} directory contains the \texttt{cache} class and the related
+dependencies.
+
+The \texttt{test} directory contains some test programs, including those used
+to collect the reported results; each of them can be synthesized and simulated
+in \emph{Vitis~HLS~2021.1} by executing the related script stored to
+\texttt{scripts}.
+
+\section{Cache}
+\lstinputlisting[language=C++,caption={Source code of \texttt{src/cache.h}}]{
+	source_code/cache.h
+}
 
 \backmatter
 
