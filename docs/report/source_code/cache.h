@@ -37,8 +37,9 @@
 #define MAX_AXI_BITWIDTH 512
 
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
-	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
-	 bool LRU, size_t L1_CACHE_LINES, size_t LATENCY>
+	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS,
+	 size_t N_WORDS_PER_LINE, bool LRU,
+	 size_t L1_CACHE_LINES, size_t LATENCY>
 class cache {
 	private:
 		static const bool MEM_IF_PROCESS = (WR_ENABLED || (PORTS > 1) ||
@@ -65,7 +66,8 @@ class cache {
 					((1 << OFF_SIZE) == N_WORDS_PER_LINE)),
 				"N_WORDS_PER_LINE must be a power of 2 greater than 0");
 		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_WORDS_PER_LINE)),
-				"N_SETS and/or N_WAYS and/or N_WORDS_PER_LINE are too big for the specified MAIN_SIZE");
+				"N_SETS and/or N_WAYS and/or N_WORDS_PER_LINE are too big \
+				for the specified MAIN_SIZE");
 
 #ifdef __SYNTHESIS__
 		template <typename TYPE, size_t SIZE>
@@ -75,7 +77,8 @@ class cache {
 			using array_type = std::array<TYPE, SIZE>;
 #endif /* __SYNTHESIS__ */
 
-		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> address_type;
+		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE>
+			address_type;
 		typedef array_type<T, N_WORDS_PER_LINE> line_type;
 		typedef l1_cache<T, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
 			l1_cache_type;
@@ -105,19 +108,19 @@ class cache {
 			line_type line;
 		} mem_req_type;
 
-		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];	// 1
-		bool m_valid[N_SETS * N_WAYS];					// 2
-		bool m_dirty[N_SETS * N_WAYS];					// 3
-		T m_cache_mem[N_SETS * N_WAYS * N_WORDS_PER_LINE];		// 4
-		hls::stream<op_type, 4> m_core_req_op[PORTS];			// 5
-		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];	// 6
-		hls::stream<T, 4> m_core_req_data[PORTS];			// 7
-		hls::stream<line_type, 4> m_core_resp[PORTS];			// 8
-		stream_cond<mem_req_type, 2, MEM_IF_PROCESS> m_mem_req;		// 9
-		stream_cond<line_type, 2, MEM_IF_PROCESS> m_mem_resp;		// 10
-		l1_cache_type m_l1_cache_get[PORTS];				// 11
-		replacer_type m_replacer;					// 12
-		unsigned int m_core_port;					// 13
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];
+		bool m_valid[N_SETS * N_WAYS];
+		bool m_dirty[N_SETS * N_WAYS];
+		T m_cache_mem[N_SETS * N_WAYS * N_WORDS_PER_LINE];
+		hls::stream<op_type, 4> m_core_req_op[PORTS];
+		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];
+		hls::stream<T, 4> m_core_req_data[PORTS];
+		hls::stream<line_type, 4> m_core_resp[PORTS];
+		stream_cond<mem_req_type, 2, MEM_IF_PROCESS> m_mem_req;
+		stream_cond<line_type, 2, MEM_IF_PROCESS> m_mem_resp;
+		l1_cache_type m_l1_cache_get[PORTS];
+		replacer_type m_replacer;
+		unsigned int m_core_port;
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs = 0;
@@ -130,7 +133,8 @@ class cache {
 #pragma HLS array_partition variable=m_tag complete dim=1
 #pragma HLS array_partition variable=m_valid complete dim=1
 #pragma HLS array_partition variable=m_dirty complete dim=1
-#pragma HLS array_partition variable=m_cache_mem cyclic factor=N_WORDS_PER_LINE dim=1
+#pragma HLS array_partition variable=m_cache_mem cyclic \
+			factor=N_WORDS_PER_LINE dim=1
 #pragma HLS array_partition variable=m_core_req_op complete
 #pragma HLS array_partition variable=m_core_req_addr complete
 #pragma HLS array_partition variable=m_core_req_data complete
@@ -144,8 +148,11 @@ class cache {
 		 * \note	Must be called before calling \ref run.
 		 */
 		void init() {
-			if (L1_CACHE)
-				m_l1_cache_get.init();
+			m_core_port = 0;
+			if (L1_CACHE) {
+				for (auto port = 0; port < PORTS; port++)
+					m_l1_cache_get[port].init();
+			}
 		}
 
 		/**
@@ -190,7 +197,8 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-			m_core_req_op.write(STOP_OP);
+			for (auto port = 0; port < PORTS; port++)
+				m_core_req_op[port].write(STOP_OP);
 		}
 
 		/**
@@ -206,9 +214,12 @@ class cache {
 			assert(addr_main < MAIN_SIZE);
 #endif /* __SYNTHESIS__ */
 
+			const auto port = m_core_port;
+			m_core_port = ((m_core_port + 1) % PORTS);
+
 			// try to get line from L1 cache
 			const auto l1_hit = (L1_CACHE &&
-					m_l1_cache_get.hit(addr_main));
+					m_l1_cache_get[port].hit(addr_main));
 
 			if (l1_hit) {
 				m_l1_cache_get[port].get_line(addr_main, line);
@@ -217,8 +228,8 @@ class cache {
 #endif /* __SYNTHESIS__ */
 			} else {
 				// send read request to cache
-				m_core_req_op.write(READ_OP);
-				m_core_req_addr.write(addr_main);
+				m_core_req_op[port].write(READ_OP);
+				m_core_req_addr[port].write(addr_main);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
@@ -228,7 +239,7 @@ class cache {
 
 				if (L1_CACHE) {
 					// store line to L1 cache
-					m_l1_cache_get.set_line(addr_main, line);
+					m_l1_cache_get[port].set_line(addr_main, line);
 				}
 			}
 
@@ -300,7 +311,8 @@ class cache {
 
 		double get_hit_ratio() const {
 			if (m_n_reqs > 0)
-				return ((m_n_hits + m_n_l1_hits) / static_cast<double>(m_n_reqs));
+				return ((m_n_hits + m_n_l1_hits) /
+						static_cast<double>(m_n_reqs));
 
 			return 0;
 		}
@@ -380,7 +392,8 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						// read from main memory
 						auto op = READ_OP;
 						// build write-back address
-						address_type write_back_addr(m_tag[addr.m_addr_line], addr.m_set,
+						address_type write_back_addr(m_tag[addr.m_addr_line],
+								addr.m_set,
 								0, addr.m_way);
 						// check if write back is necessary
 						if (WR_ENABLED && m_valid[addr.m_addr_line] &&
@@ -443,6 +456,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						set_line(m_cache_mem,
 								addr.m_addr_cache,
 								line);
+
 
 						m_dirty[addr.m_addr_line] = true;
 					}

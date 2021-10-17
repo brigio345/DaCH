@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring>
 #ifndef __SYNTHESIS__
 #define PROFILE
 #include <thread>
@@ -7,17 +8,20 @@
 #include "cache.h"
 #include "cache_multiport.h"
 
-#define USE_CACHE
-#define N 8
-#define M 8
-#define P 8
+#define CACHE
+//#define GLOBAL
+//#define LOCAL
 
-static const int RD_PORTS = 2;
+#define N 16
+#define M 16
+#define P 16
+
+static const int RD_PORTS = 1;
 
 typedef int data_type;
-typedef cache_multiport<data_type, RD_PORTS, N * M, 1, 1, 8, false> cache_a;
-typedef cache_multiport<data_type, RD_PORTS, M * P, 1, 8, 8, false> cache_b;
-typedef cache<data_type, 0, true, N * P, 2, 1, 8, true, false> cache_c;
+typedef cache<data_type, true, false, RD_PORTS, N * M, 1, 1, 16, false, 0, 1> cache_a;
+typedef cache<data_type, true, false, RD_PORTS, M * P, 1, 1, 16, false, 0, 1> cache_b;
+typedef cache<data_type, false, true, 1, N * P, 1, 1, 16, false, 0, 1> cache_c;
 
 void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 #pragma HLS inline off
@@ -34,12 +38,12 @@ void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 }
 
 extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
-#pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0 latency=1
-#pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1 latency=1
-#pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2 latency=1
+#pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0
+#pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1
+#pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
-#ifdef USE_CACHE
+#if defined(CACHE)
 #pragma HLS dataflow disable_start_propagation
 	cache_a a_cache;
 	cache_b b_cache;
@@ -71,19 +75,33 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 	c_thd.join();
 
 #ifdef PROFILE
-	printf("A hit ratio = %.3f (%d / %d)\n",
-			a_cache.get_hit_ratio(), a_cache.get_n_hits(),
-			a_cache.get_n_reqs());
-	printf("B hit ratio = %.3f (%d / %d)\n",
-			b_cache.get_hit_ratio(), b_cache.get_n_hits(),
-			b_cache.get_n_reqs());
+	printf("A hit ratio = %.3f ((%d + %d) / %d)\n",
+			a_cache.get_hit_ratio(), a_cache.get_n_l1_hits(),
+			a_cache.get_n_hits(), a_cache.get_n_reqs());
+	printf("B hit ratio = %.3f ((%d + %d) / %d)\n",
+			b_cache.get_hit_ratio(), b_cache.get_n_l1_hits(),
+			b_cache.get_n_hits(), b_cache.get_n_reqs());
 	printf("C hit ratio = %.3f ((%d + %d) / %d)\n",
 			c_cache.get_hit_ratio(), c_cache.get_n_l1_hits(),
 			c_cache.get_n_hits(), c_cache.get_n_reqs());
 #endif /* PROFILE */
 #endif	/* __SYNTHESIS__ */
-#else
+#elif defined(GLOBAL)
 	matrix::multiply<data_type *, data_type *, data_type *, N, M, P, RD_PORTS>(a_arr, b_arr, c_arr);
+#elif defined(LOCAL)
+	data_type a_local[N * M];
+	data_type b_local[M * P];
+	data_type c_local[N * P];
+#pragma HLS array_reshape variable=a_local cyclic factor=32
+#pragma HLS array_reshape variable=b_local cyclic factor=32
+#pragma HLS array_reshape variable=c_local cyclic factor=32
+
+	memcpy(a_local, a_arr, (N * M * sizeof(data_type)));
+	memcpy(b_local, b_arr, (M * P * sizeof(data_type)));
+
+	matrix::multiply<data_type *, data_type *, data_type *, N, M, P, RD_PORTS>(a_local, b_local, c_local);
+
+	memcpy(c_arr, c_local, (N * P * sizeof(data_type)));
 #endif
 }
 
