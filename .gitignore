@@ -5,10 +5,3 @@ proj_*/*
 *.out
 *.snm
 *.toc
-*.bbl
-*.bcf
-*.blg
-*.run.xml
-*.acr
-*.lof
-*.lot

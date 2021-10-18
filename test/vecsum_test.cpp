@@ -18,7 +18,7 @@ template <typename T>
 		int data;
 
 VECSUM_LOOP:	for (auto i = 0; i < N; i++) {
-#pragma HLS pipeline II=1
+#pragma HLS pipeline
 #pragma HLS unroll factor=RD_PORTS
 			data = a[i];
 			tmp += data;

@@ -31,21 +31,17 @@ class address {
 			m_addr_main(addr_main),
 			m_tag((TAG_SIZE > 0) ? (addr_main >> (OFF_SIZE + SET_SIZE)) : 0),
 			m_set((SET_SIZE > 0) ? (addr_main >> OFF_SIZE) : 0),
-			m_off((OFF_SIZE > 0) ? addr_main : 0) {
-#pragma HLS inline
-			}
+			m_off((OFF_SIZE > 0) ? addr_main : 0) {}
 
 		address(const unsigned int tag, const unsigned int set,
 				const unsigned int off, const unsigned int way):
 				m_addr_main((static_cast<ap_uint<ADDR_SIZE>>(tag) << (SET_SIZE + OFF_SIZE)) |
 						(static_cast<ap_uint<ADDR_SIZE>>(set) << OFF_SIZE) | off),
 				m_tag(tag), m_set(set), m_off(off) {
-#pragma HLS inline
 			set_way(way);
 		}
 
 		void set_way(const unsigned int way) {
-#pragma HLS inline
 			m_way = way;
 			m_addr_line = ((static_cast<ap_uint<LINE_ADDR_SIZE_ACTUAL>>(m_set) << WAY_SIZE) | way);
 			m_addr_cache = ((static_cast<ap_uint<CACHE_ADDR_SIZE_ACTUAL>>(m_set) << (WAY_SIZE + OFF_SIZE)) |
