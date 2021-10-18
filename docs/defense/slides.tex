@@ -4,12 +4,11 @@
 \usetheme[progressbar=frametitle]{metropolis}
 \usepackage{FiraSans}
 \usepackage[style=apa]{biblatex}
-\usepackage{listings}
 
-\setbeamertemplate{bibliography item}{}
 \setbeamertemplate{caption}{\raggedright\insertcaption\par}
 
 \renewcommand*{\bibfont}{\footnotesize}
+\setbeamertemplate{bibliography item}{}
 \addbibresource{bibliography.bib}
 
 \title{Acceleration by Separate-Process Cache\\for Memory-Intensive Algorithms
@@ -30,30 +29,31 @@ on FPGA\\via High-Level Synthesis}
 %	\tableofcontents[hideallsubsections]
 %\end{frame}
 
-\section{Introduction}
+{
+	\metroset{sectionpage=none}
+	\section{Introduction}
+}
 \begin{frame}{High-Level Synthesis}
 	\begin{columns}
 		\begin{column}{.45\textwidth}
-			\textbf{Designer}:
-			\begin{itemize}
-				\item Functionality
-				\item Architecture
-				\item Constraints
-			\end{itemize}
-			\textbf{HLS}:
-			\begin{itemize}
-				\item Low-level implementation
-			\end{itemize}
-		\end{column}
-		\begin{column}{.05\textwidth}
-		\includegraphics[width=\textwidth]{arrow}
+			\begin{center}
+				\includegraphics[height=.7\textheight]{hls}
+			\end{center}
 		\end{column}
 		\begin{column}{.45\textwidth}
+			\vfill
+			\textbf{Primary goals}:
 			\begin{itemize}
-				\item High productivity
-				\item Quick design space exploration
-				\item Limited low-level control
+				\item Productivity
+				\item Design space exploration
 			\end{itemize}
+
+			\bigskip
+			\textbf{Limitations}:
+			\begin{itemize}
+				\item Low-level control
+			\end{itemize}
+			\vfill
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -87,12 +87,17 @@ on FPGA\\via High-Level Synthesis}
 \begin{frame}{Previous work}
 	\begin{columns}
 		\begin{column}{.5\textwidth}
+			\vfill
 			\textbf{Architecture}:
 			\begin{itemize}
 				\item Cache inlined in application
 			\end{itemize}
 
-			\bigskip
+			\textbf{Implementation}:
+			\begin{itemize}
+				\item \texttt{C++} class
+			\end{itemize}
+
 			\textbf{User friendliness}:
 			\begin{itemize}
 				\item \emph{Integrable}: \texttt{operator[]} overload
@@ -112,25 +117,25 @@ on FPGA\\via High-Level Synthesis}
 \subsection{Basic architecture}
 \begin{frame}{Basic architecture}
 	\begin{columns}
-		\begin{column}{.5\textwidth}
+		\begin{column}{.55\textwidth}
 			\textbf{Objective}:
 			\begin{itemize}
-				\item No application cluttering
+				\item Limit application cluttering
 			\end{itemize}
 
 			\bigskip
 			\textbf{Proposed solution}:
 			\begin{itemize}
+				\item \underline{Cache:} separate process
+					\begin{itemize}
+						\item Modeling: threads (SW); dataflow (HW)
+						\item Communication: FIFOs
+					\end{itemize}
 				\item \underline{Application:}
 					\begin{enumerate}
 						\item Send \emph{request}
 						\item Receive \emph{response}
 					\end{enumerate}
-				\item \underline{Cache:} separate process
-					\begin{itemize}
-						\item {SW simulation:} \texttt{std::thread}
-						\item {HW synthesis:} dataflow
-					\end{itemize}
 			\end{itemize}
 		\end{column}
 		\begin{column}{.5\textwidth}
@@ -176,14 +181,17 @@ on FPGA\\via High-Level Synthesis}
 		\begin{column}{.5\textwidth}
 			\textbf{Objective}:
 			\begin{itemize}
-				\item Improve performance with sub-optimal
-					interface schedule
+				\item Improve read performance
 			\end{itemize}
 			
 			\bigskip
 			\textbf{Proposed solution}:
 			\begin{itemize}
 				\item L1 cache inlined in application
+					\begin{itemize}
+						\item Write-through
+						\item Direct-mapped
+					\end{itemize}
 			\end{itemize}
 		\end{column}
 		\begin{column}{.5\textwidth}
@@ -199,14 +207,14 @@ on FPGA\\via High-Level Synthesis}
 		\begin{column}{.5\textwidth}
 			\textbf{Objective}:
 			\begin{itemize}
-				\item Improve performance with loop unrolling
+				\item Efficient application loop unrolling
 			\end{itemize}
 
 			\bigskip
 			\textbf{Proposed solution}:
 			\begin{itemize}
-				\item Multiple ports
-				\item Single L2 cache, multiple L1 caches
+				\item Single L2 cache with multiple ports
+				\item Multiple L1 caches
 			\end{itemize}
 		\end{column}
 		\begin{column}{.5\textwidth}
@@ -244,13 +252,13 @@ on FPGA\\via High-Level Synthesis}
 	\textbf{Achieved results}:
 	\begin{itemize}
 		\item Multi-process modeling for HLS
-		\item Extended design space
+		\item Design space extended by cache
 	\end{itemize}
 
 	\bigskip
 	\textbf{Future work}:
 	\begin{itemize}
-		\item RTL implementation for optimizing interface
+		\item Fix interface schedule: RTL implementation
 	\end{itemize}
 \end{frame}
 
