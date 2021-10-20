@@ -34,33 +34,31 @@ on FPGA\\via High-Level Synthesis}
 	\section{Introduction}
 }
 \begin{frame}{High-Level Synthesis}
-	\begin{columns}
+	\begin{columns}[c]
 		\begin{column}{.45\textwidth}
 			\begin{center}
-				\includegraphics[height=.7\textheight]{hls}
+				\includegraphics[height=.6\textheight]{hls}
+			\end{center}
+		\end{column}
+		\begin{column}{.05\textwidth}
+			\begin{center}
+				\includegraphics[width=0.7cm]{arrow}
 			\end{center}
 		\end{column}
 		\begin{column}{.45\textwidth}
-			\vfill
-			\textbf{Primary goals}:
+			\textbf{Productivity}:
 			\begin{itemize}
-				\item Productivity
+				\item Functionality
+				\item Debugging
 				\item Design space exploration
 			\end{itemize}
-
-			\bigskip
-			\textbf{Limitations}:
-			\begin{itemize}
-				\item Low-level control
-			\end{itemize}
-			\vfill
 		\end{column}
 	\end{columns}
 \end{frame}
 
 \begin{frame}{Memory management}
-	\begin{columns}
-		\begin{column}{.5\textwidth}
+	\begin{columns}[c]
+		\begin{column}{.55\textwidth}
 			\textbf{Scratchpad}:
 			\begin{itemize}
 				\item Manual memory selection
@@ -71,7 +69,7 @@ on FPGA\\via High-Level Synthesis}
 
 			\textbf{Cache}:
 			\begin{itemize}
-				\item Automatic full hierarchy exploit
+				\item Automatically exploit whole hierarchy
 				\item<alert@+> Thesis work objective
 			\end{itemize}
 		\end{column}
@@ -85,24 +83,25 @@ on FPGA\\via High-Level Synthesis}
 
 \subsection{Previous work}
 \begin{frame}{Previous work}
-	\begin{columns}
-		\begin{column}{.5\textwidth}
+	\begin{columns}[c]
+		\begin{column}{.55\textwidth}
 			\vfill
 			\textbf{Architecture}:
 			\begin{itemize}
 				\item Cache inlined in application
+				\item One cache per DRAM array
 			\end{itemize}
 
 			\textbf{Implementation}:
 			\begin{itemize}
 				\item \texttt{C++} class
-			\end{itemize}
-
-			\textbf{User friendliness}:
-			\begin{itemize}
-				\item \emph{Integrable}: \texttt{operator[]} overload
-				\item \emph{Configurable}: template parameters
-				\item \emph{Observable}: hit ratio reports
+				\item {User friendliness}
+					\begin{itemize}
+						\item \emph{Integrability}: \texttt{operator[]} overload
+						\item \emph{Configurability}: template parameters
+						\item \emph{Observability}: hit ratio reports
+					\end{itemize}
+				\item Application logic cluttering
 			\end{itemize}
 		\end{column}
 		\begin{column}{.5\textwidth}
@@ -113,10 +112,10 @@ on FPGA\\via High-Level Synthesis}
 	\end{columns}
 \end{frame}
 
-\section{Development}
+\section{Thesis work}
 \subsection{Basic architecture}
 \begin{frame}{Basic architecture}
-	\begin{columns}
+	\begin{columns}[c]
 		\begin{column}{.55\textwidth}
 			\textbf{Objective}:
 			\begin{itemize}
@@ -126,12 +125,12 @@ on FPGA\\via High-Level Synthesis}
 			\bigskip
 			\textbf{Proposed solution}:
 			\begin{itemize}
-				\item \underline{Cache:} separate process
+				\item \emph{Cache:} separate process
 					\begin{itemize}
-						\item Modeling: threads (SW); dataflow (HW)
+						\item Modeling: threads (SW), dataflow (HW)
 						\item Communication: FIFOs
 					\end{itemize}
-				\item \underline{Application:}
+				\item \emph{Application:}
 					\begin{enumerate}
 						\item Send \emph{request}
 						\item Receive \emph{response}
@@ -145,8 +144,42 @@ on FPGA\\via High-Level Synthesis}
 		\end{column}
 	\end{columns}
 \end{frame}
+\begin{frame}{Basic architecture --- Implementation}
+	\begin{columns}[c]
+		\begin{column}{.55\textwidth}
+			\vfill
+			\textbf{Objective}:
+			\begin{itemize}
+				\item Optimally pipeline cache hits (II=1)
+			\end{itemize}
+
+			\bigskip
+			\textbf{Problem}:
+			\begin{itemize}
+				\item Dependencies on DRAM interface
+			\end{itemize}
+
+			\bigskip
+			\textbf{Proposed solution}:
+			\begin{itemize}
+				\item Multi-process architecture:
+					\begin{itemize}
+						\item \emph{Core}: cache functionality
+						\item \makebox[\linewidth][l]{\emph{Memory interface}: DRAM accesses (miss only)}
+					\end{itemize}
+			\end{itemize}
+		\end{column}
+		\begin{column}{.5\textwidth}
+			\begin{center}
+			\includegraphics[height=.7\textheight]{multi_proc_basic_arch}
+			\end{center}
+		\end{column}
+	\end{columns}
+\end{frame}
+
+\iffalse
 \begin{frame}{Basic architecture}
-	\begin{columns}
+	\begin{columns}[c]
 		\begin{column}{.5\textwidth}
 			\textbf{Cache process}:
 			\begin{itemize}
@@ -164,24 +197,27 @@ on FPGA\\via High-Level Synthesis}
 		\begin{column}{.5\textwidth}
 			\begin{center}
 				\begin{figure}
-					\caption{Original schedule}
+					\caption{Original scheduling}
 					\frame{\includegraphics[width=.55\textwidth]{actual_schedule_run}}
 				\end{figure}
 				\begin{figure}
-					\caption{Schedule with workaround}
+					\caption{Scheduling with workaround}
 					\frame{\includegraphics[width=.55\textwidth]{desired_schedule_run}}
 				\end{figure}
 			\end{center}
 		\end{column}
 	\end{columns}
 \end{frame}
+\fi
+
+\section{Optimizations}
 \subsection{Multi-levels architecture}
 \begin{frame}{Multi-levels architecture}
-	\begin{columns}
-		\begin{column}{.5\textwidth}
+	\begin{columns}[c]
+		\begin{column}{.55\textwidth}
 			\textbf{Objective}:
 			\begin{itemize}
-				\item Improve read performance
+				\item Reduce read latency
 			\end{itemize}
 			
 			\bigskip
@@ -189,8 +225,8 @@ on FPGA\\via High-Level Synthesis}
 			\begin{itemize}
 				\item L1 cache inlined in application
 					\begin{itemize}
-						\item Write-through
-						\item Direct-mapped
+						\item Fast: no communication overhead
+						\item Simple: direct mapped, write-through
 					\end{itemize}
 			\end{itemize}
 		\end{column}
@@ -203,18 +239,18 @@ on FPGA\\via High-Level Synthesis}
 \end{frame}
 \subsection{Multi-ports architecture}
 \begin{frame}{Multi-ports architecture}
-	\begin{columns}
-		\begin{column}{.5\textwidth}
+	\begin{columns}[c]
+		\begin{column}{.55\textwidth}
 			\textbf{Objective}:
 			\begin{itemize}
-				\item Efficient application loop unrolling
+				\item Execute multiple reads in parallel
 			\end{itemize}
 
 			\bigskip
 			\textbf{Proposed solution}:
 			\begin{itemize}
-				\item Single L2 cache with multiple ports
-				\item Multiple L1 caches
+				\item Single L2 cache (with multiple ports)
+				\item Multiple L1 caches (one per L2 port)
 			\end{itemize}
 		\end{column}
 		\begin{column}{.5\textwidth}
@@ -227,7 +263,7 @@ on FPGA\\via High-Level Synthesis}
 
 \section{Results}
 \begin{frame}{Matrix multiplication}
-	\begin{columns}
+	\begin{columns}[c]
 		\begin{column}{.5\textwidth}
 			\textbf{Algorithm}:
 			\[C = A \times B, \quad A, B, C \in \mathbb{R}^{32 \times 32}\]
@@ -235,7 +271,7 @@ on FPGA\\via High-Level Synthesis}
 			\textbf{Caches configuration}:
 			\begin{itemize}
 				\item $A$: 1 line of 32 elements
-				\item $B$: 32 lines of 32 elements\\(direct mapped)
+				\item $B$: 32 lines of 32 elements
 				\item $C$: 1 line of 32 elements
 			\end{itemize}
 		\end{column}
@@ -258,7 +294,8 @@ on FPGA\\via High-Level Synthesis}
 	\bigskip
 	\textbf{Future work}:
 	\begin{itemize}
-		\item Fix interface schedule: RTL implementation
+		\item RTL implementation
+		\item Pre-fetching
 	\end{itemize}
 \end{frame}
 
