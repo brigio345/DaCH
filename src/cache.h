@@ -409,18 +409,18 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 							// memory interface and
 							// write request if
 							// write-back is necessary
-							auto dep = m_mem_req.write_dep(req, false);
+							m_mem_req.write(req);
 
 							// force FIFO write and
 							// FIFO read to separate
 							// pipeline stages to
 							// avoid deadlock due to
 							// the blocking read
-							dep = utils::delay<bool, 1>(dep);
+							ap_wait();
 
 							// read response from
 							// memory interface
-							m_mem_resp.read_dep(line, dep);
+							m_mem_resp.read(line);
 						} else {
 							execute_mem_if_req(main_mem,
 									req, line);

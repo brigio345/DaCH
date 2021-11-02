@@ -23,19 +23,9 @@ class stream_cond<DATA_TYPE, DEPTH, true> {
 			return m_stream.read_nb(data);
 		}
 
-		bool read_dep(DATA_TYPE &data, volatile bool dep) {
-#pragma HLS inline
-			return m_stream.read_dep(data, dep);
-		}
-
 		void write(const DATA_TYPE &data) {
 #pragma HLS inline
 			m_stream.write(data);
-		}
-
-		bool write_dep(const DATA_TYPE &data, volatile bool dep) {
-#pragma HLS inline
-			return m_stream.write_dep(data, dep);
 		}
 };
 
@@ -51,18 +41,8 @@ class stream_cond<DATA_TYPE, DEPTH, false> {
 			return false;
 		}
 
-		bool read_dep(DATA_TYPE &data, volatile bool dep) {
-#pragma HLS inline
-			return false;
-		}
-
 		void write(const DATA_TYPE &data) {
 #pragma HLS inline
-		}
-
-		bool write_dep(const DATA_TYPE &data, volatile bool dep) {
-#pragma HLS inline
-			return false;
 		}
 };
 
