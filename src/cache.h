@@ -224,14 +224,15 @@ class cache {
 #endif /* __SYNTHESIS__ */
 			} else {
 				// send read request to cache
-				m_core_req_op[port].write(READ_OP);
-				m_core_req_addr[port].write(addr_main);
+				const auto dep_op = m_core_req_op[port].write_dep(READ_OP, false);
+				const auto dep_addr = m_core_req_addr[port].write_dep(addr_main, false);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
-				ap_wait_n(LATENCY);
+				const auto dep = utils::delay<bool, LATENCY>(dep_op && dep_addr);
+
 				// read response from cache
-				m_core_resp[port].read(line);
+				m_core_resp[port].read_dep(line, dep);
 
 				if (L1_CACHE) {
 					// store line to L1 cache
@@ -408,18 +409,18 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 							// memory interface and
 							// write request if
 							// write-back is necessary
-							m_mem_req.write(req);
+							auto dep = m_mem_req.write_dep(req, false);
 
 							// force FIFO write and
 							// FIFO read to separate
 							// pipeline stages to
 							// avoid deadlock due to
 							// the blocking read
-							ap_wait();
+							dep = utils::delay<bool, 1>(dep);
 
 							// read response from
 							// memory interface
-							m_mem_resp.read(line);
+							m_mem_resp.read_dep(line, dep);
 						} else {
 							execute_mem_if_req(main_mem,
 									req, line);
