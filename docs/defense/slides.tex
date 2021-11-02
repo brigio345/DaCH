@@ -177,39 +177,6 @@ on FPGA\\via High-Level Synthesis}
 	\end{columns}
 \end{frame}
 
-\iffalse
-\begin{frame}{Basic architecture}
-	\begin{columns}[c]
-		\begin{column}{.5\textwidth}
-			\textbf{Cache process}:
-			\begin{itemize}
-				\item Optimal pipeline (II=1)
-			\end{itemize}
-			
-			\bigskip
-			\textbf{Interface}:
-			\begin{itemize}
-				\item Scheduler unaware of latency between
-					\emph{request} and \emph{response}
-				\item Workaround: forced clock cycles
-			\end{itemize}
-		\end{column}
-		\begin{column}{.5\textwidth}
-			\begin{center}
-				\begin{figure}
-					\caption{Original scheduling}
-					\frame{\includegraphics[width=.55\textwidth]{actual_schedule_run}}
-				\end{figure}
-				\begin{figure}
-					\caption{Scheduling with workaround}
-					\frame{\includegraphics[width=.55\textwidth]{desired_schedule_run}}
-				\end{figure}
-			\end{center}
-		\end{column}
-	\end{columns}
-\end{frame}
-\fi
-
 \section{Optimizations}
 \subsection{Multi-levels architecture}
 \begin{frame}{Multi-levels architecture}
@@ -303,6 +270,37 @@ on FPGA\\via High-Level Synthesis}
 \begin{frame}{References}
 	\nocite{*}
 	\printbibliography[heading=none]
+\end{frame}
+
+\begin{frame}{Interface issues}
+	\begin{columns}[c]
+		\begin{column}{.5\textwidth}
+			\textbf{Cache process}:
+			\begin{itemize}
+				\item Optimal pipeline (II=1)
+			\end{itemize}
+			
+			\bigskip
+			\textbf{Interface}:
+			\begin{itemize}
+				\item Scheduler unaware of latency between
+					\emph{request} and \emph{response}
+				\item Workaround: forced clock cycles
+			\end{itemize}
+		\end{column}
+		\begin{column}{.5\textwidth}
+			\begin{center}
+				\begin{figure}
+					\caption{Original scheduling}
+					\frame{\includegraphics[width=.55\textwidth]{actual_schedule_run}}
+				\end{figure}
+				\begin{figure}
+					\caption{Scheduling with workaround}
+					\frame{\includegraphics[width=.55\textwidth]{desired_schedule_run}}
+				\end{figure}
+			\end{center}
+		\end{column}
+	\end{columns}
 \end{frame}
 
 \end{document}
