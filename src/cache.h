@@ -111,7 +111,7 @@ class cache {
 		T m_cache_mem[N_SETS * N_WAYS * N_WORDS_PER_LINE];		// 4
 		hls::stream<op_type, 4> m_core_req_op[PORTS];			// 5
 		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];	// 6
-		hls::stream<T, 4> m_core_req_data[PORTS];			// 7
+		hls::stream<T, 4> m_core_req_data;				// 7
 		hls::stream<line_type, 4> m_core_resp[PORTS];			// 8
 		stream_cond<mem_req_type, 2, MEM_IF_PROCESS> m_mem_req;		// 9
 		stream_cond<line_type, 2, MEM_IF_PROCESS> m_mem_resp;		// 10
@@ -133,7 +133,6 @@ class cache {
 #pragma HLS array_partition variable=m_cache_mem cyclic factor=N_WORDS_PER_LINE dim=1
 #pragma HLS array_partition variable=m_core_req_op complete
 #pragma HLS array_partition variable=m_core_req_addr complete
-#pragma HLS array_partition variable=m_core_req_data complete
 #pragma HLS array_partition variable=m_core_resp complete
 #pragma HLS array_partition variable=m_l1_cache_get complete
 		}
@@ -287,7 +286,7 @@ class cache {
 			// send write request to cache
 			m_core_req_op[0].write(WRITE_OP);
 			m_core_req_addr[0].write(addr_main);
-			m_core_req_data[0].write(data);
+			m_core_req_data.write(data);
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 			update_profiling(m_hit_status.read());
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
@@ -364,7 +363,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 					const auto addr_main = m_core_req_addr[port].read();
 					T data;
 					if (!read)
-						data = m_core_req_data[port].read();
+						data = m_core_req_data.read();
 
 					// extract information from address
 					address_type addr(addr_main);
