@@ -100,6 +100,12 @@ class cache {
 
 		typedef struct {
 			op_type op;
+			ap_uint<ADDR_SIZE> addr;
+			T data;
+		} core_req_type;
+
+		typedef struct {
+			op_type op;
 			ap_uint<ADDR_SIZE> load_addr;
 			ap_uint<ADDR_SIZE> write_back_addr;
 			line_type line;
@@ -109,15 +115,13 @@ class cache {
 		bool m_valid[N_SETS * N_WAYS];					// 2
 		bool m_dirty[N_SETS * N_WAYS];					// 3
 		T m_cache_mem[N_SETS * N_WAYS * N_WORDS_PER_LINE];		// 4
-		hls::stream<op_type, 4> m_core_req_op[PORTS];			// 5
-		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];	// 6
-		hls::stream<T, 4> m_core_req_data[PORTS];			// 7
-		hls::stream<line_type, 4> m_core_resp[PORTS];			// 8
-		stream_cond<mem_req_type, 2, MEM_IF_PROCESS> m_mem_req;		// 9
-		stream_cond<line_type, 2, MEM_IF_PROCESS> m_mem_resp;		// 10
-		l1_cache_type m_l1_cache_get[PORTS];				// 11
-		replacer_type m_replacer;					// 12
-		unsigned int m_core_port;					// 13
+		hls::stream<core_req_type, 4> m_core_req[PORTS];		// 5
+		hls::stream<line_type, 4> m_core_resp[PORTS];			// 6
+		stream_cond<mem_req_type, 2, MEM_IF_PROCESS> m_mem_req;		// 7
+		stream_cond<line_type, 2, MEM_IF_PROCESS> m_mem_resp;		// 8
+		l1_cache_type m_l1_cache_get[PORTS];				// 9
+		replacer_type m_replacer;					// 10
+		unsigned int m_core_port;					// 11
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs = 0;
@@ -131,9 +135,7 @@ class cache {
 #pragma HLS array_partition variable=m_valid complete dim=1
 #pragma HLS array_partition variable=m_dirty complete dim=1
 #pragma HLS array_partition variable=m_cache_mem cyclic factor=N_WORDS_PER_LINE dim=1
-#pragma HLS array_partition variable=m_core_req_op complete
-#pragma HLS array_partition variable=m_core_req_addr complete
-#pragma HLS array_partition variable=m_core_req_data complete
+#pragma HLS array_partition variable=m_core_req complete
 #pragma HLS array_partition variable=m_core_resp complete
 #pragma HLS array_partition variable=m_l1_cache_get complete
 		}
@@ -194,7 +196,7 @@ class cache {
 		 */
 		void stop() {
 			for (auto port = 0; port < PORTS; port++)
-				m_core_req_op[port].write(STOP_OP);
+				m_core_req[port].write((core_req_type){.op = STOP_OP});
 		}
 
 		/**
@@ -220,16 +222,17 @@ class cache {
 			if (l1_hit) {
 				m_l1_cache_get[port].get_line(addr_main, line);
 #ifndef __SYNTHESIS__
-				m_core_req_op[port].write(NOP_OP);
+				m_core_req[port].write((core_req_type){.op = NOP_OP});
 #endif /* __SYNTHESIS__ */
 			} else {
 				// send read request to cache
-				const auto dep_op = m_core_req_op[port].write_dep(READ_OP, false);
-				const auto dep_addr = m_core_req_addr[port].write_dep(addr_main, false);
+				auto dep = m_core_req[port].write_dep(
+						(core_req_type){.op = READ_OP,
+						.addr = addr_main}, false);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
-				const auto dep = utils::delay<bool, LATENCY>(dep_op && dep_addr);
+				dep = utils::delay<bool, LATENCY>(dep);
 
 				// read response from cache
 				m_core_resp[port].read_dep(line, dep);
@@ -285,9 +288,7 @@ class cache {
 			}
 
 			// send write request to cache
-			m_core_req_op[0].write(WRITE_OP);
-			m_core_req_addr[0].write(addr_main);
-			m_core_req_data[0].write(data);
+			m_core_req[0].write({WRITE_OP, addr_main, data});
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 			update_profiling(m_hit_status.read());
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
@@ -337,37 +338,31 @@ class cache {
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline II=PORTS
 INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
-					op_type op;
+					core_req_type req;
 #ifdef __SYNTHESIS__
 					// get request and
 					// make pipeline flushable (to avoid deadlock)
-					if (m_core_req_op[port].read_nb(op)) {
+					if (m_core_req[port].read_nb(req)) {
 #else
 					// get request
-					m_core_req_op[port].read(op);
+					m_core_req[port].read(req);
 #endif /* __SYNTHESIS__ */
 
 					// exit the loop if request is "end-of-request"
-					if (op == STOP_OP)
+					if (req.op == STOP_OP)
 						goto core_end;
 
 #ifndef __SYNTHESIS__
-					if (op == NOP_OP)
+					if (req.op == NOP_OP)
 						continue;
 #endif /* __SYNTHESIS__ */
 
 					// check the request type
-					const auto read = ((RD_ENABLED && (op == READ_OP)) ||
+					const auto read = ((RD_ENABLED && (req.op == READ_OP)) ||
 							(!WR_ENABLED));
 
-					// in case of write request, read data to be written
-					const auto addr_main = m_core_req_addr[port].read();
-					T data;
-					if (!read)
-						data = m_core_req_data[port].read();
-
 					// extract information from address
-					address_type addr(addr_main);
+					address_type addr(req.addr);
 
 					auto way = hit(addr);
 					const auto is_hit = (way != -1);
@@ -445,7 +440,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						m_core_resp[port].write(line);
 					} else {
 						// modify the line
-						line[addr.m_off] = data;
+						line[addr.m_off] = req.data;
 
 						// store the modified line to cache
 						set_line(m_cache_mem,
