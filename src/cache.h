@@ -22,7 +22,6 @@
 #include "l1_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
-#include "stream_cond.h"
 #include "ap_utils.h"
 #include "ap_int.h"
 #include "utils.h"
@@ -34,15 +33,11 @@
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
-#define MAX_AXI_BITWIDTH 512
-
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
 	 bool LRU, size_t L1_CACHE_LINES, size_t LATENCY>
 class cache {
 	private:
-		static const bool MEM_IF_PROCESS = (WR_ENABLED || (PORTS > 1) ||
-				((sizeof(T) * N_WORDS_PER_LINE * 8) > MAX_AXI_BITWIDTH));
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
@@ -117,8 +112,8 @@ class cache {
 		T m_cache_mem[N_SETS * N_WAYS * N_WORDS_PER_LINE];		// 4
 		hls::stream<core_req_type, 4> m_core_req[PORTS];		// 5
 		hls::stream<line_type, 4> m_core_resp[PORTS];			// 6
-		stream_cond<mem_req_type, 2, MEM_IF_PROCESS> m_mem_req;		// 7
-		stream_cond<line_type, 2, MEM_IF_PROCESS> m_mem_resp;		// 8
+		hls::stream<mem_req_type, 2> m_mem_req;				// 7
+		hls::stream<line_type, 2> m_mem_resp;				// 8
 		l1_cache_type m_l1_cache_get[PORTS];				// 9
 		replacer_type m_replacer;					// 10
 		unsigned int m_core_port;					// 11
@@ -171,20 +166,14 @@ class cache {
 		void run(T * const main_mem) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
-			run_core(main_mem);
-			if (MEM_IF_PROCESS)
-				run_mem_if(main_mem);
+			run_core();
+			run_mem_if(main_mem);
 #else
-			std::thread core_thd([&]{run_core(main_mem);});
-			if (MEM_IF_PROCESS) {
-				std::thread mem_if_thd([&]{
-						run_mem_if(main_mem);
-						});
-
-				mem_if_thd.join();
-			}
+			std::thread core_thd([&]{run_core();});
+			std::thread mem_if_thd([&]{run_mem_if(main_mem);});
 
 			core_thd.join();
+			mem_if_thd.join();
 #endif /* __SYNTHESIS__ */
 		}
 
@@ -320,14 +309,11 @@ class cache {
 		 * \brief		Infinite loop managing the cache access
 		 * 			requests (sent from the outside).
 		 *
-		 * \param[in] main_mem	The pointer to the main memory (ignored
-		 * 			if \ref MEM_IF_PROCESS is \c true).
-		 *
 		 * \note		The infinite loop must be stopped by
 		 * 			calling \ref stop (from the outside)
 		 * 			when all the accesses have been completed.
 		 */
-		void run_core(T * const main_mem) {
+		void run_core() {
 #pragma HLS inline off
 			// invalidate all cache lines
 			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
@@ -399,27 +385,22 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						const mem_req_type req = {op, addr.m_addr_main,
 									write_back_addr.m_addr_main, line};
 
-						if (MEM_IF_PROCESS) {
-							// send read request to
-							// memory interface and
-							// write request if
-							// write-back is necessary
-							m_mem_req.write(req);
+						// send read request to
+						// memory interface and
+						// write request if
+						// write-back is necessary
+						m_mem_req.write(req);
 
-							// force FIFO write and
-							// FIFO read to separate
-							// pipeline stages to
-							// avoid deadlock due to
-							// the blocking read
-							ap_wait();
+						// force FIFO write and
+						// FIFO read to separate
+						// pipeline stages to
+						// avoid deadlock due to
+						// the blocking read
+						ap_wait();
 
-							// read response from
-							// memory interface
-							m_mem_resp.read(line);
-						} else {
-							execute_mem_if_req(main_mem,
-									req, line);
-						}
+						// read response from
+						// memory interface
+						m_mem_resp.read(line);
 
 						m_tag[addr.m_addr_line] = addr.m_tag;
 						m_valid[addr.m_addr_line] = true;
@@ -469,11 +450,8 @@ core_end:
 			// memory interface
 			ap_wait();
 
-			if (MEM_IF_PROCESS) {
-				// stop memory interface
-				line_type dummy;
-				m_mem_req.write({STOP_OP, 0, 0, dummy});
-			}
+			// stop memory interface
+			m_mem_req.write((mem_req_type){.op = STOP_OP});
 		}
 
 		/**
@@ -503,7 +481,17 @@ MEM_IF_LOOP:		while (1) {
 					break;
 
 				line_type line;
-				execute_mem_if_req(main_mem, req, line);
+				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
+					// read line from main memory
+					get_line(main_mem, req.load_addr, line);
+				}
+
+				if (WR_ENABLED && ((req.op == WRITE_OP) ||
+							(req.op == READ_WRITE_OP))) {
+					// write line to main memory
+					set_line(main_mem, req.write_back_addr,
+							req.line);
+				}
 
 				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
 					// send the response to the read request
@@ -511,32 +499,6 @@ MEM_IF_LOOP:		while (1) {
 				}
 			}
 
-		}
-
-		/**
-		 * \brief		Execute memory access(es) specified in
-		 * 			\p req.
-		 *
-		 * \param[in] main_mem	The pointer to the main memory.
-		 * \param[in] req	The request to be executed.
-		 * \param[out] line	The buffer to store the read line.
-		 *
-		 * \note		\p main_mem must be associated with
-		 * 			a dedicated AXI port.
-		 */
-		void execute_mem_if_req(T * const main_mem,
-				const mem_req_type &req, line_type &line) {
-#pragma HLS inline
-			if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
-				// read line from main memory
-				get_line(main_mem, req.load_addr, line);
-			}
-
-			if (WR_ENABLED && ((req.op == WRITE_OP) ||
-						(req.op == READ_WRITE_OP))) {
-				// write line to main memory
-				set_line(main_mem, req.write_back_addr, req.line);
-			}
 		}
 
 		/**
