@@ -110,8 +110,8 @@ class cache {
 		bool m_valid[N_SETS * N_WAYS];					// 2
 		bool m_dirty[N_SETS * N_WAYS];					// 3
 		T m_cache_mem[N_SETS * N_WAYS * N_WORDS_PER_LINE];		// 4
-		hls::stream<core_req_type, 4> m_core_req[PORTS];		// 5
-		hls::stream<line_type, 4> m_core_resp[PORTS];			// 6
+		hls::stream<core_req_type, 512> m_core_req[PORTS];		// 5
+		hls::stream<line_type, 512> m_core_resp[PORTS];			// 6
 		hls::stream<mem_req_type, 2> m_mem_req;				// 7
 		hls::stream<line_type, 2> m_mem_resp;				// 8
 		l1_cache_type m_l1_cache_get[PORTS];				// 9
