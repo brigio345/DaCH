@@ -22,10 +22,10 @@
 #include "l1_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
-#include "stream_cond.h"
 #include "ap_utils.h"
 #include "ap_int.h"
 #include "utils.h"
+#include <type_traits>
 #ifdef __SYNTHESIS__
 #include "hls_vector.h"
 #else
@@ -34,15 +34,11 @@
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
-#define MAX_AXI_BITWIDTH 512
-
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
 	 bool LRU, size_t L1_CACHE_LINES, size_t LATENCY>
 class cache {
 	private:
-		static const bool MEM_IF_PROCESS = (WR_ENABLED || (PORTS > 1) ||
-				((sizeof(T) * N_WORDS_PER_LINE * 8) > MAX_AXI_BITWIDTH));
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
@@ -100,6 +96,12 @@ class cache {
 
 		typedef struct {
 			op_type op;
+			ap_uint<ADDR_SIZE> addr;
+			T data;
+		} core_req_type;
+
+		typedef struct {
+			op_type op;
 			ap_uint<ADDR_SIZE> load_addr;
 			ap_uint<ADDR_SIZE> write_back_addr;
 			line_type line;
@@ -109,15 +111,13 @@ class cache {
 		bool m_valid[N_SETS * N_WAYS];					// 2
 		bool m_dirty[N_SETS * N_WAYS];					// 3
 		T m_cache_mem[N_SETS * N_WAYS * N_WORDS_PER_LINE];		// 4
-		hls::stream<op_type, 4> m_core_req_op[PORTS];			// 5
-		hls::stream<ap_uint<ADDR_SIZE>, 4> m_core_req_addr[PORTS];	// 6
-		hls::stream<T, 4> m_core_req_data;				// 7
-		hls::stream<line_type, 4> m_core_resp[PORTS];			// 8
-		stream_cond<mem_req_type, 2, MEM_IF_PROCESS> m_mem_req;		// 9
-		stream_cond<line_type, 2, MEM_IF_PROCESS> m_mem_resp;		// 10
-		l1_cache_type m_l1_cache_get[PORTS];				// 11
-		replacer_type m_replacer;					// 12
-		unsigned int m_core_port;					// 13
+		hls::stream<core_req_type, 512> m_core_req[PORTS];		// 5
+		hls::stream<line_type, 512> m_core_resp[PORTS];			// 6
+		hls::stream<mem_req_type, 2> m_mem_req;				// 7
+		hls::stream<line_type, 2> m_mem_resp;				// 8
+		l1_cache_type m_l1_cache_get[PORTS];				// 9
+		replacer_type m_replacer;					// 10
+		unsigned int m_core_port;					// 11
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs = 0;
@@ -131,8 +131,7 @@ class cache {
 #pragma HLS array_partition variable=m_valid complete dim=1
 #pragma HLS array_partition variable=m_dirty complete dim=1
 #pragma HLS array_partition variable=m_cache_mem cyclic factor=N_WORDS_PER_LINE dim=1
-#pragma HLS array_partition variable=m_core_req_op complete
-#pragma HLS array_partition variable=m_core_req_addr complete
+#pragma HLS array_partition variable=m_core_req complete
 #pragma HLS array_partition variable=m_core_resp complete
 #pragma HLS array_partition variable=m_l1_cache_get complete
 		}
@@ -168,20 +167,14 @@ class cache {
 		void run(T * const main_mem) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
-			run_core(main_mem);
-			if (MEM_IF_PROCESS)
-				run_mem_if(main_mem);
+			run_core();
+			run_mem_if(main_mem);
 #else
-			std::thread core_thd([&]{run_core(main_mem);});
-			if (MEM_IF_PROCESS) {
-				std::thread mem_if_thd([&]{
-						run_mem_if(main_mem);
-						});
-
-				mem_if_thd.join();
-			}
+			std::thread core_thd([&]{run_core();});
+			std::thread mem_if_thd([&]{run_mem_if(main_mem);});
 
 			core_thd.join();
+			mem_if_thd.join();
 #endif /* __SYNTHESIS__ */
 		}
 
@@ -193,8 +186,31 @@ class cache {
 		 */
 		void stop() {
 			for (auto port = 0; port < PORTS; port++)
-				m_core_req_op[port].write(STOP_OP);
+				m_core_req[port].write((core_req_type){.op = STOP_OP});
 		}
+
+		template <unsigned int PORT>
+			typename std::enable_if<(PORT < PORTS), bool>::type
+			write_req(core_req_type req) {
+				return m_core_req[PORT].write_dep(req, false);
+			}
+
+		template <unsigned int PORT>
+			typename std::enable_if<(PORT >= PORTS), bool>::type
+			write_req(core_req_type req) {
+				return false;
+			}
+
+		template <unsigned int PORT>
+			typename std::enable_if<(PORT < PORTS), void>::type
+			read_resp(line_type &line, bool dep) {
+				m_core_resp[PORT].read_dep(line, dep);
+			}
+
+		template <unsigned int PORT>
+			typename std::enable_if<(PORT >= PORTS), void>::type
+			read_resp(line_type &line, bool dep) {
+			}
 
 		/**
 		 * \brief		Request to read a whole cache line.
@@ -219,19 +235,150 @@ class cache {
 			if (l1_hit) {
 				m_l1_cache_get[port].get_line(addr_main, line);
 #ifndef __SYNTHESIS__
-				m_core_req_op[port].write(NOP_OP);
+				m_core_req[port].write((core_req_type){.op = NOP_OP});
 #endif /* __SYNTHESIS__ */
 			} else {
 				// send read request to cache
-				const auto dep_op = m_core_req_op[port].write_dep(READ_OP, false);
-				const auto dep_addr = m_core_req_addr[port].write_dep(addr_main, false);
+				bool dep;
+				switch (port) {
+					case 0:
+						dep = write_req<0>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 1:
+						dep = write_req<1>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 2:
+						dep = write_req<2>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 3:
+						dep = write_req<3>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 4:
+						dep = write_req<4>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 5:
+						dep = write_req<5>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 6:
+						dep = write_req<6>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 7:
+						dep = write_req<7>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 8:
+						dep = write_req<8>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 9:
+						dep = write_req<9>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 10:
+						dep = write_req<10>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 11:
+						dep = write_req<11>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 12:
+						dep = write_req<12>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 13:
+						dep = write_req<13>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					case 14:
+						dep = write_req<14>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+					default:
+						dep = write_req<15>((core_req_type){
+								.op = READ_OP,
+								.addr = addr_main});
+						break;
+				}
+
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
-				const auto dep = utils::delay<bool, LATENCY>(dep_op && dep_addr);
+				dep = utils::delay<bool, LATENCY>(dep);
 
 				// read response from cache
-				m_core_resp[port].read_dep(line, dep);
+				switch (port) {
+					case 0:
+						read_resp<0>(line, dep);
+						break;
+					case 1:
+						read_resp<1>(line, dep);
+						break;
+					case 2:
+						read_resp<2>(line, dep);
+						break;
+					case 3:
+						read_resp<3>(line, dep);
+						break;
+					case 4:
+						read_resp<4>(line, dep);
+						break;
+					case 5:
+						read_resp<5>(line, dep);
+						break;
+					case 6:
+						read_resp<6>(line, dep);
+						break;
+					case 7:
+						read_resp<7>(line, dep);
+						break;
+					case 8:
+						read_resp<8>(line, dep);
+						break;
+					case 9:
+						read_resp<9>(line, dep);
+						break;
+					case 10:
+						read_resp<10>(line, dep);
+						break;
+					case 11:
+						read_resp<11>(line, dep);
+						break;
+					case 12:
+						read_resp<12>(line, dep);
+						break;
+					case 13:
+						read_resp<13>(line, dep);
+						break;
+					case 14:
+						read_resp<14>(line, dep);
+						break;
+					default:
+						read_resp<15>(line, dep);
+						break;
+				}
 
 				if (L1_CACHE) {
 					// store line to L1 cache
@@ -284,9 +431,7 @@ class cache {
 			}
 
 			// send write request to cache
-			m_core_req_op[0].write(WRITE_OP);
-			m_core_req_addr[0].write(addr_main);
-			m_core_req_data.write(data);
+			m_core_req[0].write({WRITE_OP, addr_main, data});
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 			update_profiling(m_hit_status.read());
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
@@ -318,14 +463,11 @@ class cache {
 		 * \brief		Infinite loop managing the cache access
 		 * 			requests (sent from the outside).
 		 *
-		 * \param[in] main_mem	The pointer to the main memory (ignored
-		 * 			if \ref MEM_IF_PROCESS is \c true).
-		 *
 		 * \note		The infinite loop must be stopped by
 		 * 			calling \ref stop (from the outside)
 		 * 			when all the accesses have been completed.
 		 */
-		void run_core(T * const main_mem) {
+		void run_core() {
 #pragma HLS inline off
 			// invalidate all cache lines
 			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
@@ -336,37 +478,31 @@ class cache {
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline II=PORTS
 INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
-					op_type op;
+					core_req_type req;
 #ifdef __SYNTHESIS__
 					// get request and
 					// make pipeline flushable (to avoid deadlock)
-					if (m_core_req_op[port].read_nb(op)) {
+					if (m_core_req[port].read_nb(req)) {
 #else
 					// get request
-					m_core_req_op[port].read(op);
+					m_core_req[port].read(req);
 #endif /* __SYNTHESIS__ */
 
 					// exit the loop if request is "end-of-request"
-					if (op == STOP_OP)
+					if (req.op == STOP_OP)
 						goto core_end;
 
 #ifndef __SYNTHESIS__
-					if (op == NOP_OP)
+					if (req.op == NOP_OP)
 						continue;
 #endif /* __SYNTHESIS__ */
 
 					// check the request type
-					const auto read = ((RD_ENABLED && (op == READ_OP)) ||
+					const auto read = ((RD_ENABLED && (req.op == READ_OP)) ||
 							(!WR_ENABLED));
 
-					// in case of write request, read data to be written
-					const auto addr_main = m_core_req_addr[port].read();
-					T data;
-					if (!read)
-						data = m_core_req_data.read();
-
 					// extract information from address
-					address_type addr(addr_main);
+					address_type addr(req.addr);
 
 					auto way = hit(addr);
 					const auto is_hit = (way != -1);
@@ -400,30 +536,24 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 							op = READ_WRITE_OP;
 						}
 
-						const mem_req_type req = {op, addr.m_addr_main,
-									write_back_addr.m_addr_main, line};
+						// send read request to
+						// memory interface and
+						// write request if
+						// write-back is necessary
+						m_mem_req.write({op, addr.m_addr_main,
+								write_back_addr.m_addr_main,
+								line});
 
-						if (MEM_IF_PROCESS) {
-							// send read request to
-							// memory interface and
-							// write request if
-							// write-back is necessary
-							m_mem_req.write(req);
+						// force FIFO write and
+						// FIFO read to separate
+						// pipeline stages to
+						// avoid deadlock due to
+						// the blocking read
+						ap_wait();
 
-							// force FIFO write and
-							// FIFO read to separate
-							// pipeline stages to
-							// avoid deadlock due to
-							// the blocking read
-							ap_wait();
-
-							// read response from
-							// memory interface
-							m_mem_resp.read(line);
-						} else {
-							execute_mem_if_req(main_mem,
-									req, line);
-						}
+						// read response from
+						// memory interface
+						m_mem_resp.read(line);
 
 						m_tag[addr.m_addr_line] = addr.m_tag;
 						m_valid[addr.m_addr_line] = true;
@@ -444,7 +574,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						m_core_resp[port].write(line);
 					} else {
 						// modify the line
-						line[addr.m_off] = data;
+						line[addr.m_off] = req.data;
 
 						// store the modified line to cache
 						set_line(m_cache_mem,
@@ -473,11 +603,8 @@ core_end:
 			// memory interface
 			ap_wait();
 
-			if (MEM_IF_PROCESS) {
-				// stop memory interface
-				line_type dummy;
-				m_mem_req.write({STOP_OP, 0, 0, dummy});
-			}
+			// stop memory interface
+			m_mem_req.write((mem_req_type){.op = STOP_OP});
 		}
 
 		/**
@@ -507,7 +634,17 @@ MEM_IF_LOOP:		while (1) {
 					break;
 
 				line_type line;
-				execute_mem_if_req(main_mem, req, line);
+				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
+					// read line from main memory
+					get_line(main_mem, req.load_addr, line);
+				}
+
+				if (WR_ENABLED && ((req.op == WRITE_OP) ||
+							(req.op == READ_WRITE_OP))) {
+					// write line to main memory
+					set_line(main_mem, req.write_back_addr,
+							req.line);
+				}
 
 				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
 					// send the response to the read request
@@ -515,32 +652,6 @@ MEM_IF_LOOP:		while (1) {
 				}
 			}
 
-		}
-
-		/**
-		 * \brief		Execute memory access(es) specified in
-		 * 			\p req.
-		 *
-		 * \param[in] main_mem	The pointer to the main memory.
-		 * \param[in] req	The request to be executed.
-		 * \param[out] line	The buffer to store the read line.
-		 *
-		 * \note		\p main_mem must be associated with
-		 * 			a dedicated AXI port.
-		 */
-		void execute_mem_if_req(T * const main_mem,
-				const mem_req_type &req, line_type &line) {
-#pragma HLS inline
-			if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
-				// read line from main memory
-				get_line(main_mem, req.load_addr, line);
-			}
-
-			if (WR_ENABLED && ((req.op == WRITE_OP) ||
-						(req.op == READ_WRITE_OP))) {
-				// write line to main memory
-				set_line(main_mem, req.write_back_addr, req.line);
-			}
 		}
 
 		/**
