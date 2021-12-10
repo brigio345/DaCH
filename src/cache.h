@@ -188,6 +188,16 @@ class cache {
 				m_core_req[port].write((core_req_type){.op = STOP_OP});
 		}
 
+		bool write_req(const core_req_type req, const unsigned int port) {
+#pragma HLS function_instantiate variable=port
+			return m_core_req[port].write_dep(req, false);
+		}
+
+		void read_resp(line_type &line, bool dep, const unsigned int port) {
+#pragma HLS function_instantiate variable=port
+			m_core_resp[port].read_dep(line, dep);
+		}
+
 		/**
 		 * \brief		Request to read a whole cache line.
 		 *
@@ -215,16 +225,17 @@ class cache {
 #endif /* __SYNTHESIS__ */
 			} else {
 				// send read request to cache
-				auto dep = m_core_req[port].write_dep(
-						(core_req_type){.op = READ_OP,
-						.addr = addr_main}, false);
+				auto dep = write_req((core_req_type){
+						.op = READ_OP,
+						.addr = addr_main},
+						port);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
 				dep = utils::delay<bool, LATENCY>(dep);
 
 				// read response from cache
-				m_core_resp[port].read_dep(line, dep);
+				read_resp(line, dep, port);
 
 				if (L1_CACHE) {
 					// store line to L1 cache
