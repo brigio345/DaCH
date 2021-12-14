@@ -25,7 +25,6 @@
 #include "ap_utils.h"
 #include "ap_int.h"
 #include "utils.h"
-#include <type_traits>
 #ifdef __SYNTHESIS__
 #include "hls_vector.h"
 #else
@@ -189,28 +188,15 @@ class cache {
 				m_core_req[port].write((core_req_type){.op = STOP_OP});
 		}
 
-		template <unsigned int PORT>
-			typename std::enable_if<(PORT < PORTS), bool>::type
-			write_req(core_req_type req) {
-				return m_core_req[PORT].write_dep(req, false);
-			}
+		bool write_req(const core_req_type req, const unsigned int port) {
+#pragma HLS function_instantiate variable=port
+			return m_core_req[port].write_dep(req, false);
+		}
 
-		template <unsigned int PORT>
-			typename std::enable_if<(PORT >= PORTS), bool>::type
-			write_req(core_req_type req) {
-				return false;
-			}
-
-		template <unsigned int PORT>
-			typename std::enable_if<(PORT < PORTS), void>::type
-			read_resp(line_type &line, bool dep) {
-				m_core_resp[PORT].read_dep(line, dep);
-			}
-
-		template <unsigned int PORT>
-			typename std::enable_if<(PORT >= PORTS), void>::type
-			read_resp(line_type &line, bool dep) {
-			}
+		void read_resp(line_type &line, bool dep, const unsigned int port) {
+#pragma HLS function_instantiate variable=port
+			m_core_resp[port].read_dep(line, dep);
+		}
 
 		/**
 		 * \brief		Request to read a whole cache line.
@@ -239,146 +225,17 @@ class cache {
 #endif /* __SYNTHESIS__ */
 			} else {
 				// send read request to cache
-				bool dep;
-				switch (port) {
-					case 0:
-						dep = write_req<0>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 1:
-						dep = write_req<1>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 2:
-						dep = write_req<2>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 3:
-						dep = write_req<3>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 4:
-						dep = write_req<4>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 5:
-						dep = write_req<5>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 6:
-						dep = write_req<6>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 7:
-						dep = write_req<7>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 8:
-						dep = write_req<8>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 9:
-						dep = write_req<9>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 10:
-						dep = write_req<10>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 11:
-						dep = write_req<11>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 12:
-						dep = write_req<12>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 13:
-						dep = write_req<13>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					case 14:
-						dep = write_req<14>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-					default:
-						dep = write_req<15>((core_req_type){
-								.op = READ_OP,
-								.addr = addr_main});
-						break;
-				}
-
+				auto dep = write_req((core_req_type){
+						.op = READ_OP,
+						.addr = addr_main},
+						port);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
 				dep = utils::delay<bool, LATENCY>(dep);
 
 				// read response from cache
-				switch (port) {
-					case 0:
-						read_resp<0>(line, dep);
-						break;
-					case 1:
-						read_resp<1>(line, dep);
-						break;
-					case 2:
-						read_resp<2>(line, dep);
-						break;
-					case 3:
-						read_resp<3>(line, dep);
-						break;
-					case 4:
-						read_resp<4>(line, dep);
-						break;
-					case 5:
-						read_resp<5>(line, dep);
-						break;
-					case 6:
-						read_resp<6>(line, dep);
-						break;
-					case 7:
-						read_resp<7>(line, dep);
-						break;
-					case 8:
-						read_resp<8>(line, dep);
-						break;
-					case 9:
-						read_resp<9>(line, dep);
-						break;
-					case 10:
-						read_resp<10>(line, dep);
-						break;
-					case 11:
-						read_resp<11>(line, dep);
-						break;
-					case 12:
-						read_resp<12>(line, dep);
-						break;
-					case 13:
-						read_resp<13>(line, dep);
-						break;
-					case 14:
-						read_resp<14>(line, dep);
-						break;
-					default:
-						read_resp<15>(line, dep);
-						break;
-				}
+				read_resp(line, dep, port);
 
 				if (L1_CACHE) {
 					// store line to L1 cache
@@ -536,13 +393,14 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 							op = READ_WRITE_OP;
 						}
 
+						const mem_req_type req = {op, addr.m_addr_main,
+									write_back_addr.m_addr_main, line};
+
 						// send read request to
 						// memory interface and
 						// write request if
 						// write-back is necessary
-						m_mem_req.write({op, addr.m_addr_main,
-								write_back_addr.m_addr_main,
-								line});
+						m_mem_req.write(req);
 
 						// force FIFO write and
 						// FIFO read to separate
