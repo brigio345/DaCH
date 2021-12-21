@@ -109,7 +109,7 @@ class cache {
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];	// 1
 		bool m_valid[N_SETS * N_WAYS];					// 2
 		bool m_dirty[N_SETS * N_WAYS];					// 3
-		T m_cache_mem[N_SETS * N_WAYS * N_WORDS_PER_LINE];		// 4
+		line_type m_cache_mem[N_SETS * N_WAYS];				// 4
 		hls::stream<core_req_type, 512> m_core_req[PORTS];		// 5
 		hls::stream<line_type, 512> m_core_resp[PORTS];			// 6
 		hls::stream<mem_req_type, 2> m_mem_req;				// 7
@@ -129,7 +129,6 @@ class cache {
 #pragma HLS array_partition variable=m_tag complete dim=1
 #pragma HLS array_partition variable=m_valid complete dim=1
 #pragma HLS array_partition variable=m_dirty complete dim=1
-#pragma HLS array_partition variable=m_cache_mem cyclic factor=N_WORDS_PER_LINE dim=1
 #pragma HLS array_partition variable=m_core_req complete
 #pragma HLS array_partition variable=m_core_resp complete
 #pragma HLS array_partition variable=m_l1_cache_get complete
@@ -373,9 +372,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 					line_type line;
 					if (is_hit) {
 						// read from cache memory
-						get_line(m_cache_mem,
-								addr.m_addr_cache,
-								line);
+						line = m_cache_mem[addr.m_addr_line];
 					} else {
 						// read from main memory
 						auto op = READ_OP;
@@ -386,9 +383,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						if (WR_ENABLED && m_valid[addr.m_addr_line] &&
 								m_dirty[addr.m_addr_line]) {
 							// get the line to be written back
-							get_line(m_cache_mem,
-									write_back_addr.m_addr_cache,
-									line);
+							line = m_cache_mem[write_back_addr.m_addr_line];
 
 							op = READ_WRITE_OP;
 						}
@@ -421,9 +416,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 
 						if (read) {
 							// store loaded line to cache
-							set_line(m_cache_mem,
-									addr.m_addr_cache,
-									line);
+							m_cache_mem[addr.m_addr_line] = line;
 						}
 					}
 
@@ -435,9 +428,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						line[addr.m_off] = req.data;
 
 						// store the modified line to cache
-						set_line(m_cache_mem,
-								addr.m_addr_cache,
-								line);
+						m_cache_mem[addr.m_addr_line] = line;
 
 
 						m_dirty[addr.m_addr_line] = true;
@@ -552,9 +543,7 @@ MEM_IF_LOOP:		while (1) {
 						line_type line;
 
 						// read line
-						get_line(m_cache_mem,
-								addr.m_addr_cache,
-								line);
+						line = m_cache_mem[addr.m_addr_line];
 
 						// send write request to memory
 						// interface
