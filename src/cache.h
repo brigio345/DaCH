@@ -25,11 +25,8 @@
 #include "ap_utils.h"
 #include "ap_int.h"
 #include "utils.h"
-#ifdef __SYNTHESIS__
-#include "hls_vector.h"
-#else
+#ifndef __SYNTHESIS__
 #include <thread>
-#include <array>
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
@@ -44,6 +41,7 @@ class cache {
 		static const size_t OFF_SIZE = utils::log2_ceil(N_WORDS_PER_LINE);
 		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
+		static const size_t WORD_SIZE = (sizeof(T) * 8);
 
 		static_assert((RD_ENABLED || WR_ENABLED),
 				"RD_ENABLED and/or WR_ENABLED must be true");
@@ -62,16 +60,8 @@ class cache {
 		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_WORDS_PER_LINE)),
 				"N_SETS and/or N_WAYS and/or N_WORDS_PER_LINE are too big for the specified MAIN_SIZE");
 
-#ifdef __SYNTHESIS__
-		template <typename TYPE, size_t SIZE>
-			using array_type = hls::vector<TYPE, SIZE>;
-#else
-		template <typename TYPE, size_t SIZE>
-			using array_type = std::array<TYPE, SIZE>;
-#endif /* __SYNTHESIS__ */
-
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> address_type;
-		typedef array_type<T, N_WORDS_PER_LINE> line_type;
+		typedef ap_uint<N_WORDS_PER_LINE * WORD_SIZE> line_type;
 		typedef l1_cache<T, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
 			l1_cache_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
@@ -265,7 +255,9 @@ class cache {
 			// extract information from address
 			address_type addr(addr_main);
 
-			return line[addr.m_off];
+			const auto LSB = (addr.m_off * WORD_SIZE);
+			const auto MSB = (LSB + WORD_SIZE - 1);
+			return line(MSB, LSB);
 		}
 
 		/**
@@ -425,7 +417,9 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						m_core_resp[port].write(line);
 					} else {
 						// modify the line
-						line[addr.m_off] = req.data;
+						const auto LSB = (addr.m_off * WORD_SIZE);
+						const auto MSB = (LSB + WORD_SIZE - 1);
+						line(MSB, LSB) = req.data;
 
 						// store the modified line to cache
 						m_cache_mem[addr.m_addr_line] = line;
@@ -565,7 +559,9 @@ MEM_IF_LOOP:		while (1) {
 
 			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				line[off] = mem_line[off];
+				const auto LSB = (off * WORD_SIZE);
+				const auto MSB = (LSB + WORD_SIZE - 1);
+				line(MSB, LSB) = mem_line[off];
 			}
 		}
 
@@ -577,7 +573,9 @@ MEM_IF_LOOP:		while (1) {
 
 			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				mem_line[off] = line[off];
+				const auto LSB = (off * WORD_SIZE);
+				const auto MSB = (LSB + WORD_SIZE - 1);
+				mem_line[off] = line(MSB, LSB);
 			}
 		}
 
