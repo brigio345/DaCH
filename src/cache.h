@@ -63,7 +63,7 @@ class cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> address_type;
 		typedef ap_uint<WORD_SIZE * N_WORDS_PER_LINE> line_type;
-		typedef l1_cache<T, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
+		typedef l1_cache<line_type, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
 			l1_cache_type;
 		typedef raw_cache<line_type, (N_SETS * N_WAYS * N_WORDS_PER_LINE), 2>
 			raw_cache_type;
