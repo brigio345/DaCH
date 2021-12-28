@@ -4,6 +4,11 @@
 #include "address.h"
 #include "utils.h"
 #include "ap_int.h"
+#ifdef __SYNTHESIS__
+#include "hls_vector.h"
+#else
+#include <array>
+#endif /* __SYNTHESIS__ */
 
 template <typename T, size_t MAIN_SIZE, size_t N_SETS, size_t N_WORDS_PER_LINE>
 class l1_cache {
@@ -12,7 +17,6 @@ class l1_cache {
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
 		static const size_t OFF_SIZE = utils::log2_ceil(N_WORDS_PER_LINE);
 		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
-		static const size_t WORD_SIZE = (sizeof(T) * 8);
 
 		static_assert(((MAIN_SIZE > 0) && ((1 << ADDR_SIZE) == MAIN_SIZE)),
 				"MAIN_SIZE must be a power of 2 greater than 0");
@@ -24,7 +28,15 @@ class l1_cache {
 		static_assert((MAIN_SIZE >= (N_SETS * N_WORDS_PER_LINE)),
 				"N_SETS and/or N_WORDS_PER_LINE are too big for the specified MAIN_SIZE");
 
-		typedef ap_uint<N_WORDS_PER_LINE * WORD_SIZE> line_type;
+#ifdef __SYNTHESIS__
+		template <typename TYPE, size_t SIZE>
+			using array_type = hls::vector<TYPE, SIZE>;
+#else
+		template <typename TYPE, size_t SIZE>
+			using array_type = std::array<TYPE, SIZE>;
+#endif /* __SYNTHESIS__ */
+
+		typedef array_type<T, N_WORDS_PER_LINE> line_type;
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, 0> addr_type;
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[(N_SETS > 0) ? N_SETS : 1];	// 1
@@ -50,9 +62,7 @@ class l1_cache {
 
 			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				const auto LSB = (off * N_WORDS_PER_LINE);
-				const auto MSB = (LSB + N_WORDS_PER_LINE - 1);
-				line(MSB, LSB) = m_cache_mem[addr.m_set * N_WORDS_PER_LINE + off];
+				line[off] = m_cache_mem[addr.m_set * N_WORDS_PER_LINE + off];
 			}
 		}
 
@@ -62,9 +72,7 @@ class l1_cache {
 
 			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				const auto LSB = (off * N_WORDS_PER_LINE);
-				const auto MSB = (LSB + N_WORDS_PER_LINE - 1);
-				m_cache_mem[addr.m_set * N_WORDS_PER_LINE + off] = line(MSB, LSB);
+				m_cache_mem[addr.m_set * N_WORDS_PER_LINE + off] = line[off];
 			}
 			m_valid[addr.m_set] = true;
 			m_tag[addr.m_set] = addr.m_tag;
