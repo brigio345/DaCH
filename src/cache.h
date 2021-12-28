@@ -260,7 +260,8 @@ class cache {
 
 			const auto LSB = (addr.m_off * WORD_SIZE);
 			const auto MSB = (LSB + WORD_SIZE - 1);
-			return static_cast<T>(line(LSB, MSB));
+			ap_uint<WORD_SIZE> buff = line(LSB, MSB);
+			return *reinterpret_cast<T *>(&buff);
 		}
 
 		/**
@@ -432,7 +433,7 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						// modify the line
 						const auto LSB = (addr.m_off * WORD_SIZE);
 						const auto MSB = (LSB + WORD_SIZE - 1);
-						line(LSB, MSB) = static_cast<ap_uint<WORD_SIZE>>(req.data);
+						line(LSB, MSB) = *reinterpret_cast<ap_uint<WORD_SIZE> *>(&(req.data));
 
 						// store the modified line to cache
 						raw_cache_mem.set_line(
@@ -577,7 +578,8 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS unroll
 				const auto LSB = (off * WORD_SIZE);
 				const auto MSB = (LSB + WORD_SIZE - 1);
-				line(LSB, MSB) = static_cast<ap_uint<WORD_SIZE>>(mem_line[off]);
+				line(LSB, MSB) = *const_cast<ap_uint<WORD_SIZE> *>(
+						reinterpret_cast<const ap_uint<WORD_SIZE> *>(&mem_line[off]));
 			}
 		}
 
@@ -591,7 +593,8 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS unroll
 				const auto LSB = (off * WORD_SIZE);
 				const auto MSB = (LSB + WORD_SIZE - 1);
-				mem_line[off] = static_cast<T>(line(LSB, MSB));
+				ap_uint<WORD_SIZE> buff = line(LSB, MSB);
+				mem_line[off] = *reinterpret_cast<T *>(&buff);
 			}
 		}
 
