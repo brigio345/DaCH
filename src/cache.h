@@ -20,6 +20,7 @@
 #include "address.h"
 #include "replacer.h"
 #include "l1_cache.h"
+#include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
 #include "ap_utils.h"
@@ -64,6 +65,8 @@ class cache {
 		typedef ap_uint<N_WORDS_PER_LINE * WORD_SIZE> line_type;
 		typedef l1_cache<T, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
 			l1_cache_type;
+		typedef raw_cache<line_type, (N_SETS * N_WAYS * N_WORDS_PER_LINE), 2>
+			raw_cache_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
 			N_WORDS_PER_LINE> replacer_type;
 
@@ -105,6 +108,7 @@ class cache {
 		hls::stream<mem_req_type, 2> m_mem_req;				// 7
 		hls::stream<line_type, 2> m_mem_resp;				// 8
 		l1_cache_type m_l1_cache_get[PORTS];				// 9
+		raw_cache_type m_raw_cache;
 		replacer_type m_replacer;					// 10
 		unsigned int m_core_port;					// 11
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
@@ -321,11 +325,13 @@ class cache {
 			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
 				m_valid[line] = false;
 
+			m_raw_cache.init();
 			m_replacer.init();
 
 CORE_LOOP:		while (1) {
 #pragma HLS pipeline II=PORTS
 INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
+#pragma HLS dependence variable=m_cache_mem inter RAW distance=3 true
 					core_req_type req;
 #ifdef __SYNTHESIS__
 					// get request and
@@ -364,7 +370,9 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 					line_type line;
 					if (is_hit) {
 						// read from cache memory
-						line = m_cache_mem[addr.m_addr_line];
+						m_raw_cache.get_line(m_cache_mem,
+								addr.m_addr_line,
+								line);
 					} else {
 						// read from main memory
 						auto op = READ_OP;
@@ -375,7 +383,9 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						if (WR_ENABLED && m_valid[addr.m_addr_line] &&
 								m_dirty[addr.m_addr_line]) {
 							// get the line to be written back
-							line = m_cache_mem[write_back_addr.m_addr_line];
+							m_raw_cache.get_line(m_cache_mem,
+									write_back_addr.m_addr_line,
+									line);
 
 							op = READ_WRITE_OP;
 						}
@@ -408,7 +418,10 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 
 						if (read) {
 							// store loaded line to cache
-							m_cache_mem[addr.m_addr_line] = line;
+							m_raw_cache.set_line(
+									m_cache_mem,
+									addr.m_addr_line,
+									line);
 						}
 					}
 
@@ -422,7 +435,10 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						line(MSB, LSB) = req.data;
 
 						// store the modified line to cache
-						m_cache_mem[addr.m_addr_line] = line;
+						m_raw_cache.set_line(
+								m_cache_mem,
+								addr.m_addr_line,
+								line);
 
 
 						m_dirty[addr.m_addr_line] = true;
