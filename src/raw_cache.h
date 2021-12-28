@@ -15,7 +15,11 @@ class raw_cache {
 		ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> m_tag[DISTANCE];
 
 	public:
-		void init() {
+		raw_cache() {
+#pragma HLS inline
+#pragma HLS array_partition variable=m_valid complete
+#pragma HLS array_partition variable=m_cache_mem complete
+#pragma HLS array_partition variable=m_tag complete
 			for (auto way = 0; way < DISTANCE; way++)
 				m_valid[way] = false;
 		}
