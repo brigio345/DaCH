@@ -33,7 +33,7 @@ class l1_cache {
 		l1_cache() {
 #pragma HLS array_partition variable=m_tag complete
 #pragma HLS array_partition variable=m_valid complete
-#pragma HLS array_partition variable=m_cache_mem complete
+#pragma HLS array_partition variable=m_cache_mem complete dim=2
 		}
 
 		void init() {
