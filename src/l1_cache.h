@@ -26,20 +26,18 @@ class l1_cache {
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, 0> addr_type;
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[(N_SETS > 0) ? N_SETS : 1];	// 1
-		bool m_valid[(N_SETS > 0) ? N_SETS : 1];					// 2
+		ap_uint<(N_SETS > 0) ? N_SETS : 1> m_valid;					// 2
 		LINE_TYPE m_cache_mem[((N_SETS > 0) ? N_SETS : 1)];				// 3
 
 	public:
 		l1_cache() {
 #pragma HLS array_partition variable=m_tag complete
-#pragma HLS array_partition variable=m_valid complete
 #pragma HLS array_partition variable=m_cache_mem complete dim=2
 		}
 
 		void init() {
 #pragma HLS inline
-			for (auto line = 0; line < N_SETS; line++)
-				m_valid[line] = false;
+			m_valid = 0;
 		}
 
 		void get_line(const ap_uint<ADDR_SIZE> addr_main,

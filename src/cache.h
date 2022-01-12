@@ -101,8 +101,8 @@ class cache {
 		} mem_req_type;
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];	// 1
-		bool m_valid[N_SETS * N_WAYS];					// 2
-		bool m_dirty[N_SETS * N_WAYS];					// 3
+		ap_uint<N_SETS * N_WAYS> m_valid;				// 2
+		ap_uint<N_SETS * N_WAYS> m_dirty;				// 3
 		line_type m_cache_mem[N_SETS * N_WAYS];				// 4
 		hls::stream<core_req_type, 512> m_core_req[PORTS];		// 5
 		hls::stream<line_type, 512> m_core_resp[PORTS];			// 6
@@ -121,8 +121,6 @@ class cache {
 	public:
 		cache() {
 #pragma HLS array_partition variable=m_tag complete dim=1
-#pragma HLS array_partition variable=m_valid complete dim=1
-#pragma HLS array_partition variable=m_dirty complete dim=1
 #pragma HLS array_partition variable=m_core_req complete
 #pragma HLS array_partition variable=m_core_resp complete
 #pragma HLS array_partition variable=m_l1_cache_get complete
@@ -327,8 +325,7 @@ class cache {
 			raw_cache_type raw_cache_mem;
 
 			// invalidate all cache lines
-			for (auto line = 0; line < (N_SETS * N_WAYS); line++)
-				m_valid[line] = false;
+			m_valid = 0;
 
 			m_replacer.init();
 

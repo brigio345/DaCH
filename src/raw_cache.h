@@ -10,18 +10,16 @@ class raw_cache {
 	private:
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 
-		bool m_valid[DISTANCE];
+		ap_uint<DISTANCE> m_valid;
 		T m_cache_mem[DISTANCE];
 		ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> m_tag[DISTANCE];
 
 	public:
 		raw_cache() {
 #pragma HLS inline
-#pragma HLS array_partition variable=m_valid complete
 #pragma HLS array_partition variable=m_cache_mem complete
 #pragma HLS array_partition variable=m_tag complete
-			for (auto way = 0; way < DISTANCE; way++)
-				m_valid[way] = false;
+			m_valid = 0;
 		}
 
 		void get_line(const T * const main_mem,
