@@ -26,6 +26,7 @@
 #include "ap_utils.h"
 #include "ap_int.h"
 #include "utils.h"
+#include <cstring>
 #ifndef __SYNTHESIS__
 #include <thread>
 #include <cassert>
@@ -261,7 +262,9 @@ class cache {
 			const auto LSB = (addr.m_off * WORD_SIZE);
 			const auto MSB = (LSB + WORD_SIZE - 1);
 			ap_uint<WORD_SIZE> buff = line(LSB, MSB);
-			return *reinterpret_cast<T *>(&buff);
+			T ret;
+			std::memcpy(&ret, &buff, sizeof(T));
+			return ret;
 		}
 
 		/**
@@ -433,7 +436,9 @@ INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 						// modify the line
 						const auto LSB = (addr.m_off * WORD_SIZE);
 						const auto MSB = (LSB + WORD_SIZE - 1);
-						line(LSB, MSB) = *reinterpret_cast<ap_uint<WORD_SIZE> *>(&(req.data));
+						ap_uint<WORD_SIZE> buff;
+						std::memcpy(&buff, &(req.data), sizeof(T));
+						line(LSB, MSB) = buff;
 
 						// store the modified line to cache
 						raw_cache_mem.set_line(
@@ -578,8 +583,9 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS unroll
 				const auto LSB = (off * WORD_SIZE);
 				const auto MSB = (LSB + WORD_SIZE - 1);
-				line(LSB, MSB) = *const_cast<ap_uint<WORD_SIZE> *>(
-						reinterpret_cast<const ap_uint<WORD_SIZE> *>(&mem_line[off]));
+				ap_uint<WORD_SIZE> buff;
+				std::memcpy(&buff, &mem_line[off], sizeof(T));
+				line(LSB, MSB) = buff;
 			}
 		}
 
@@ -594,7 +600,7 @@ MEM_IF_LOOP:		while (1) {
 				const auto LSB = (off * WORD_SIZE);
 				const auto MSB = (LSB + WORD_SIZE - 1);
 				ap_uint<WORD_SIZE> buff = line(LSB, MSB);
-				mem_line[off] = *reinterpret_cast<T *>(&buff);
+				std::memcpy(&mem_line[off], &buff, sizeof(T));
 			}
 		}
 
