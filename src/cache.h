@@ -461,10 +461,6 @@ core_end:
 			if (WR_ENABLED)
 				flush();
 
-			// make sure that flush has completed before stopping
-			// memory interface
-			ap_wait();
-
 			// stop memory interface
 			m_mem_req.write((mem_req_type){.op = STOP_OP});
 		}
