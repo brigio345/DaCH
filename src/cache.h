@@ -330,7 +330,7 @@ class cache {
 			m_replacer.init();
 
 CORE_LOOP:		while (1) {
-#pragma HLS pipeline II=PORTS
+#pragma HLS pipeline II=PORTS style=flp
 INNER_CORE_LOOP:		for (auto port = 0; port < PORTS; port++) {
 #pragma HLS dependence variable=m_cache_mem inter RAW distance=3 true
 					core_req_type req;
