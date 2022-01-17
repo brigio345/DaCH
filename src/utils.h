@@ -10,7 +10,7 @@ namespace utils {
 		    return ((x > 1) ? (log2_floor(x - 1) + 1) : 0);
 	}
 
-	template <typename T, size_t AMOUNT>
+	template <size_t AMOUNT, typename T>
 		__attribute__((hls_preserve))
 		T delay(T data) {
 #pragma HLS pipeline II=1

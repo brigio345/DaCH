@@ -223,7 +223,7 @@ class cache {
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
-				dep = utils::delay<bool, LATENCY>(dep);
+				dep = utils::delay<LATENCY>(dep);
 
 				// read response from cache
 				read_resp(line, dep, port);
