@@ -17,6 +17,7 @@
  *			- Multi-ports (read-only).
  */
 
+#define AP_INT_MAX_W (1 << 15)
 #include "address.h"
 #include "replacer.h"
 #include "l1_cache.h"
