@@ -5,7 +5,8 @@
 #include "utils.h"
 #include "ap_int.h"
 
-template <typename LINE_TYPE, size_t MAIN_SIZE, size_t N_SETS, size_t N_WORDS_PER_LINE>
+template <typename LINE_TYPE, size_t MAIN_SIZE, size_t N_SETS, size_t N_WORDS_PER_LINE,
+	 bool SWAP_TAG_SET>
 class l1_cache {
 	private:
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
@@ -23,7 +24,8 @@ class l1_cache {
 		static_assert((MAIN_SIZE >= (N_SETS * N_WORDS_PER_LINE)),
 				"N_SETS and/or N_WORDS_PER_LINE are too big for the specified MAIN_SIZE");
 
-		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, 0> addr_type;
+		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, 0, SWAP_TAG_SET>
+			addr_type;
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[(N_SETS > 0) ? N_SETS : 1];	// 1
 		ap_uint<(N_SETS > 0) ? N_SETS : 1> m_valid;					// 2

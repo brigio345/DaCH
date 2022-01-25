@@ -34,7 +34,7 @@
 
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
-	 bool LRU, size_t L1_CACHE_LINES, size_t LATENCY>
+	 bool LRU, size_t L1_CACHE_LINES, bool SWAP_TAG_SET, size_t LATENCY>
 class cache {
 	private:
 		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
@@ -62,10 +62,11 @@ class cache {
 		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_WORDS_PER_LINE)),
 				"N_SETS and/or N_WAYS and/or N_WORDS_PER_LINE are too big for the specified MAIN_SIZE");
 
-		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE> address_type;
+		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, SWAP_TAG_SET>
+			address_type;
 		typedef ap_uint<WORD_SIZE * N_WORDS_PER_LINE> line_type;
-		typedef l1_cache<line_type, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE>
-			l1_cache_type;
+		typedef l1_cache<line_type, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE,
+			SWAP_TAG_SET> l1_cache_type;
 		typedef raw_cache<line_type, (N_SETS * N_WAYS * N_WORDS_PER_LINE), 2>
 			raw_cache_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
