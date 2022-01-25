@@ -1,7 +1,6 @@
 #ifndef RAW_CACHE_H
 #define RAW_CACHE_H
 
-#include "address.h"
 #include "utils.h"
 #include "ap_int.h"
 
