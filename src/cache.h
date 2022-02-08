@@ -176,8 +176,7 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-			for (auto port = 0; port < PORTS; port++)
-				m_core_req[port].write((core_req_type){.op = STOP_OP});
+			m_core_req[m_core_port].write((core_req_type){.op = STOP_OP});
 		}
 
 		bool write_req(const core_req_type req, const unsigned int port) {
