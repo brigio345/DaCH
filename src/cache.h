@@ -114,9 +114,10 @@ class cache {
 		unsigned int m_core_port;					// 10
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		hls::stream<hit_status_type> m_hit_status;
-		int m_n_reqs = 0;
-		int m_n_hits = 0;
-		int m_n_l1_hits = 0;
+		int m_n_reqs[PORTS] = {0};
+		int m_n_hits[PORTS] = {0};
+		int m_n_l1_reqs[PORTS] = {0};
+		int m_n_l1_hits[PORTS] = {0};
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 	public:
@@ -233,7 +234,8 @@ class cache {
 			}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			update_profiling(l1_hit ? L1_HIT : m_hit_status.read());
+			auto status = (l1_hit ? L1_HIT : m_hit_status.read());
+			update_profiling(status, port);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
@@ -282,26 +284,32 @@ class cache {
 			// send write request to cache
 			m_core_req[0].write({WRITE_OP, addr_main, data});
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			update_profiling(m_hit_status.read());
+			update_profiling(m_hit_status.read(), 0);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-		int get_n_reqs() const {
-			return m_n_reqs;
+		int get_n_reqs(const unsigned int port) const {
+			return m_n_reqs[port];
 		}
 
-		int get_n_hits() const {
-			return m_n_hits;
+		int get_n_hits(const unsigned int port) const {
+			return m_n_hits[port];
 		}
 
-		int get_n_l1_hits() const {
-			return m_n_l1_hits;
+		int get_n_l1_reqs(const unsigned int port) const {
+			return m_n_l1_reqs[port];
 		}
 
-		double get_hit_ratio() const {
-			if (m_n_reqs > 0)
-				return ((m_n_hits + m_n_l1_hits) / static_cast<double>(m_n_reqs));
+		int get_n_l1_hits(const unsigned int port) const {
+			return m_n_l1_hits[port];
+		}
+
+		double get_hit_ratio(const unsigned int port) const {
+			if (m_n_reqs[port] > 0)
+				return ((m_n_hits[port] + m_n_l1_hits[port]) /
+						static_cast<double>(m_n_reqs[port] +
+							m_n_l1_reqs[port]));
 
 			return 0;
 		}
@@ -591,14 +599,18 @@ MEM_IF_LOOP:		while (1) {
 		}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-		void update_profiling(const hit_status_type status) {
-			m_n_reqs++;
+		void update_profiling(const hit_status_type status, const unsigned int port) {
+			m_n_l1_reqs[port]++;
 
-			if (status == HIT)
-				m_n_hits++;
-			else if (status == L1_HIT)
-				m_n_l1_hits++;
+			if (status == L1_HIT) {
+				m_n_l1_hits[port]++;
+			} else {
+				m_n_reqs[port]++;
+				if (status == HIT)
+					m_n_hits[port]++;
+			}
 		}
+
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 		class square_bracket_proxy {
