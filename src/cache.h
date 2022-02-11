@@ -212,7 +212,9 @@ class cache {
 
 			if (l1_hit) {
 				m_l1_cache_get[port].get_line(addr_main, line);
+#ifndef __SYNTHESIS__
 				m_core_req[port].write((core_req_type){.op = NOP_OP});
+#endif /* __SYNTHESIS__ */
 			} else {
 				// send read request to cache
 				auto dep = write_req((core_req_type){
@@ -340,25 +342,20 @@ CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 #ifdef __SYNTHESIS__
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
-				auto ready = !(RD_ENABLED && WR_ENABLED);
-				if (ready)
-					m_core_req[port].read(req);
-				else
-					ready = m_core_req[port].read_nb(req);
-
-				if (ready)
+				if (m_core_req[port].read_nb(req)) {
 #else
 				// get request
 				m_core_req[port].read(req);
 #endif /* __SYNTHESIS__ */
-				{
 
 				// exit the loop if request is "end-of-request"
 				if (req.op == STOP_OP)
 					break;
 
+#ifndef __SYNTHESIS__
 				if (req.op == NOP_OP)
 					continue;
+#endif /* __SYNTHESIS__ */
 
 				// check the request type
 				const auto read = ((RD_ENABLED && (req.op == READ_OP)) ||
@@ -456,7 +453,9 @@ CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 				m_hit_status.write(is_hit ? HIT : MISS);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#ifdef __SYNTHESIS__
 				}
+#endif /* __SYNTHESIS__ */
 			}
 
 			// synchronize main memory with cache memory
