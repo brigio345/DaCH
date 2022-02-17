@@ -200,16 +200,15 @@ class cache {
 		 *
 		 * \param[in] addr_main	The address in main memory belonging to
 		 * 			the cache line to be read.
+		 * \param[in] port	The port from which to read.
 		 * \param[out] line	The buffer to store the read line.
 		 */
-		void get_line(const ap_uint<ADDR_SIZE> addr_main, line_type &line) {
+		void get_line(const ap_uint<ADDR_SIZE> addr_main,
+				const unsigned int port, line_type &line) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			assert(addr_main < MAIN_SIZE);
 #endif /* __SYNTHESIS__ */
-
-			const auto port = m_core_port;
-			m_core_port = ((m_core_port + 1) % PORTS);
 
 			// try to get line from L1 cache
 			const auto l1_hit = (L1_CACHE &&
@@ -247,6 +246,32 @@ class cache {
 		}
 
 		/**
+		 * \brief		Request to read a data element from a
+		 * 			specific port.
+		 *
+		 * \param[in] addr_main	The address in main memory referring to
+		 * 			the data element to be read.
+		 * \param[in] port	The port from which to read.
+		 *
+		 * \return		The read data element.
+		 */
+		T get(const ap_uint<ADDR_SIZE> addr_main, const unsigned int port) {
+#pragma HLS inline
+			line_type line;
+
+			// get the whole cache line
+			get_line(addr_main, port, line);
+
+			// extract information from address
+			address_type addr(addr_main);
+
+			const auto LSB = (addr.m_off * WORD_SIZE);
+			const auto MSB = (LSB + WORD_SIZE - 1);
+			ap_uint<WORD_SIZE> buff = line(LSB, MSB);
+			return *reinterpret_cast<T *>(&buff);
+		}
+
+		/**
 		 * \brief		Request to read a data element.
 		 *
 		 * \param[in] addr_main	The address in main memory referring to
@@ -256,18 +281,10 @@ class cache {
 		 */
 		T get(const ap_uint<ADDR_SIZE> addr_main) {
 #pragma HLS inline
-			line_type line;
+			const auto data = get(addr_main, m_core_port);
+			m_core_port = ((m_core_port + 1) % PORTS);
 
-			// get the whole cache line
-			get_line(addr_main, line);
-
-			// extract information from address
-			address_type addr(addr_main);
-
-			const auto LSB = (addr.m_off * WORD_SIZE);
-			const auto MSB = (LSB + WORD_SIZE - 1);
-			ap_uint<WORD_SIZE> buff = line(LSB, MSB);
-			return *reinterpret_cast<T *>(&buff);
+			return data;
 		}
 
 		/**
