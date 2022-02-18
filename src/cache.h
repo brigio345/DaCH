@@ -34,10 +34,10 @@
 
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
-	 bool LRU, size_t L1_CACHE_LINES, bool SWAP_TAG_SET, size_t LATENCY>
+	 bool LRU, size_t N_L1_SETS, size_t N_L1_WAYS, bool SWAP_TAG_SET, size_t LATENCY>
 class cache {
 	private:
-		static const bool L1_CACHE = (L1_CACHE_LINES > 0);
+		static const bool L1_CACHE = ((N_L1_SETS * N_L1_WAYS) > 0);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
 		static const size_t OFF_SIZE = utils::log2_ceil(N_WORDS_PER_LINE);
@@ -65,8 +65,8 @@ class cache {
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, SWAP_TAG_SET>
 			address_type;
 		typedef ap_uint<WORD_SIZE * N_WORDS_PER_LINE> line_type;
-		typedef l1_cache<line_type, MAIN_SIZE, L1_CACHE_LINES, N_WORDS_PER_LINE,
-			SWAP_TAG_SET> l1_cache_type;
+		typedef l1_cache<line_type, MAIN_SIZE, N_L1_SETS, N_L1_WAYS,
+			N_WORDS_PER_LINE, SWAP_TAG_SET> l1_cache_type;
 		typedef raw_cache<line_type, (N_SETS * N_WAYS * N_WORDS_PER_LINE), 2>
 			raw_cache_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
@@ -212,10 +212,9 @@ class cache {
 
 			// try to get line from L1 cache
 			const auto l1_hit = (L1_CACHE &&
-					m_l1_cache_get[port].hit(addr_main));
+					m_l1_cache_get[port].get_line(addr_main, line));
 
 			if (l1_hit) {
-				m_l1_cache_get[port].get_line(addr_main, line);
 #ifndef __SYNTHESIS__
 				m_core_req[port].write((core_req_type){.op = NOP_OP});
 #endif /* __SYNTHESIS__ */
