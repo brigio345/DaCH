@@ -122,10 +122,7 @@ class cache {
 
 	public:
 		cache() {
-			if (N_WAYS > 1) {
 #pragma HLS array_partition variable=m_tag complete dim=1
-			}
-
 			if (PORTS > 1) {
 #pragma HLS array_partition variable=m_core_req complete
 #pragma HLS array_partition variable=m_core_resp complete
