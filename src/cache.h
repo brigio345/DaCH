@@ -308,21 +308,6 @@ class cache {
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
-		/**
-		 * \brief		Send a NOP_OP request to L2 cache.
-		 *
-		 * \param[in] port	The port to which send the request.
-		 *
-		 * \note		Must be called when manually selecting
-		 * 			the accessed cache to avoid deadlock
-		 * 			in C simulation.
-		 */
-		void nop(const unsigned int port) {
-#ifndef __SYNTHESIS__
-			m_core_req[port].write((core_req_type){.op = NOP_OP});
-#endif /* __SYNTHESIS__ */
-		}
-
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		int get_n_reqs(const unsigned int port) const {
 			return m_n_reqs[port];
