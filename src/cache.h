@@ -113,6 +113,7 @@ class cache {
 		replacer_type m_replacer;					// 10
 		unsigned int m_core_port;					// 11
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+		T *m_main_mem;
 		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs[PORTS] = {0};
 		int m_n_hits[PORTS] = {0};
@@ -159,17 +160,24 @@ class cache {
 		 * 			executed by a thread separated from the
 		 * 			thread in which cache is accessed.
 		 */
-		void run(T * const main_mem) {
+		void run(T *main_mem) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
 			run_core();
 			run_mem_if(main_mem);
+#else
+#ifdef PROFILE
+			m_main_mem = main_mem;
+			std::thread core_thd([&]{run_core();});
+
+			core_thd.join();
 #else
 			std::thread core_thd([&]{run_core();});
 			std::thread mem_if_thd([&]{run_mem_if(main_mem);});
 
 			core_thd.join();
 			mem_if_thd.join();
+#endif /* PROFILE */
 #endif /* __SYNTHESIS__ */
 		}
 
@@ -373,12 +381,15 @@ class cache {
 					op = READ_WRITE_OP;
 				}
 
-				const mem_req_type req = {
+				mem_req_type req = {
 					op, addr.m_addr_main,
 					write_back_addr.m_addr_main,
 					line
 				};
 
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+				exec_mem_req(m_main_mem, req, line);
+#else
 				// send read request to
 				// memory interface and
 				// write request if
@@ -395,6 +406,7 @@ class cache {
 				// read response from
 				// memory interface
 				m_mem_resp.read(line);
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 				m_tag[addr.m_addr_line] = addr.m_tag;
 				m_valid[addr.m_addr_line] = true;
@@ -428,7 +440,7 @@ class cache {
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
-		void exec_mem_req(T * const main_mem, mem_req_type &req,
+		void exec_mem_req(T *main_mem, mem_req_type &req,
 				line_type &line) {
 #pragma HLS inline
 			if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
@@ -485,8 +497,10 @@ CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 			if (WR_ENABLED)
 				flush();
 
+#if (!(defined(PROFILE) && (!defined(__SYNTHESIS__))))
 			// stop memory interface
 			m_mem_req.write((mem_req_type){.op = STOP_OP});
+#endif /* (!(defined(PROFILE) && (!defined(__SYNTHESIS__)))) */
 		}
 
 		/**
@@ -567,11 +581,16 @@ MEM_IF_LOOP:		while (1) {
 						// read line
 						line = m_cache_mem[addr.m_addr_line];
 
+						mem_req_type req = {WRITE_OP, 0,
+							addr.m_addr_main, line};
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+						line_type dummy;
+						exec_mem_req(m_main_mem, req, dummy);
+#else
 						// send write request to memory
 						// interface
-						m_mem_req.write({WRITE_OP, 0,
-								addr.m_addr_main,
-								line});
+						m_mem_req.write(req);
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 						m_dirty[addr.m_addr_line] = false;
 					}
