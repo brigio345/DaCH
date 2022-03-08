@@ -104,19 +104,15 @@ class cache {
 		ap_uint<N_SETS * N_WAYS> m_valid;				// 1
 		ap_uint<N_SETS * N_WAYS> m_dirty;				// 2
 		line_type m_cache_mem[N_SETS * N_WAYS];				// 3
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-		T *m_main_mem;
-#else
 		hls::stream<core_req_type, (LATENCY * PORTS)> m_core_req[PORTS];// 4
 		hls::stream<line_type, (LATENCY * PORTS)> m_core_resp[PORTS];	// 5
 		hls::stream<mem_req_type, 2> m_mem_req;				// 6
 		hls::stream<line_type, 2> m_mem_resp;				// 7
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		l1_cache_type m_l1_cache_get[PORTS];				// 8
-		raw_cache_type m_raw_cache_core;				// 9
-		replacer_type m_replacer;					// 10
-		unsigned int m_core_port;					// 11
+		replacer_type m_replacer;					// 9
+		unsigned int m_core_port;					// 10
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs[PORTS] = {0};
 		int m_n_hits[PORTS] = {0};
 		int m_n_l1_reqs[PORTS] = {0};
@@ -139,13 +135,7 @@ class cache {
 		 * \note	Must be called before calling \ref run.
 		 */
 		void init() {
-			// invalidate all cache lines
-			m_valid = 0;
 			m_core_port = 0;
-
-			m_raw_cache_core.init();
-			m_replacer.init();
-
 			if (L1_CACHE) {
 				for (auto port = 0; port < PORTS; port++)
 					m_l1_cache_get[port].init();
@@ -167,21 +157,17 @@ class cache {
 		 * 			executed by a thread separated from the
 		 * 			thread in which cache is accessed.
 		 */
-		void run(T *main_mem) {
+		void run(T * const main_mem) {
 #pragma HLS inline
 #ifdef __SYNTHESIS__
 			run_core();
 			run_mem_if(main_mem);
-#else
-#ifdef PROFILE
-			m_main_mem = main_mem;
 #else
 			std::thread core_thd([&]{run_core();});
 			std::thread mem_if_thd([&]{run_mem_if(main_mem);});
 
 			core_thd.join();
 			mem_if_thd.join();
-#endif /* PROFILE */
 #endif /* __SYNTHESIS__ */
 		}
 
@@ -192,14 +178,9 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			flush();
-#else
 			m_core_req[m_core_port].write((core_req_type){.op = STOP_OP});
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
-#if (!(defined(PROFILE) && (!defined(__SYNTHESIS__))))
 		bool write_req(const core_req_type req, const unsigned int port) {
 #pragma HLS function_instantiate variable=port
 			return m_core_req[port].write_dep(req, false);
@@ -209,7 +190,6 @@ class cache {
 #pragma HLS function_instantiate variable=port
 			m_core_resp[port].read_dep(line, dep);
 		}
-#endif /* (!(defined(PROFILE) && (!defined(__SYNTHESIS__)))) */
 
 		/**
 		 * \brief		Request to read a whole cache line.
@@ -230,20 +210,12 @@ class cache {
 			const auto l1_hit = (L1_CACHE &&
 					m_l1_cache_get[port].get_line(addr_main, line));
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			hit_status_type hit_status = L1_HIT;
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 			if (!l1_hit) {
-				const core_req_type req = {
-					.op = READ_OP, .addr = addr_main
-				};
-
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-				hit_status = exec_core_req(req, port, line);
-#else
 				// send read request to cache
-				auto dep = write_req(req, port);
-
+				auto dep = write_req((core_req_type){
+						.op = READ_OP,
+						.addr = addr_main},
+						port);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
@@ -251,7 +223,6 @@ class cache {
 
 				// read response from cache
 				read_resp(line, dep, port);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 				if (L1_CACHE) {
 					// store line to L1 cache
@@ -260,7 +231,8 @@ class cache {
 			}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			update_profiling(hit_status, port);
+			auto status = (l1_hit ? L1_HIT : m_hit_status.read());
+			update_profiling(status, port);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
@@ -324,14 +296,10 @@ class cache {
 				m_l1_cache_get[0].notify_write(addr_main);
 			}
 
-			const core_req_type req = {WRITE_OP, addr_main, data};
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			line_type dummy_line;
-			const auto hit_status = exec_core_req(req, 0, dummy_line);
-			update_profiling(hit_status, 0);
-#else
 			// send write request to cache
-			m_core_req[0].write(req);
+			m_core_req[0].write({WRITE_OP, addr_main, data});
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+			update_profiling(m_hit_status.read(), 0);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
@@ -363,127 +331,6 @@ class cache {
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 	private:
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-		hit_status_type exec_core_req(core_req_type req,
-				const unsigned int port, line_type &line) {
-#else
-		void exec_core_req(core_req_type req,
-				const unsigned int port, line_type &line) {
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
-#pragma HLS inline
-			// check the request type
-			const auto read = ((RD_ENABLED && (req.op == READ_OP)) ||
-					(!WR_ENABLED));
-
-			// extract information from address
-			address_type addr(req.addr);
-
-			auto way = hit(addr);
-			const auto is_hit = (way != -1);
-
-			if (!is_hit)
-				way = m_replacer.get_way(addr);
-
-			addr.set_way(way);
-			m_replacer.notify_use(addr);
-
-			if (is_hit) {
-				// read from cache memory
-				m_raw_cache_core.get_line(m_cache_mem,
-						addr.m_addr_line, line);
-			} else {
-				// read from main memory
-				auto op = READ_OP;
-				// build write-back address
-				address_type write_back_addr(m_tag[addr.m_addr_line],
-						addr.m_set, 0, addr.m_way);
-				// check if write back is necessary
-				if (WR_ENABLED && m_valid[addr.m_addr_line] &&
-						m_dirty[addr.m_addr_line]) {
-					// get the line to be written back
-					m_raw_cache_core.get_line(m_cache_mem,
-							write_back_addr.m_addr_line,
-							line);
-
-					op = READ_WRITE_OP;
-				}
-
-				const mem_req_type req = {
-					op, addr.m_addr_main,
-					write_back_addr.m_addr_main,
-					line
-				};
-
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-				exec_mem_if_req(m_main_mem, req, line);
-#else
-				// send read request to
-				// memory interface and
-				// write request if
-				// write-back is necessary
-				m_mem_req.write(req);
-
-				// force FIFO write and
-				// FIFO read to separate
-				// pipeline stages to
-				// avoid deadlock due to
-				// the blocking read
-				ap_wait();
-
-				// read response from
-				// memory interface
-				m_mem_resp.read(line);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
-
-				m_tag[addr.m_addr_line] = addr.m_tag;
-				m_valid[addr.m_addr_line] = true;
-				m_dirty[addr.m_addr_line] = false;
-
-				m_replacer.notify_insertion(addr);
-
-				if (read) {
-					// store loaded line to cache
-					m_raw_cache_core.set_line(m_cache_mem,
-							addr.m_addr_line, line);
-				}
-			}
-
-			if (!read) {
-				// modify the line
-				const auto LSB = (addr.m_off * WORD_SIZE);
-				const auto MSB = (LSB + WORD_SIZE - 1);
-				line(LSB, MSB) = *reinterpret_cast<ap_uint<WORD_SIZE> *>(&(req.data));
-
-				// store the modified line to cache
-				m_raw_cache_core.set_line(m_cache_mem,
-						addr.m_addr_line, line);
-
-
-				m_dirty[addr.m_addr_line] = true;
-			}
-
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			return (is_hit ? HIT : MISS);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
-		}
-
-		void exec_mem_if_req(T * const main_mem, mem_req_type req,
-				line_type &line) {
-#pragma HLS inline
-			if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
-				// read line from main memory
-				get_line(main_mem, req.load_addr, line);
-			}
-
-			if (WR_ENABLED && ((req.op == WRITE_OP) ||
-						(req.op == READ_WRITE_OP))) {
-				// write line to main memory
-				set_line(main_mem, req.write_back_addr,
-						req.line);
-			}
-		}
-
-#if (!(defined(PROFILE) && (!defined(__SYNTHESIS__))))
 		/**
 		 * \brief		Infinite loop managing the cache access
 		 * 			requests (sent from the outside).
@@ -494,6 +341,13 @@ class cache {
 		 */
 		void run_core() {
 #pragma HLS inline off
+			raw_cache_type raw_cache_mem;
+
+			// invalidate all cache lines
+			m_valid = 0;
+
+			m_replacer.init();
+
 CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 #pragma HLS pipeline II=1 style=flp
 #pragma HLS dependence variable=m_cache_mem inter RAW distance=3 true
@@ -505,14 +359,102 @@ CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 					if (req.op == STOP_OP)
 						break;
 
-					line_type line;
-					exec_core_req(req, port, line);
+					// check the request type
+					const auto read = ((RD_ENABLED && (req.op == READ_OP)) ||
+							(!WR_ENABLED));
 
-					if ((RD_ENABLED && (req.op == READ_OP)) ||
-							(!WR_ENABLED)) {
+					// extract information from address
+					address_type addr(req.addr);
+
+					auto way = hit(addr);
+					const auto is_hit = (way != -1);
+
+					if (!is_hit)
+						way = m_replacer.get_way(addr);
+
+					addr.set_way(way);
+					m_replacer.notify_use(addr);
+
+					line_type line;
+					if (is_hit) {
+						// read from cache memory
+						raw_cache_mem.get_line(m_cache_mem,
+								addr.m_addr_line, line);
+					} else {
+						// read from main memory
+						auto op = READ_OP;
+						// build write-back address
+						address_type write_back_addr(m_tag[addr.m_addr_line],
+								addr.m_set, 0, addr.m_way);
+						// check if write back is necessary
+						if (WR_ENABLED && m_valid[addr.m_addr_line] &&
+								m_dirty[addr.m_addr_line]) {
+							// get the line to be written back
+							raw_cache_mem.get_line(m_cache_mem,
+									write_back_addr.m_addr_line,
+									line);
+
+							op = READ_WRITE_OP;
+						}
+
+						const mem_req_type req = {
+							op, addr.m_addr_main,
+							write_back_addr.m_addr_main,
+							line
+						};
+
+						// send read request to
+						// memory interface and
+						// write request if
+						// write-back is necessary
+						m_mem_req.write(req);
+
+						// force FIFO write and
+						// FIFO read to separate
+						// pipeline stages to
+						// avoid deadlock due to
+						// the blocking read
+						ap_wait();
+
+						// read response from
+						// memory interface
+						m_mem_resp.read(line);
+
+						m_tag[addr.m_addr_line] = addr.m_tag;
+						m_valid[addr.m_addr_line] = true;
+						m_dirty[addr.m_addr_line] = false;
+
+						m_replacer.notify_insertion(addr);
+
+						if (read) {
+							// store loaded line to cache
+							raw_cache_mem.set_line(
+									m_cache_mem,
+									addr.m_addr_line,
+									line);
+						}
+					}
+
+					if (read) {
 						// send the response to the read request
 						m_core_resp[port].write(line);
+					} else {
+						// modify the line
+						const auto LSB = (addr.m_off * WORD_SIZE);
+						const auto MSB = (LSB + WORD_SIZE - 1);
+						line(LSB, MSB) = *reinterpret_cast<ap_uint<WORD_SIZE> *>(&(req.data));
+
+						// store the modified line to cache
+						raw_cache_mem.set_line( m_cache_mem,
+								addr.m_addr_line, line);
+
+
+						m_dirty[addr.m_addr_line] = true;
 					}
+
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+					m_hit_status.write(is_hit ? HIT : MISS);
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 				}
 			}
 
@@ -551,7 +493,17 @@ MEM_IF_LOOP:		while (1) {
 					break;
 
 				line_type line;
-				exec_mem_if_req(main_mem, req, line);
+				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
+					// read line from main memory
+					get_line(main_mem, req.load_addr, line);
+				}
+
+				if (WR_ENABLED && ((req.op == WRITE_OP) ||
+							(req.op == READ_WRITE_OP))) {
+					// write line to main memory
+					set_line(main_mem, req.write_back_addr,
+							req.line);
+				}
 
 				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
 					// send the response to the read request
@@ -560,7 +512,6 @@ MEM_IF_LOOP:		while (1) {
 			}
 
 		}
-#endif /* (!(defined(PROFILE) && (!defined(__SYNTHESIS__)))) */
 
 		/**
 		 * \brief		Check if \p addr causes an HIT or a MISS.
@@ -603,20 +554,12 @@ MEM_IF_LOOP:		while (1) {
 
 						// read line
 						line = m_cache_mem[addr.m_addr_line];
-						const mem_req_type req = {
-							WRITE_OP, 0,
-							addr.m_addr_main, line
-						};
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-						line_type dummy_line;
-						exec_mem_if_req(m_main_mem, req,
-								dummy_line);
-#else
 						// send write request to memory
 						// interface
-						m_mem_req.write(req);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+						m_mem_req.write({WRITE_OP, 0,
+								addr.m_addr_main,
+								line});
 
 						m_dirty[addr.m_addr_line] = false;
 					}
@@ -666,6 +609,7 @@ MEM_IF_LOOP:		while (1) {
 					m_n_hits[port]++;
 			}
 		}
+
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 		class square_bracket_proxy {

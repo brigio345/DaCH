@@ -15,12 +15,9 @@ class raw_cache {
 
 	public:
 		raw_cache() {
+#pragma HLS inline
 #pragma HLS array_partition variable=m_cache_mem complete
 #pragma HLS array_partition variable=m_tag complete
-		}
-
-		void init() {
-#pragma HLS inline
 			m_valid = 0;
 		}
 
