@@ -114,7 +114,6 @@ class cache {
 		unsigned int m_core_port;					// 11
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
 		T *m_main_mem;
-		hls::stream<hit_status_type> m_hit_status;
 		int m_n_reqs[PORTS] = {0};
 		int m_n_hits[PORTS] = {0};
 		int m_n_l1_reqs[PORTS] = {0};
@@ -137,8 +136,17 @@ class cache {
 		 * \note	Must be called before calling \ref run.
 		 */
 		void init() {
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+			// invalidate all cache lines
+			m_valid = 0;
+
+			m_replacer.init();
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+
 			m_core_port = 0;
+
 			m_raw_cache_core.init();
+
 			if (L1_CACHE) {
 				for (auto port = 0; port < PORTS; port++)
 					m_l1_cache_get[port].init();
@@ -168,9 +176,6 @@ class cache {
 #else
 #ifdef PROFILE
 			m_main_mem = main_mem;
-			std::thread core_thd([&]{run_core();});
-
-			core_thd.join();
 #else
 			std::thread core_thd([&]{run_core();});
 			std::thread mem_if_thd([&]{run_mem_if(main_mem);});
@@ -188,7 +193,11 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+			flush();
+#else
 			m_core_req[m_core_port].write((core_req_type){.op = STOP_OP});
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
 		bool write_req(const core_req_type req, const unsigned int port) {
@@ -220,12 +229,20 @@ class cache {
 			const auto l1_hit = (L1_CACHE &&
 					m_l1_cache_get[port].get_line(addr_main, line));
 
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+			auto hit_status = L1_HIT;
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 			if (!l1_hit) {
+				core_req_type req = {
+					.op = READ_OP,
+					.addr = addr_main
+				};
+
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+				hit_status = exec_core_req(req, port, line);
+#else
 				// send read request to cache
-				auto dep = write_req((core_req_type){
-						.op = READ_OP,
-						.addr = addr_main},
-						port);
+				auto dep = write_req(req, port);
 				// force FIFO write and FIFO read to separate
 				// pipeline stages to avoid deadlock due to
 				// the blocking read
@@ -233,6 +250,7 @@ class cache {
 
 				// read response from cache
 				read_resp(line, dep, port);
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 				if (L1_CACHE) {
 					// store line to L1 cache
@@ -241,8 +259,7 @@ class cache {
 			}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			auto status = (l1_hit ? L1_HIT : m_hit_status.read());
-			update_profiling(status, port);
+			update_profiling(hit_status, port);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
@@ -307,9 +324,14 @@ class cache {
 			}
 
 			// send write request to cache
-			m_core_req[0].write({WRITE_OP, addr_main, data});
+			core_req_type req = {WRITE_OP, addr_main, data};
+
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			update_profiling(m_hit_status.read(), 0);
+			line_type dummy;
+			const auto hit_status = exec_core_req(req, 0, dummy);
+			update_profiling(hit_status, 0);
+#else
+			m_core_req[0].write(req);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
@@ -341,8 +363,13 @@ class cache {
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 	private:
-		void exec_core_req(core_req_type &req, const unsigned int port,
-				line_type &line) {
+#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+		hit_status_type exec_core_req(core_req_type &req,
+				const unsigned int port, line_type &line) {
+#else
+		void exec_core_req(core_req_type &req,
+				const unsigned int port, line_type &line) {
+#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 #pragma HLS inline
 			// check the request type
 			const auto read = ((RD_ENABLED && (req.op == READ_OP)) ||
@@ -436,7 +463,7 @@ class cache {
 			}
 
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			m_hit_status.write(is_hit ? HIT : MISS);
+			return (is_hit ? HIT : MISS);
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 		}
 
