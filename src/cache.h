@@ -354,8 +354,17 @@ class cache {
 
 		double get_hit_ratio(const unsigned int port) const {
 			if (m_n_reqs[port] > 0)
-				return ((m_n_hits[port] + m_n_l1_hits[port]) /
-						static_cast<double>(m_n_reqs[port] +
+				return (m_n_hits[port] /
+						static_cast<double>(
+							m_n_reqs[port]));
+
+			return 0;
+		}
+
+		double get_l1_hit_ratio(const unsigned int port) const {
+			if (m_n_l1_reqs[port] > 0)
+				return (m_n_l1_hits[port] /
+						static_cast<double>(
 							m_n_l1_reqs[port]));
 
 			return 0;
