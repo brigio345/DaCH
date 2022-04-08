@@ -4,7 +4,7 @@
 /**
  * \file	cache.h
  *
- * \brief 	Cache module compatible with Vitis HLS 2021.1.
+ * \brief 	Cache module compatible with Vitis HLS 2021.2.
  *
  *		Cache module whose characteristics are:
  *			- address mapping: set-associative;
