@@ -28,7 +28,6 @@
 #include "ap_int.h"
 #include "utils.h"
 #ifndef __SYNTHESIS__
-#include <thread>
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
@@ -158,15 +157,9 @@ class cache {
 		 *
 		 * \param[in] main_mem	The pointer to the main memory.
 		 *
-		 * \note		In case of synthesis this must be
-		 * 			called in a dataflow region with
-		 * 			disable_start_propagation option,
-		 * 			together with the function in which
-		 * 			cache is accessed.
-		 *
-		 * \note		In case of C simulation this must be
-		 * 			executed by a thread separated from the
-		 * 			thread in which cache is accessed.
+		 * \note		This function must be before
+		 * 			the function in which cache is
+		 * 			accessed.
 		 */
 		void run(T *main_mem) {
 #pragma HLS inline
@@ -174,15 +167,7 @@ class cache {
 			run_core();
 			run_mem_if(main_mem);
 #else
-#ifdef PROFILE
 			m_main_mem = main_mem;
-#else
-			std::thread core_thd([&]{run_core();});
-			std::thread mem_if_thd([&]{run_mem_if(main_mem);});
-
-			core_thd.join();
-			mem_if_thd.join();
-#endif /* PROFILE */
 #endif /* __SYNTHESIS__ */
 		}
 
