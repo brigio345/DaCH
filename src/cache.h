@@ -79,13 +79,13 @@ class cache {
 			STOP_OP
 		} op_type;
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#ifndef __SYNTHESIS__
 		typedef enum {
 			MISS,
 			HIT,
 			L1_HIT
 		} hit_status_type;
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#endif /* __SYNTHESIS__ */
 
 		typedef struct {
 			op_type op;
@@ -112,13 +112,13 @@ class cache {
 		l1_cache_type m_l1_cache_get[PORTS];				// 9
 		replacer_type m_replacer;					// 10
 		unsigned int m_core_port;					// 11
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#ifndef __SYNTHESIS__
 		T *m_main_mem;
 		int m_n_reqs[PORTS] = {0};
 		int m_n_hits[PORTS] = {0};
 		int m_n_l1_reqs[PORTS] = {0};
 		int m_n_l1_hits[PORTS] = {0};
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#endif /* __SYNTHESIS__ */
 
 	public:
 		cache() {
@@ -136,13 +136,13 @@ class cache {
 		 * \note	Must be called before calling \ref run.
 		 */
 		void init() {
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#ifndef __SYNTHESIS__
 			// invalidate all cache lines
 			m_valid = 0;
 
 			m_replacer.init();
 			m_raw_cache_core.init();
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#endif /* __SYNTHESIS__ */
 
 			m_core_port = 0;
 
@@ -178,11 +178,11 @@ class cache {
 		 * 		is accessed has completed.
 		 */
 		void stop() {
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-			flush();
-#else
+#ifdef __SYNTHESIS__
 			m_core_req[m_core_port].write((core_req_type){.op = STOP_OP});
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#else
+			flush();
+#endif /* __SYNTHESIS__ */
 		}
 
 		bool write_req(const core_req_type req, const unsigned int port) {
@@ -214,18 +214,16 @@ class cache {
 			const auto l1_hit = (L1_CACHE &&
 					m_l1_cache_get[port].get_line(addr_main, line));
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#ifndef __SYNTHESIS__
 			auto hit_status = L1_HIT;
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#endif /* __SYNTHESIS__ */
 			if (!l1_hit) {
 				core_req_type req = {
 					.op = READ_OP,
 					.addr = addr_main
 				};
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-				hit_status = exec_core_req(req, port, line);
-#else
+#ifdef __SYNTHESIS__
 				// send read request to cache
 				auto dep = write_req(req, port);
 				// force FIFO write and FIFO read to separate
@@ -235,7 +233,9 @@ class cache {
 
 				// read response from cache
 				read_resp(line, dep, port);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#else
+				hit_status = exec_core_req(req, port, line);
+#endif /* __SYNTHESIS__ */
 
 				if (L1_CACHE) {
 					// store line to L1 cache
@@ -243,9 +243,9 @@ class cache {
 				}
 			}
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#ifndef __SYNTHESIS__
 			update_profiling(hit_status, port);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#endif /* __SYNTHESIS__ */
 		}
 
 		/**
@@ -311,16 +311,16 @@ class cache {
 			// send write request to cache
 			core_req_type req = {WRITE_OP, addr_main, data};
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#ifdef __SYNTHESIS__
+			m_core_req[0].write(req);
+#else
 			line_type dummy;
 			const auto hit_status = exec_core_req(req, 0, dummy);
 			update_profiling(hit_status, 0);
-#else
-			m_core_req[0].write(req);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#endif /* __SYNTHESIS__ */
 		}
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#ifndef __SYNTHESIS__
 		int get_n_reqs(const unsigned int port) const {
 			return m_n_reqs[port];
 		}
@@ -345,16 +345,16 @@ class cache {
 
 			return 0;
 		}
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#endif /* __SYNTHESIS__ */
 
 	private:
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-		hit_status_type exec_core_req(core_req_type &req,
-				const unsigned int port, line_type &line) {
-#else
+#ifdef __SYNTHESIS__
 		void exec_core_req(core_req_type &req,
 				const unsigned int port, line_type &line) {
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#else
+		hit_status_type exec_core_req(core_req_type &req,
+				const unsigned int port, line_type &line) {
+#endif /* __SYNTHESIS__ */
 #pragma HLS inline
 			// check the request type
 			const auto read = ((RD_ENABLED && (req.op == READ_OP)) ||
@@ -399,9 +399,7 @@ class cache {
 			}
 	
 			if (!is_hit) {
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-				exec_mem_req(m_main_mem, mem_req, line);
-#else
+#ifdef __SYNTHESIS__
 				// send read request to
 				// memory interface and
 				// write request if
@@ -418,7 +416,9 @@ class cache {
 				// read response from
 				// memory interface
 				m_mem_resp.read(line);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#else
+				exec_mem_req(m_main_mem, mem_req, line);
+#endif /* __SYNTHESIS__ */
 
 				m_tag[addr.m_addr_line] = addr.m_tag;
 				m_valid[addr.m_addr_line] = true;
@@ -447,9 +447,9 @@ class cache {
 				m_dirty[addr.m_addr_line] = true;
 			}
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#ifndef __SYNTHESIS__
 			return (is_hit ? HIT : MISS);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#endif /* __SYNTHESIS__ */
 		}
 
 		void exec_mem_req(T *main_mem, mem_req_type &req,
@@ -510,10 +510,10 @@ CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 			if (WR_ENABLED)
 				flush();
 
-#if (!(defined(PROFILE) && (!defined(__SYNTHESIS__))))
+#ifdef __SYNTHESIS__
 			// stop memory interface
 			m_mem_req.write((mem_req_type){.op = STOP_OP});
-#endif /* (!(defined(PROFILE) && (!defined(__SYNTHESIS__)))) */
+#endif /* __SYNTHESIS__ */
 		}
 
 		/**
@@ -596,14 +596,14 @@ MEM_IF_LOOP:		while (1) {
 
 						mem_req_type req = {WRITE_OP, 0,
 							addr.m_addr_main, line};
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-						line_type dummy;
-						exec_mem_req(m_main_mem, req, dummy);
-#else
+#ifdef __SYNTHESIS__
 						// send write request to memory
 						// interface
 						m_mem_req.write(req);
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#else
+						line_type dummy;
+						exec_mem_req(m_main_mem, req, dummy);
+#endif /* __SYNTHESIS__ */
 
 						m_dirty[addr.m_addr_line] = false;
 					}
@@ -641,7 +641,7 @@ MEM_IF_LOOP:		while (1) {
 			}
 		}
 
-#if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
+#ifndef __SYNTHESIS__
 		void update_profiling(const hit_status_type status, const unsigned int port) {
 			m_n_l1_reqs[port]++;
 
@@ -654,7 +654,7 @@ MEM_IF_LOOP:		while (1) {
 			}
 		}
 
-#endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
+#endif /* __SYNTHESIS__ */
 
 		class square_bracket_proxy {
 			private:
