@@ -372,41 +372,41 @@ class cache {
 			addr.set_way(way);
 			m_replacer.notify_use(addr);
 
-			if (is_hit) {
-				// read from cache memory
-				m_raw_cache_core.get_line(m_cache_mem,
-						addr.m_addr_line, line);
-			} else {
+			mem_req_type mem_req;
+			address_type *wb_addr_ptr;
+			if (!is_hit) {
 				// read from main memory
-				auto op = READ_OP;
-				// build write-back address
-				address_type write_back_addr(m_tag[addr.m_addr_line],
-						addr.m_set, 0, addr.m_way);
+				mem_req.op = READ_OP;
+				mem_req.load_addr = addr.m_addr_main;
+
 				// check if write back is necessary
 				if (WR_ENABLED && m_valid[addr.m_addr_line] &&
 						m_dirty[addr.m_addr_line]) {
-					// get the line to be written back
-					m_raw_cache_core.get_line(m_cache_mem,
-							write_back_addr.m_addr_line,
-							line);
-
-					op = READ_WRITE_OP;
+					// build write-back address
+					address_type write_back_addr(m_tag[addr.m_addr_line],
+							addr.m_set, 0, addr.m_way);
+					wb_addr_ptr = &write_back_addr;
+					mem_req.op = READ_WRITE_OP;
+					mem_req.write_back_addr = write_back_addr.m_addr_main;
 				}
+			}
 
-				mem_req_type req = {
-					op, addr.m_addr_main,
-					write_back_addr.m_addr_main,
-					line
-				};
-
+			if (is_hit || (mem_req.op == READ_WRITE_OP)) {
+				// read from cache memory
+				m_raw_cache_core.get_line(m_cache_mem,
+						is_hit ? addr.m_addr_line : wb_addr_ptr->m_addr_line,
+						is_hit ? line : mem_req.line);
+			}
+	
+			if (!is_hit) {
 #if (defined(PROFILE) && (!defined(__SYNTHESIS__)))
-				exec_mem_req(m_main_mem, req, line);
+				exec_mem_req(m_main_mem, mem_req, line);
 #else
 				// send read request to
 				// memory interface and
 				// write request if
 				// write-back is necessary
-				m_mem_req.write(req);
+				m_mem_req.write(mem_req);
 
 				// force FIFO write and
 				// FIFO read to separate
@@ -440,7 +440,7 @@ class cache {
 				line(LSB, MSB) = *reinterpret_cast<ap_uint<WORD_SIZE> *>(&(req.data));
 
 				// store the modified line to cache
-				m_raw_cache_core.set_line( m_cache_mem,
+				m_raw_cache_core.set_line(m_cache_mem,
 						addr.m_addr_line, line);
 
 
