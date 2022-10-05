@@ -121,11 +121,11 @@ class cache {
 
 	public:
 		cache() {
-#pragma HLS array_partition variable=m_tag complete dim=1
+#pragma HLS array_partition variable=m_tag type=complete dim=0
 			if (PORTS > 1) {
-#pragma HLS array_partition variable=m_core_req complete
-#pragma HLS array_partition variable=m_core_resp complete
-#pragma HLS array_partition variable=m_l1_cache_get complete
+#pragma HLS array_partition variable=m_core_req type=complete dim=0
+#pragma HLS array_partition variable=m_core_resp type=complete dim=0
+#pragma HLS array_partition variable=m_l1_cache_get type=complete dim=0
 			}
 		}
 

@@ -41,7 +41,7 @@ class l1_cache {
 
 	public:
 		l1_cache() {
-#pragma HLS array_partition variable=m_tag complete
+#pragma HLS array_partition variable=m_tag type=complete dim=0
 		}
 
 		void init() {

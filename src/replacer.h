@@ -22,8 +22,8 @@ class replacer {
 
 	public:
 		replacer() {
-#pragma HLS array_partition variable=m_lru complete dim=0
-#pragma HLS array_partition variable=m_lifo complete dim=0
+#pragma HLS array_partition variable=m_lru type=complete dim=0
+#pragma HLS array_partition variable=m_lifo type=complete dim=0
 		}
 
 		/**
