@@ -15,8 +15,8 @@ class raw_cache {
 
 	public:
 		raw_cache() {
-#pragma HLS array_partition variable=m_cache_mem complete
-#pragma HLS array_partition variable=m_tag complete
+#pragma HLS array_partition variable=m_cache_mem type=complete dim=0
+#pragma HLS array_partition variable=m_tag type=complete dim=0
 		}
 
 		void init() {
