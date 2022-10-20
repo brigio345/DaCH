@@ -140,11 +140,10 @@ class cache {
 			m_valid = 0;
 
 			m_replacer.init();
+			m_raw_cache_core.init();
 #endif /* (defined(PROFILE) && (!defined(__SYNTHESIS__))) */
 
 			m_core_port = 0;
-
-			m_raw_cache_core.init();
 
 			if (L1_CACHE) {
 				for (auto port = 0; port < PORTS; port++)
@@ -482,6 +481,7 @@ class cache {
 			m_valid = 0;
 
 			m_replacer.init();
+			m_raw_cache_core.init();
 
 CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 #pragma HLS pipeline II=1 style=flp
