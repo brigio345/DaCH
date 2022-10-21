@@ -1,17 +1,13 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
-#ifndef __SYNTHESIS__
-#define PROFILE
-#include <thread>
-#endif	/* __SYNTHESIS__ */
 #include "cache.h"
 
-//#define CACHE
-#define BASELINE
+#define CACHE
+//#define BASELINE
 
-#define N_BITS 20
-#define N (1 << N_BITS)
+static const size_t N_BITS = 20;
+static const size_t N = (1 << N_BITS);
 
 typedef int data_type;
 typedef cache<data_type, true, true, 1, N, 1, 2, 64, false, 1, 1, false, 4> cache_a;
@@ -26,7 +22,7 @@ void compare_and_swap(data_type &pos0, data_type &pos1, const bool dir) {
 }
 
 template <typename T>
-void bitonic_sort(T a, const bool dir = true) {
+void bitonic_sort(T &a, const bool dir = true) {
 #pragma HLS inline
 BITS_LOOP:for (auto bits = 1; bits <= N_BITS; bits++) {
 STRIDE_LOOP:	for (auto stride = (bits - 1); stride >= 0; stride--) {
@@ -46,45 +42,33 @@ I_LOOP:			for (auto i = 0; i < (N / 2); i++) {
 	}
 }
 
-void bitonic_sort_syn(cache_a &a_cache) {
+void bitonic_sort_wrapper(cache_a &a_cache) {
 #pragma HLS inline off
 	a_cache.init();
 
-	bitonic_sort<cache_a &>(a_cache);
+	bitonic_sort(a_cache);
 
 	a_cache.stop();
 }
 
 extern "C" void bitonic_sort_top(data_type a_arr[N]) {
-#pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0
+#pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0 depth=N
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #if defined(CACHE)
 #pragma HLS dataflow disable_start_propagation
 	cache_a a_cache;
 
-#ifdef __SYNTHESIS__
 	a_cache.run(a_arr);
-	bitonic_sort_syn(a_cache);
-#else
-	a_cache.init();
+	bitonic_sort_wrapper(a_cache);
 
-	std::thread a_thd([&]{a_cache.run(a_arr);});
-	std::thread bitonic_sort_thread([&]{bitonic_sort<cache_a &>(a_cache);});
-
-	bitonic_sort_thread.join();
-
-	a_cache.stop();
-	a_thd.join();
-
-#ifdef PROFILE
+#ifndef __SYNTHESIS__
 	printf("A hit ratio = L1: %d/%d L2: %d/%d\n",
 			a_cache.get_n_l1_hits(0), a_cache.get_n_l1_reqs(0),
 			a_cache.get_n_hits(0), a_cache.get_n_reqs(0));
-#endif /* PROFILE */
 #endif	/* __SYNTHESIS__ */
 #elif defined(BASELINE)
-	bitonic_sort<data_type *>(a_arr);
+	bitonic_sort(a_arr);
 #else
 	std::cout << "CACHE or BASELINE must be defined" << std::endl;
 #endif
@@ -105,7 +89,7 @@ int main() {
 	// bitonic sorting with caches
 	bitonic_sort_top(a_arr);
 	// standard bitonic sorting
-	bitonic_sort<data_type *>(a_arr_ref);
+	bitonic_sort(a_arr_ref);
 
 	for (auto i = 0; i < N; i++) {
 		if (a_arr[i] != a_arr_ref[i])
