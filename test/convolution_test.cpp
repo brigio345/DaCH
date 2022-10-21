@@ -8,18 +8,19 @@
 //#define BASELINE
 //#define MANUAL
 
-#define WIDTH 1920
-#define WIDTH_PADDED (utils::ceil(WIDTH / 16.0) * 16)
-#define HEIGHT 1080
-#define SIZE (WIDTH * HEIGHT)
-#define SIZE_PADDED_CACHE (1 << utils::log2_ceil(SIZE))
-#define SIZE_PADDED_MANUAL (WIDTH_PADDED * HEIGHT)
-#define FILTER_V_SIZE 15
-#define FILTER_H_SIZE 15
-#define FILTER_SIZE (FILTER_V_SIZE * FILTER_H_SIZE)
-#define FILTER_V_SIZE_PADDED (1 << utils::log2_ceil(FILTER_V_SIZE))
-#define FILTER_H_SIZE_PADDED (1 << utils::log2_ceil(FILTER_H_SIZE))
-#define FILTER_SIZE_PADDED (1 << utils::log2_ceil(FILTER_H_SIZE_PADDED * FILTER_V_SIZE_PADDED))
+static const size_t WIDTH = 1920;
+static const size_t HEIGHT = 1080;
+static const size_t FILTER_V_SIZE = 15;
+static const size_t FILTER_H_SIZE = 15;
+
+static const size_t WIDTH_PADDED = (utils::ceil(WIDTH / 16.0) * 16);
+static const size_t SIZE = (WIDTH * HEIGHT);
+static const size_t SIZE_PADDED_CACHE = (1 << utils::log2_ceil(SIZE));
+static const size_t SIZE_PADDED_MANUAL = (WIDTH_PADDED * HEIGHT);
+static const size_t FILTER_SIZE = (FILTER_V_SIZE * FILTER_H_SIZE);
+static const size_t FILTER_V_SIZE_PADDED = (1 << utils::log2_ceil(FILTER_V_SIZE));
+static const size_t FILTER_H_SIZE_PADDED = (1 << utils::log2_ceil(FILTER_H_SIZE));
+static const size_t FILTER_SIZE_PADDED = (1 << utils::log2_ceil(FILTER_H_SIZE_PADDED * FILTER_V_SIZE_PADDED));
 
 #ifndef UNROLL
 #define UNROLL 2
@@ -122,6 +123,7 @@ ROW:			for(int row=0; row<FILTER_V_SIZE; row += RD_PORTS) {
 COL:				for(int col=0; col<FILTER_H_SIZE; col++) {
 #pragma HLS pipeline II=1
 PORT:					for (auto port = 0; port < RD_PORTS; port++) {
+						int tmp = 0;
 						if ((row + port) < FILTER_V_SIZE) {
 							unsigned char pixel;
 							int xoffset = (x+col-(FILTER_H_SIZE/2));
@@ -132,8 +134,9 @@ PORT:					for (auto port = 0; port < RD_PORTS; port++) {
 							} else {
 								pixel = src.get(yoffset*WIDTH+xoffset, port);
 							}
-							sum += pixel*coeffs.get((row+port) * FILTER_H_SIZE + col, port);
+							tmp = pixel*coeffs.get((row+port) * FILTER_H_SIZE + col, port);
 						}
+						sum += tmp;
 					}
 				}
 			}
@@ -327,7 +330,7 @@ extern "C" {
 
 }
 
-void convolution_syn(cache_coeff &coeffs, cache_src &src, cache_dst &dst) {
+void convolution_wrapper(cache_coeff &coeffs, cache_src &src, cache_dst &dst) {
 #pragma HLS inline off
 	coeffs.init();
 	src.init();
@@ -341,9 +344,9 @@ void convolution_syn(cache_coeff &coeffs, cache_src &src, cache_dst &dst) {
 }
 
 extern "C" void convolution_top(char *coeffs, unsigned char *src, unsigned char *dst) {
-#pragma HLS INTERFACE m_axi port=coeffs offset=slave bundle=gmem0 depth=16*16
-#pragma HLS INTERFACE m_axi port=src offset=slave bundle=gmem1 depth=16*16
-#pragma HLS interface m_axi port=dst offset=slave bundle=gmem2 depth=16*16
+#pragma HLS INTERFACE m_axi port=coeffs offset=slave bundle=gmem0 depth=FILTER_SIZE_PADDED
+#pragma HLS INTERFACE m_axi port=src offset=slave bundle=gmem1 depth=SIZE_PADDED_CACHE
+#pragma HLS interface m_axi port=dst offset=slave bundle=gmem2 depth=SIZE_PADDED_CACHE
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #if defined(CACHE)
@@ -352,28 +355,13 @@ extern "C" void convolution_top(char *coeffs, unsigned char *src, unsigned char 
 	cache_src src_cache;
 	cache_dst dst_cache;
 
-#ifdef __SYNTHESIS__
 	coeffs_cache.run(coeffs);
 	src_cache.run(src);
 	dst_cache.run(dst);
 
-	convolution_syn(coeffs_cache, src_cache, dst_cache);
-#else
-	coeffs_cache.init();
-	src_cache.init();
-	dst_cache.init();
+	convolution_wrapper(coeffs_cache, src_cache, dst_cache);
 
-	coeffs_cache.run(coeffs);
-	src_cache.run(src);
-	dst_cache.run(dst);
-
-	convolution(coeffs_cache, src_cache, dst_cache);
-
-	coeffs_cache.stop();
-	src_cache.stop();
-	dst_cache.stop();
-
-#ifdef PROFILE
+#ifndef __SYNTHESIS__
 	printf("coeffs hit ratio = \n");
 	for (auto port = 0; port < RD_PORTS; port++) {
 		printf("\tP=%d: L1=%d/%d; L2=%d/%d\n", port,
@@ -389,7 +377,6 @@ extern "C" void convolution_top(char *coeffs, unsigned char *src, unsigned char 
 	printf("dst hit ratio = L1=%d/%d; L2=%d/%d\n",
 			dst_cache.get_n_l1_hits(0), dst_cache.get_n_l1_reqs(0),
 			dst_cache.get_n_hits(0), dst_cache.get_n_reqs(0));
-#endif /* PROFILE */
 #endif	/* __SYNTHESIS__ */
 #elif defined(BASELINE)
 	convolution(coeffs, src, dst);
