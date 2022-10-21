@@ -323,7 +323,7 @@ void multiply_wrapper(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
 	c_cache.stop();
 }
 
-extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
+extern "C" void matmult_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
 #pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0 latency=0 depth=1024
 #pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1 latency=0 depth=1024
 #pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2 latency=0 depth=1024
@@ -376,7 +376,7 @@ int main() {
 		b_arr[i] = i;
 
 	// matrix multiplication with caches
-	matmul_top(a_arr, b_arr, c_arr);
+	matmult_top(a_arr, b_arr, c_arr);
 	// standard matrix multiplication
 	multiply(a_arr, b_arr, c_arr_ref);
 

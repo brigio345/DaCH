@@ -8,10 +8,10 @@
 //#define BASELINE
 //#define MANUAL
 
-static const size_t WIDTH = 1920;
-static const size_t HEIGHT = 1080;
-static const size_t FILTER_V_SIZE = 15;
-static const size_t FILTER_H_SIZE = 15;
+static const size_t WIDTH = 64;
+static const size_t HEIGHT = 64;
+static const size_t FILTER_V_SIZE = 3;
+static const size_t FILTER_H_SIZE = 3;
 
 static const size_t WIDTH_PADDED = (utils::ceil(WIDTH / 16.0) * 16);
 static const size_t SIZE = (WIDTH * HEIGHT);
@@ -343,7 +343,7 @@ void convolution_wrapper(cache_coeff &coeffs, cache_src &src, cache_dst &dst) {
 	dst.stop();
 }
 
-extern "C" void convolution_top(char *coeffs, unsigned char *src, unsigned char *dst) {
+extern "C" void conv2d_top(char *coeffs, unsigned char *src, unsigned char *dst) {
 #pragma HLS INTERFACE m_axi port=coeffs offset=slave bundle=gmem0 depth=FILTER_SIZE_PADDED
 #pragma HLS INTERFACE m_axi port=src offset=slave bundle=gmem1 depth=SIZE_PADDED_CACHE
 #pragma HLS interface m_axi port=dst offset=slave bundle=gmem2 depth=SIZE_PADDED_CACHE
@@ -417,7 +417,7 @@ int main() {
 	for (auto i = 0; i < (FILTER_V_SIZE * FILTER_H_SIZE); i++)
 		coeffs[i] = 1;
 
-	convolution_top(coeffs, src, dst);
+	conv2d_top(coeffs, src, dst);
 	convolution(coeffs, src_ref, dst_ref);
 
 	int ret = 0;

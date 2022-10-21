@@ -6,7 +6,7 @@
 #define CACHE
 //#define BASELINE
 
-static const size_t N_BITS = 20;
+static const size_t N_BITS = 8;
 static const size_t N = (1 << N_BITS);
 
 typedef int data_type;
@@ -51,7 +51,7 @@ void bitonic_sort_wrapper(cache_a &a_cache) {
 	a_cache.stop();
 }
 
-extern "C" void bitonic_sort_top(data_type a_arr[N]) {
+extern "C" void bitsort_top(data_type a_arr[N]) {
 #pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0 depth=N
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
@@ -87,7 +87,7 @@ int main() {
 	}
 
 	// bitonic sorting with caches
-	bitonic_sort_top(a_arr);
+	bitsort_top(a_arr);
 	// standard bitonic sorting
 	bitonic_sort(a_arr_ref);
 
