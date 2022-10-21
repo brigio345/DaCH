@@ -2,7 +2,7 @@
 
 # DaCH
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/brigio345/hls_cache)](https://github.com/brigio345/hls_cache/releases/latest)
-[![vitis_hls](https://img.shields.io/badge/Vitis%20HLS-2021.2-green)](https://www.xilinx.com/support/documentation-navigation/design-hubs/2021-2/dh0090-vitis-hls-hub.html)
+[![vitis_hls](https://img.shields.io/badge/vitis--hls-2020.1%20--%202021.2-blue)](https://docs.xilinx.com/r/2021.2-English/ug1399-vitis-hls/Getting-Started-with-Vitis-HLS)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause%20-blue)](https://github.com/brigio345/hls_cache/blob/master/LICENSE)
 
 _DaCH_ (dataflow cache for high-level synthesis) is a C++ **cache library** for accelerating memory-bound *Xilinx Vitis HLS* kernels.
