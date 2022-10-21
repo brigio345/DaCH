@@ -4,7 +4,37 @@
 [![vitis_hls](https://img.shields.io/badge/vitis--hls-2020.1%20--%202021.2-blue)](https://docs.xilinx.com/r/2021.2-English/ug1399-vitis-hls/Getting-Started-with-Vitis-HLS)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause%20-blue)](https://github.com/brigio345/hls_cache/blob/master/LICENSE)
 
-_DaCH_ (dataflow cache for high-level synthesis) is a C++ **cache library** for accelerating memory-bound *Xilinx Vitis HLS* kernels.
+_DaCH_ (dataflow cache for high-level synthesis) is a library compatible with
+*Xilinx Vitis HLS* for automating the memory management of field-programmable
+gate arrays (FPGAs) in HLS kernels through caches.
+
+## Overview
+_DaCH_ allows allocating a dedicated cache to each DRAM-mapped array (thus
+guaranteeing higher hit-ratios by avoiding interferences of accesses to
+different arrays).
+Each cache consists in a level 2 (L2) cache that exposes one or more (in case
+of read-only arrays) ports.
+Every port can be associated with a private level 1 (L1) cache.
+
+The L2 cache is implemented as a dataflow task, thus the resulting system
+resembles the load, compute, store design paradigm (as recommended by _Xilinx_),
+without any source code modification.
+
+Each cache is an object of type `cache`, and is configured by template parameters:
+* `typename T`: the data type of the word
+* `bool RD_ENABLED`: whether the original array is accessed in read mode
+* `bool WR_ENABLED`: whether the original array is accessed in write mode
+* `size_t PORTS`: the number of ports (`1` if `WR_ENABLED` is true)
+* `size_t MAIN_SIZE`: the size of the original array
+* `size_t N_SETS`: the number of L2 sets (`1` for fully-associative cache)
+* `size_t N_WAYS`: the number of L2 ways (`1` for direct-mapped cache)
+* `size_t N_WORDS_PER_LINE`: the size of the cache line, in words
+* `bool LRU`: the replacement policy *least-recently used* if `true`, *last-in
+  first-out* otherwise
+* `size_t N_L1_SETS`: the number of L1 sets
+* `size_t N_L1_WAYS`: the number of L1 ways
+* `bool SWAP_TAG_SET`: the address bits mapping (x for more details)
+* `size_t LATENCY`: the request-response distance of the L2 cache (y for more details)
 
 ## Usage
 Given `top`, as an example kernel to be accelerated:
@@ -63,6 +93,6 @@ extern "C" void top(DATA_TYPE *a) {
 }
 ```
 
-## Benchmarking
+## Examples
 
 ## Documentation
