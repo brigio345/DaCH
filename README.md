@@ -1,7 +1,7 @@
 ![dach_logo](https://user-images.githubusercontent.com/5991825/196959914-0750dd8c-b089-4b53-b077-b3f5b2a78039.svg)
 
 # DaCH
-[![vitis_hls](https://img.shields.io/badge/vitis--hls-2020.1%20--%202021.2-blue)](https://docs.xilinx.com/r/2021.2-English/ug1399-vitis-hls/Getting-Started-with-Vitis-HLS)
+[![vitis_hls](https://img.shields.io/badge/vitis--hls-2020.1--2021.2%20%7C%202022.2-blue)](https://docs.xilinx.com/r/en-US/ug1399-vitis-hls)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause%20-blue)](https://github.com/brigio345/hls_cache/blob/master/LICENSE)
 
 _DaCH_ (dataflow cache for high-level synthesis) is a library compatible with
