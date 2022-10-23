@@ -17,7 +17,7 @@ of read-only arrays) ports.
 Every port can be associated with a private level 1 (L1) cache.
 
 The L2 cache is implemented as a dataflow task, thus the resulting system
-resembles the load, compute, store design paradigm (as recommended by _Xilinx_),
+resembles the [load, compute, store design paradigm](https://docs.xilinx.com/r/en-US/ug1399-vitis-hls/Creating-Efficient-HLS-Designs),
 without any source code modification.
 
 ### Cache parameters
