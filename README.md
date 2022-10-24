@@ -8,20 +8,49 @@ _DaCH_ (dataflow cache for high-level synthesis) is a library compatible with
 *Xilinx Vitis HLS* for automating the memory management of field-programmable
 gate arrays (FPGAs) in HLS kernels through caches.
 
-## Overview
-_DaCH_ allows allocating a dedicated cache to each DRAM-mapped array (thus
-guaranteeing higher hit-ratios by avoiding interferences of accesses to
-different arrays).
-Each cache consists in a level 2 (L2) cache that exposes one or more (in case
-of read-only arrays) ports.
-Every port can be associated with a private level 1 (L1) cache.
+_DaCH_ provides the `cache` class, that allows associating a dedicated cache to
+each DRAM-mapped array, that automatically buffers the data in block-RAMs and registers.
 
-The L2 cache is implemented as a dataflow task, thus the resulting system
-resembles the [load, compute, store design paradigm](https://docs.xilinx.com/r/en-US/ug1399-vitis-hls/Creating-Efficient-HLS-Designs),
-without any source code modification.
+A `cache` object consists in a level 2 (L2) cache that exposes one or more
+(in case of read-only arrays) ports.
+Each L2 port can be associated with a private level 1 (L1) cache.
+The L2 cache is implemented as a dataflow task that consumes a stream of
+requests (read or write) from the function accessing the array, and produces
+a stream of responses (read) in the opposite direction.
 
-### Cache parameters
-Each cache is an object of type `cache`, and is configured by template parameters:
+_DaCH_ fits well within the *Xilinx* guidelines for
+[creating efficient HLS designs](https://docs.xilinx.com/r/en-US/ug1399-vitis-hls/Creating-Efficient-HLS-Designs),
+since it automates multiple suggested techniques:
+* the kernel decomposition in producer-consumer tasks, since the L2 cache is a dataflow task
+	that consumes a stream of requests (read or write) and produces a stream of responses (read)
+> * Decompose the kernel algorithm by building a pipeline of producer-consumer tasks,
+> 	modeled using a Load, Compute, Store (LCS) coding pattern
+* the creation of internal caching structures
+> * In many cases, the sequential order of data in and out of the Compute tasks is different
+> 	from the arrangement order of data in global memory.
+> 	* In this situation, optimizing the interface functions requires creating internal caching
+> 		structures that gather enough data and organize it appropriately to minimize the overhead
+>			of global memory accesses while being able to satisfy the sequential order expected by the
+>			streaming interface 
+* the access to large contiguous blocks of data, since `cache` accesses the DRAM in lines
+	(i.e., blocks of words)
+> * Global memories have long access times (DRAM, HBM) and their bandwidth is limited (DRAM).
+> 	To reduce the overhead of accessing global memory, the interface function needs to
+> 	* Access sufficiently large contiguous blocks of data (to benefit from bursting)
+
+> * Maximize the port width of the interface, i.e., the bit-width of each AXI port
+>		by setting it to 512 bits (64 bytes).
+> 	* Accessing the global memory is expensive and so accessing larger word sizes is
+>			more efficient.
+> 	* Transfer large blocks of data from the global device memory.
+>			One large transfer is more efficient than several smaller transfers. 
+* the avoidance of redundant DRAM accesses, since `cache` accesses DRAM in case of miss only
+> * Accessing data sequentially leads to larger bursts (and higher data throughput efficiency)
+> 	as compared to accessing random and/or out-of-order data (where burst analysis will fail)
+> 	* Avoid redundant accesses (to preserve bandwidth)
+
+## Cache parameters
+The `cache` specifications are configurable through template parameters:
 * `typename T`: the data type of the word.
 * `bool RD_ENABLED`: whether the original array is accessed in read mode.
 * `bool WR_ENABLED`: whether the original array is accessed in write mode.
@@ -37,14 +66,31 @@ Each cache is an object of type `cache`, and is configured by template parameter
 * `bool SWAP_TAG_SET`: the address bits mapping (x for more details).
 * `size_t LATENCY`: the request-response distance of the L2 cache (y for more details).
 
+## Profiling
+`cache` exposes a set of profiling functions, useful for tuning the
+[cache parameters](#cache-parameters):
+* `int get_n_reqs(const unsigned int port)`: returns the number of requests
+  (reads and writes) to the L2 cache, on the port `port`.
+* `int get_n_hits(const unsigned int port)`: returns the number of hits to the
+  L1 cache, on the port `port`.
+* `int get_n_l1_reqs(const unsigned int port)`: returns the number of requests
+  (reads and writes) to the L2 cache, on the port `port`.
+* `int get_n_l1_hits(const unsigned int port)`: returns the number of hits to the
+  L1 cache, on the port `port`.
+* `double get_hit_ratio(const unsigned int port)`: returns the hit ratio to the
+  L2 and L1 caches, on the port `port`.
+
 ## Usage
-Users can associate a `cache` to an array by:
-1. fixing the [`cache` parameters](#cache-parameters)
-2. creating a wrapper function that:
+A `cache` object is associated to an array by:
+1. adding the _DaCH_ `src` directory to the include path, and including
+	the `cache.h` header file
+2. setting the [`cache` parameters](#cache-parameters), possibly taking advantage
+	of the [profiling functions](#profiling) for their fine-tuning
+3. creating a wrapper function that:
     1. initializes the `cache` (through the `init` member function)
     2. calls the function that accesses the array
     3. stops the `cache` (through the `stop` member function)
-3. calling the wrapper function, instead of the original function, in a
+4. calling the wrapper function, instead of the original function, in a
    `dataflow` region
 
 As an example, the changes required for accelerating the `vecinit` kernel
@@ -82,22 +128,6 @@ extern "C" void top(int *a) {
 
 Note that the algorithm original code (i.e., the `vecinit` function) is
 unchanged: it is enough to change the input data type from `int *` to `cache &`.
-
-### Cache parameters tuning
-The `cache` exposes a set of profiling functions:
-* `int get_n_reqs(const unsigned int port)`: returns the number of requests
-  (reads and writes) to the L2 cache, on the port `port`.
-* `int get_n_hits(const unsigned int port)`: returns the number of hits to the
-  L1 cache, on the port `port`.
-* `int get_n_l1_reqs(const unsigned int port)`: returns the number of requests
-  (reads and writes) to the L2 cache, on the port `port`.
-* `int get_n_l1_hits(const unsigned int port)`: returns the number of hits to the
-  L1 cache, on the port `port`.
-* `double get_hit_ratio(const unsigned int port)`: returns the hit ratio to the
-  L2 and L1 caches, on the port `port`.
-
-Therefore, users may tune the `cache` parameters based on the data returned by
-these profiling functions.
 
 ## Examples
 
