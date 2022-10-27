@@ -310,19 +310,6 @@ void multiply_buffer(data_type a_arr[N * M], data_type b_arr[M * P], data_type c
 	store(c_arr, c_stream);
 }
 
-void multiply_wrapper(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
-#pragma HLS inline off
-	a_cache.init();
-	b_cache.init();
-	c_cache.init();
-
-	multiply(a_cache, b_cache, c_cache);
-
-	a_cache.stop();
-	b_cache.stop();
-	c_cache.stop();
-}
-
 extern "C" void matmult_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
 #pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0 latency=0 depth=1024
 #pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1 latency=0 depth=1024
@@ -331,15 +318,11 @@ extern "C" void matmult_top(data_type a_arr[N * M], data_type b_arr[M * P], data
 
 #if defined(CACHE)
 #pragma HLS dataflow disable_start_propagation
-	cache_a a_cache;
-	cache_b b_cache;
-	cache_c c_cache;
+	cache_a a_cache(a_arr);
+	cache_b b_cache(b_arr);
+	cache_c c_cache(c_arr);
 
-	a_cache.run(a_arr);
-	b_cache.run(b_arr);
-	c_cache.run(c_arr);
-
-	multiply_wrapper(a_cache, b_cache, c_cache);
+	cache_wrapper(multiply<cache_a,cache_b,cache_c>, a_cache, b_cache, c_cache);
 
 #ifndef __SYNTHESIS__
 #ifdef PROFILE

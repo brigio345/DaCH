@@ -42,25 +42,15 @@ I_LOOP:			for (auto i = 0; i < (N / 2); i++) {
 	}
 }
 
-void bitonic_sort_wrapper(cache_a &a_cache) {
-#pragma HLS inline off
-	a_cache.init();
-
-	bitonic_sort(a_cache);
-
-	a_cache.stop();
-}
-
 extern "C" void bitsort_top(data_type a_arr[N]) {
 #pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0 depth=N
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #if defined(CACHE)
 #pragma HLS dataflow disable_start_propagation
-	cache_a a_cache;
+	cache_a a_cache(a_arr);
 
-	a_cache.run(a_arr);
-	bitonic_sort_wrapper(a_cache);
+	cache_wrapper(bitonic_sort<cache_a>, a_cache, true);
 
 #ifndef __SYNTHESIS__
 	printf("A hit ratio = L1: %d/%d L2: %d/%d\n",

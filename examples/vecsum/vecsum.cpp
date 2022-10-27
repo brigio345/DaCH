@@ -27,15 +27,6 @@ VECSUM_LOOP:	for (auto i = 0; i < N; i++) {
 		sum = tmp;
 	}
 
-void vecsum_wrapper(cache_a &a, int &sum) {
-#pragma HLS inline off
-	a.init();
-
-	vecsum(a, sum);
-
-	a.stop();
-}
-
 extern "C" void vecsum_top(int a[N], int &sum) {
 #pragma HLS INTERFACE m_axi port=a bundle=gmem0 depth=N
 #pragma HLS INTERFACE ap_ctrl_hs port=return
@@ -44,7 +35,7 @@ extern "C" void vecsum_top(int a[N], int &sum) {
 	cache_a a_cache;
 
 	a_cache.run(a);
-	vecsum_wrapper(a_cache, sum);
+	cache_wrapper(vecsum<cache_a>, a_cache, sum);
 }
 
 int main() {

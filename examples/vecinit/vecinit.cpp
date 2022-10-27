@@ -14,24 +14,14 @@ template <typename T>
 		}
 	}
 
-void vecinit_wrapper(cache_t &a) {
-#pragma HLS inline off
-	a.init();
-
-	vecinit(a);
-
-	a.stop();
-}
-
 extern "C" void vecinit_top(int a[N]) {
 #pragma HLS INTERFACE m_axi port=a bundle=gmem0 depth=N
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #pragma HLS dataflow disable_start_propagation
-	cache_t a_cache;
+	cache_t a_cache(a);
 
-	a_cache.run(a);
-	vecinit_wrapper(a_cache);
+	cache_wrapper(vecinit<cache_t>, a_cache);
 }
 
 int main() {

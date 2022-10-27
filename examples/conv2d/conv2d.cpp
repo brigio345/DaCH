@@ -88,7 +88,8 @@ typedef cache<unsigned char, true, false, RD_PORTS, SIZE_PADDED_CACHE,
 typedef cache<unsigned char, false, true, 1, SIZE_PADDED_CACHE, DST_L2_SETS,
 	DST_L2_WAYS, DST_WORDS, false, 0, 0, false, DST_L2_LATENCY> cache_dst;
 
-void convolution(const char coeffs[FILTER_SIZE], const unsigned char src[SIZE], unsigned char dst[SIZE]) {
+template <typename FILTER_TYPE, typename SRC_TYPE, typename DST_TYPE>
+void convolution(FILTER_TYPE &coeffs, SRC_TYPE &src, DST_TYPE &dst) {
 	for(int y=0; y<HEIGHT; ++y) {
 		for(int x=0; x<WIDTH; ++x) {
 			// Apply 2D filter to the pixel window
@@ -114,6 +115,7 @@ void convolution(const char coeffs[FILTER_SIZE], const unsigned char src[SIZE], 
 	}
 }
 
+template<>
 void convolution(cache_coeff &coeffs, cache_src &src, cache_dst &dst) {
 Y:	for(int y=0; y<HEIGHT; ++y) {
 X:		for(int x=0; x<WIDTH; ++x) {
@@ -330,19 +332,6 @@ extern "C" {
 
 }
 
-void convolution_wrapper(cache_coeff &coeffs, cache_src &src, cache_dst &dst) {
-#pragma HLS inline off
-	coeffs.init();
-	src.init();
-	dst.init();
-
-	convolution(coeffs, src, dst);
-
-	coeffs.stop();
-	src.stop();
-	dst.stop();
-}
-
 extern "C" void conv2d_top(char *coeffs, unsigned char *src, unsigned char *dst) {
 #pragma HLS INTERFACE m_axi port=coeffs offset=slave bundle=gmem0 depth=FILTER_SIZE_PADDED
 #pragma HLS INTERFACE m_axi port=src offset=slave bundle=gmem1 depth=SIZE_PADDED_CACHE
@@ -351,15 +340,12 @@ extern "C" void conv2d_top(char *coeffs, unsigned char *src, unsigned char *dst)
 
 #if defined(CACHE)
 #pragma HLS dataflow disable_start_propagation
-	cache_coeff coeffs_cache;
-	cache_src src_cache;
-	cache_dst dst_cache;
+	cache_coeff coeffs_cache(coeffs);
+	cache_src src_cache(src);
+	cache_dst dst_cache(dst);
 
-	coeffs_cache.run(coeffs);
-	src_cache.run(src);
-	dst_cache.run(dst);
-
-	convolution_wrapper(coeffs_cache, src_cache, dst_cache);
+	cache_wrapper(convolution<cache_coeff, cache_src, cache_dst>,
+			coeffs_cache, src_cache, dst_cache);
 
 #ifndef __SYNTHESIS__
 	printf("coeffs hit ratio = \n");

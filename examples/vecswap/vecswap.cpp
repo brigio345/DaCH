@@ -18,29 +18,16 @@ VECSWAP_LOOP:	for (auto i = 0; i < N; i++) {
 		}
 	}
 
-void vecswap_wrapper(cache_t &a, cache_t &b) {
-	a.init();
-	b.init();
-
-	vecswap(a, b);
-
-	a.stop();
-	b.stop();
-}
-
 extern "C" void vecswap_top(int a[N], int b[N]) {
 #pragma HLS INTERFACE m_axi port=a bundle=gmem0 depth=N
 #pragma HLS INTERFACE m_axi port=b bundle=gmem1 depth=N
 #pragma HLS INTERFACE ap_ctrl_hs port=return
 
 #pragma HLS dataflow disable_start_propagation
-	cache_t a_cache;
-	cache_t b_cache;
+	cache_t a_cache(a);
+	cache_t b_cache(b);
 
-	a_cache.run(a);
-	b_cache.run(b);
-
-	vecswap_wrapper(a_cache, b_cache);
+	cache_wrapper(vecswap<cache_t>, a_cache, b_cache);
 }
 
 int main() {
