@@ -86,12 +86,8 @@ A `cache` object is associated to an array by:
 	the `cache.h` header file
 2. setting the [`cache` parameters](#cache-parameters), possibly taking advantage
 	of the [profiling functions](#profiling) for their fine-tuning
-3. creating a wrapper function that:
-    1. initializes the `cache` (through the `init` member function)
-    2. calls the function that accesses the array
-    3. stops the `cache` (through the `stop` member function)
-4. calling the wrapper function, instead of the original function, in a
-   `dataflow` region
+4. instantiating the `cache` and calling the function to be accelerated through
+   the `cache_wrapper` function, in a `dataflow` region
 
 As an example, the changes required for accelerating the `vecinit` kernel
 consist in:
@@ -110,19 +106,12 @@ template <typename T>
     }
   }
 
-+void vecinit_wrapper(cache_type &a_cache) {
-+ a_cache.init();
-+ vecinit(a_cache);
-+ a_cache.stop();
-+}
-+
 extern "C" void top(int *a) {
 #pragma HLS interface m_axi port=a bundle=gmem0
-- vecinit(a);
 +#pragma HLS dataflow
-+ cache_type a_cache;
-+ a_cache.run(a);
-+ vecinit_wrapper(a_cache);
++ cache_type a_cache(a);
+- vecinit(a);
++ cache_wrapper(vecinit<cache_type>, a_cache);
 }
 ```
 
