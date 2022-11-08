@@ -66,9 +66,24 @@ The `cache` specifications are configurable through template parameters:
   first-out* otherwise.
 * `size_t N_L1_SETS`: the number of L1 sets.
 * `size_t N_L1_WAYS`: the number of L1 ways.
-* `bool SWAP_TAG_SET`: the address bits mapping (x for more details).
-* `size_t LATENCY`: the request-response distance of the L2 cache (y for more details).
+* `bool SWAP_TAG_SET`: the address bits mapping
+([Sections III and VI-B](https://ieeexplore.ieee.org/document/9940270) for more details).
+* `size_t LATENCY`: the request-response distance of the L2 cache
+([Section III-B3](https://ieeexplore.ieee.org/document/9940270) for more details).
 
+### `LATENCY` parameter
+The `LATENCY` parameter can have an impact on the L2 cache performance
+([Section III-A1](https://ieeexplore.ieee.org/document/9940270) for more details).
+
+The recommended `LATENCY` value is:
+* No L1 cache included (`N_L1_SETS` or `N_L1_WAYS` set to `0`):
+	* Read-only accesses (`RD_ENABLED = true` and `WR_ENABLED = false`): `LATENCY = 7`
+	* Read-write accesses (`RD_ENABLED = true` and `WR_ENABLED = true`): `LATENCY = 2`
+	* Write-only accesses (`RD_ENABLED = false` and `WR_ENABLED = true`): `LATENCY = 3`
+* L1 cache included:
+	* Read-only accesses (`RD_ENABLED = true` and `WR_ENABLED = false`): `LATENCY = 3`
+	* Read-write accesses (`RD_ENABLED = true` and `WR_ENABLED = true`): `LATENCY = 2`
+	* Write-only accesses (`RD_ENABLED = false` and `WR_ENABLED = true`): not meaningful, since L1 cache is write-through
 ## Profiling
 `cache` exposes a set of profiling functions, useful for tuning the
 [cache parameters](#cache-parameters):
