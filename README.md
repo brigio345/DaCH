@@ -122,6 +122,18 @@ Note that the algorithm original code (i.e., the `vecinit` function) is
 unchanged: it is enough to change the input data type from `int *` to `cache &`.
 
 ## Examples
+The `examples` directory contains a set of applications using _DaCH_.
+
+Each `examples` sub-directory is related to a different application, and contains:
+* `{app_name}.cpp`: source code for the kernel and the testbench.
+* `{app_name}.tcl`: script for synthesizing, simulating and exporting the kernel.
+* (optional) `{app_name}.csv`: results collected from the implementation of the kernel
+on a *Avnet Ultra96v1* board (more details in the [paper](https://ieeexplore.ieee.org/document/9940270),
+at Section VI, Evaluation).
+
+Users can test an application `{app_name}` by:
+1. entering the `examples/{app_name}` directory: `cd examples/{app_name}`
+2. running the `{app_name}.tcl` script: `vitis_hls -f {app_name}.tcl`
 
 ## Publication
 BibTeX:
