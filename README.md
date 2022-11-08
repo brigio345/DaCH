@@ -49,6 +49,9 @@ since it automates multiple suggested techniques:
 > 	as compared to accessing random and/or out-of-order data (where burst analysis will fail)
 > 	* Avoid redundant accesses (to preserve bandwidth)
 
+Further details can be found in the paper:
+[Array-specific dataflow caches for high-level synthesis of memory-intensive algorithms on FPGAs](https://ieeexplore.ieee.org/document/9940270).
+
 ## Cache parameters
 The `cache` specifications are configurable through template parameters:
 * `typename T`: the data type of the word.
@@ -120,5 +123,18 @@ unchanged: it is enough to change the input data type from `int *` to `cache &`.
 
 ## Examples
 
-## Documentation
-
+## Publication
+BibTeX:
+```bibtex
+@article{DaCH,
+	author={Brignone, Giovanni and Usman Jamal, M. and Lazarescu, Mihai T. and Lavagno, Luciano},
+	journal={IEEE Access},
+	title={Array-specific dataflow caches for high-level synthesis of memory-intensive algorithms on FPGAs},
+	year={2022},
+	doi={10.1109/ACCESS.2022.3219868}
+}
+```
+Plain text:
+```
+G. Brignone, M. Usman Jamal, M. T. Lazarescu and L. Lavagno, "Array-specific dataflow caches for high-level synthesis of memory-intensive algorithms on FPGAs," in IEEE Access, 2022, doi: 10.1109/ACCESS.2022.3219868.
+```
