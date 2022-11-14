@@ -121,6 +121,11 @@ class cache {
 #endif /* __SYNTHESIS__ */
 
 	public:
+		cache(T *main_mem) {
+			cache();
+			run(main_mem);
+		}
+
 		cache() {
 #pragma HLS array_partition variable=m_tag type=complete dim=0
 			if (PORTS > 1) {
@@ -141,11 +146,10 @@ class cache {
 			m_valid = 0;
 
 			m_replacer.init();
+			m_raw_cache_core.init();
 #endif /* __SYNTHESIS__ */
 
 			m_core_port = 0;
-
-			m_raw_cache_core.init();
 
 			if (L1_CACHE) {
 				for (auto port = 0; port < PORTS; port++)
@@ -483,6 +487,7 @@ class cache {
 			m_valid = 0;
 
 			m_replacer.init();
+			m_raw_cache_core.init();
 
 CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 #pragma HLS pipeline II=1 style=flp
@@ -703,6 +708,54 @@ MEM_IF_LOOP:		while (1) {
 			return square_bracket_proxy(this, addr_main);
 		}
 };
+
+template<typename>
+struct is_cache : std::false_type {};
+
+template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
+	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
+	 bool LRU, size_t N_L1_SETS, size_t N_L1_WAYS, bool SWAP_TAG_SET, size_t LATENCY>
+	 struct is_cache<cache<T, RD_ENABLED, WR_ENABLED, PORTS, MAIN_SIZE,
+	 N_SETS, N_WAYS, N_WORDS_PER_LINE, LRU, N_L1_SETS, N_L1_WAYS,
+	 SWAP_TAG_SET, LATENCY>&> : std::true_type {};
+
+void init() {}
+
+template <typename HEAD_TYPE, typename... TAIL_TYPES>
+typename std::enable_if<!is_cache<HEAD_TYPE>::value, void>::type
+init(HEAD_TYPE &&head, TAIL_TYPES&&... tail) {
+	init(tail...);
+}
+
+template <typename HEAD_TYPE, typename... TAIL_TYPES>
+typename std::enable_if<is_cache<HEAD_TYPE>::value, void>::type
+init(HEAD_TYPE &&head, TAIL_TYPES&&... tail) {
+	head.init();
+	init(tail...);
+}
+
+void stop() {}
+
+template <typename HEAD_TYPE, typename... TAIL_TYPES>
+typename std::enable_if<!is_cache<HEAD_TYPE>::value, void>::type
+stop(HEAD_TYPE &&head, TAIL_TYPES&&... tail) {
+	stop(tail...);
+}
+
+template <typename HEAD_TYPE, typename... TAIL_TYPES>
+typename std::enable_if<is_cache<HEAD_TYPE>::value, void>::type
+stop(HEAD_TYPE &&head, TAIL_TYPES&&... tail) {
+	head.stop();
+	stop(tail...);
+}
+
+template <class T, typename... ARGS_TYPES>
+void cache_wrapper(T &&fn, ARGS_TYPES&&... args) {
+#pragma HLS inline off
+	init(args...);
+	fn(args...);
+	stop(args...);
+}
 
 #endif /* CACHE_H */
 

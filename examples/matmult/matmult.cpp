@@ -16,11 +16,9 @@
 
 static const int RD_PORTS = 2;
 
+#ifndef BLK
 #define BLK 16
-
-#ifndef BLOCKS
-#define BLOCKS 16
-#endif /* BLOCKS */
+#endif /* BLK */
 
 #ifndef A_WORDS
 #define A_WORDS BLK
@@ -79,7 +77,7 @@ static const int RD_PORTS = 2;
 #define C_L2_LATENCY 3
 #endif /* C_L2_LATENCY */
 
-#ifdef HORIZONTAL
+#ifdef STANDARD
 #define C_RD_ENABLED false
 #else
 #define C_RD_ENABLED true
@@ -159,12 +157,12 @@ STORE_LOOP:		for (auto port = 0; port < RD_PORTS; port++) {
 template<>
 void multiply(cache_a &A, cache_b &B, cache_c &C) {
 #pragma HLS inline
-II_LOOP:for (int ii = 0; ii < P; ii += BLOCKS) {
-KK_LOOP:	for (int kk = 0; kk < M; kk += BLOCKS) {
+II_LOOP:for (int ii = 0; ii < P; ii += BLK) {
+KK_LOOP:	for (int kk = 0; kk < M; kk += BLK) {
 J_LOOP:			for (int j = 0; j < N; j++) {
-I_LOOP:				for (int i = ii; i < (ii + BLOCKS); i++) {
+I_LOOP:				for (int i = ii; i < (ii + BLK); i++) {
 					data_type acc = 0;
-K_LOOP:					for (int k = kk; k < (kk + BLOCKS); k += RD_PORTS) {
+K_LOOP:					for (int k = kk; k < (kk + BLK); k += RD_PORTS) {
 #pragma HLS pipeline II=1
 						for (int port = 0; port < RD_PORTS; port++) {
 #pragma HLS unroll
@@ -312,20 +310,7 @@ void multiply_buffer(data_type a_arr[N * M], data_type b_arr[M * P], data_type c
 	store(c_arr, c_stream);
 }
 
-void multiply_syn(cache_a &a_cache, cache_b &b_cache, cache_c &c_cache) {
-#pragma HLS inline off
-	a_cache.init();
-	b_cache.init();
-	c_cache.init();
-
-	multiply(a_cache, b_cache, c_cache);
-
-	a_cache.stop();
-	b_cache.stop();
-	c_cache.stop();
-}
-
-extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
+extern "C" void matmult_top(data_type a_arr[N * M], data_type b_arr[M * P], data_type c_arr[N * P]) {
 #pragma HLS INTERFACE m_axi port=a_arr offset=slave bundle=gmem0 latency=0 depth=1024
 #pragma HLS INTERFACE m_axi port=b_arr offset=slave bundle=gmem1 latency=0 depth=1024
 #pragma HLS INTERFACE m_axi port=c_arr offset=slave bundle=gmem2 latency=0 depth=1024
@@ -333,30 +318,13 @@ extern "C" void matmul_top(data_type a_arr[N * M], data_type b_arr[M * P], data_
 
 #if defined(CACHE)
 #pragma HLS dataflow disable_start_propagation
-	cache_a a_cache;
-	cache_b b_cache;
-	cache_c c_cache;
+	cache_a a_cache(a_arr);
+	cache_b b_cache(b_arr);
+	cache_c c_cache(c_arr);
 
-#ifdef __SYNTHESIS__
-	a_cache.run(a_arr);
-	b_cache.run(b_arr);
-	c_cache.run(c_arr);
-	multiply_syn(a_cache, b_cache, c_cache);
-#else
-	a_cache.init();
-	b_cache.init();
-	c_cache.init();
+	cache_wrapper(multiply<cache_a,cache_b,cache_c>, a_cache, b_cache, c_cache);
 
-	a_cache.run(a_arr);
-	b_cache.run(b_arr);
-	c_cache.run(c_arr);
-
-	multiply(a_cache, b_cache, c_cache);
-
-	a_cache.stop();
-	b_cache.stop();
-	c_cache.stop();
-
+#ifndef __SYNTHESIS__
 #ifdef PROFILE
 	printf("A hit ratio = \n");
 	for (auto port = 0; port < RD_PORTS; port++) {
@@ -391,7 +359,7 @@ int main() {
 		b_arr[i] = i;
 
 	// matrix multiplication with caches
-	matmul_top(a_arr, b_arr, c_arr);
+	matmult_top(a_arr, b_arr, c_arr);
 	// standard matrix multiplication
 	multiply(a_arr, b_arr, c_arr_ref);
 
