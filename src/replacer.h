@@ -17,8 +17,13 @@ class replacer {
 	private:
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
 
+#ifdef __SYNTHESIS__
 		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> m_lru[N_SETS][N_WAYS];
 		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> m_lifo[N_SETS];
+#else
+		unsigned int m_lru[N_SETS][N_WAYS];
+		unsigned int m_lifo[N_SETS];
+#endif /* __SYNTHESIS__ */
 
 	public:
 		replacer() {
@@ -82,8 +87,12 @@ class replacer {
 		void notify_insertion(const ADDR_T &addr) {
 #pragma HLS inline
 			if (!LRU) {
-				if (WAY_SIZE > 0)
+				if (WAY_SIZE > 0) {
 					m_lifo[addr.m_set]++;
+#ifndef __SYNTHESIS__
+					m_lifo[addr.m_set] &= (~(-1U << WAY_SIZE));
+#endif /* __SYNTHESIS__ */
+				}
 			}
 		}
 

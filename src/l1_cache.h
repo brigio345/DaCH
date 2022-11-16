@@ -4,6 +4,9 @@
 #include "address.h"
 #include "utils.h"
 #include "ap_int.h"
+#ifndef __SYNTHESIS__
+#include <cstring>
+#endif /* __SYNTHESIS__ */
 
 template <typename LINE_TYPE, size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS,
 	 size_t N_WORDS_PER_LINE, bool SWAP_TAG_SET>
@@ -29,13 +32,23 @@ class l1_cache {
 		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_WORDS_PER_LINE)),
 				"N_SETS and/or N_WAYS and/or N_WORDS_PER_LINE are too big for the specified MAIN_SIZE");
 
+#ifdef __SYNTHESIS__
+		typedef ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> main_addr_type;
+#else
+		typedef unsigned int main_addr_type;
+#endif /* __SYNTHESIS__ */
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, SWAP_TAG_SET>
 			addr_type;
 		typedef replacer<false, addr_type, ((N_SETS > 0) ? N_SETS : 1),
 			((N_WAYS > 0) ? N_WAYS : 1), N_WORDS_PER_LINE> replacer_type;
 
+#ifdef __SYNTHESIS__
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_LINES];	// 1
 		ap_uint<N_LINES> m_valid;				// 2
+#else
+		unsigned int m_tag[N_LINES];
+		bool m_valid[N_LINES];
+#endif /* __SYNTHESIS__ */
 		LINE_TYPE m_cache_mem[N_LINES];				// 3
 		replacer_type m_replacer;				// 4
 
@@ -46,11 +59,15 @@ class l1_cache {
 
 		void init() {
 #pragma HLS inline
+#ifdef __SYNTHESIS__
 			m_valid = 0;
+#else
+			std::memset(m_valid, 0, sizeof(m_valid));
+#endif /* __SYNTHESIS__ */
 			m_replacer.init();
 		}
 
-		bool get_line(const ap_uint<ADDR_SIZE> addr_main, LINE_TYPE &line) const {
+		bool get_line(const main_addr_type addr_main, LINE_TYPE &line) const {
 #pragma HLS inline
 			addr_type addr(addr_main);
 			const auto way = hit(addr);
@@ -59,26 +76,35 @@ class l1_cache {
 				return false;
 
 			addr.set_way(way);
+#ifdef __SYNTHESIS__
 			line = m_cache_mem[addr.m_addr_line];
+#else
+			std::memcpy(line, m_cache_mem[addr.m_addr_line], sizeof(line));
+#endif /* __SYNTHESIS__ */
 
 			return true;
 		}
 
-		void set_line(const ap_uint<ADDR_SIZE> addr_main,
+		void set_line(const main_addr_type addr_main,
 				const LINE_TYPE &line) {
 #pragma HLS inline
 			addr_type addr(addr_main);
 
 			addr.set_way(m_replacer.get_way(addr));
 
+#ifdef __SYNTHESIS__
 			m_cache_mem[addr.m_addr_line] = line;
+#else
+			std::memcpy(m_cache_mem[addr.m_addr_line], line,
+					sizeof(m_cache_mem[addr.m_addr_line]));
+#endif /* __SYNTHESIS__ */
 			m_valid[addr.m_addr_line] = true;
 			m_tag[addr.m_addr_line] = addr.m_tag;
 
 			m_replacer.notify_insertion(addr);
 		}
 
-		void notify_write(const ap_uint<ADDR_SIZE> addr_main) {
+		void notify_write(const main_addr_type addr_main) {
 #pragma HLS inline
 			const addr_type addr(addr_main);
 
