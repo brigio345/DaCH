@@ -9,9 +9,15 @@ class raw_cache {
 	private:
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 
+#ifdef __SYNTHESIS__
+		typedef ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main_type;
+#else
+		typedef unsigned long int addr_main_type;
+#endif /* __SYNTHESIS__ */
+
 		ap_uint<DISTANCE> m_valid;
 		T m_cache_mem[DISTANCE];
-		ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> m_tag[DISTANCE];
+		addr_main_type m_tag[DISTANCE];
 
 	public:
 		raw_cache() {
@@ -25,7 +31,7 @@ class raw_cache {
 		}
 
 		void get_line(const T * const main_mem,
-				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main,
+				const addr_main_type addr_main,
 				T &data) const {
 #pragma HLS inline
 			const auto way = hit(addr_main);
@@ -33,7 +39,7 @@ class raw_cache {
 		}
 
 		void set_line(T * const main_mem,
-				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main,
+				const addr_main_type addr_main,
 				const T &line) {
 #pragma HLS inline
 			main_mem[addr_main] = line;
@@ -51,7 +57,7 @@ class raw_cache {
 		}
 
 	private:
-		int hit(const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main) const {
+		int hit(const addr_main_type addr_main) const {
 #pragma HLS inline
 			for (auto way = 0; way < DISTANCE; way++) {
 #pragma HLS unroll

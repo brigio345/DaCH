@@ -63,6 +63,11 @@ class cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, SWAP_TAG_SET>
 			address_type;
+#ifdef __SYNTHESIS__
+		typedef ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main_type;
+#else
+		typedef unsigned long int addr_main_type;
+#endif /* __SYNTHESIS__ */
 		typedef hls::vector<T, N_WORDS_PER_LINE> line_type;
 		typedef l1_cache<line_type, MAIN_SIZE, N_L1_SETS, N_L1_WAYS,
 			N_WORDS_PER_LINE, SWAP_TAG_SET> l1_cache_type;
@@ -88,14 +93,14 @@ class cache {
 
 		typedef struct {
 			op_type op;
-			ap_uint<ADDR_SIZE> addr;
+			addr_main_type addr;
 			T data;
 		} core_req_type;
 
 		typedef struct {
 			op_type op;
-			ap_uint<ADDR_SIZE> load_addr;
-			ap_uint<ADDR_SIZE> write_back_addr;
+			addr_main_type load_addr;
+			addr_main_type write_back_addr;
 			line_type line;
 		} mem_req_type;
 
@@ -203,7 +208,7 @@ class cache {
 		 * \param[in] port	The port from which to read.
 		 * \param[out] line	The buffer to store the read line.
 		 */
-		void get_line(const ap_uint<ADDR_SIZE> addr_main,
+		void get_line(const addr_main_type addr_main,
 				const unsigned int port, line_type &line) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
@@ -258,7 +263,7 @@ class cache {
 		 *
 		 * \return		The read data element.
 		 */
-		T get(const ap_uint<ADDR_SIZE> addr_main, const unsigned int port) {
+		T get(const addr_main_type addr_main, const unsigned int port) {
 #pragma HLS inline
 			line_type line;
 
@@ -279,7 +284,7 @@ class cache {
 		 *
 		 * \return		The read data element.
 		 */
-		T get(const ap_uint<ADDR_SIZE> addr_main) {
+		T get(const addr_main_type addr_main) {
 #pragma HLS inline
 			const auto data = get(addr_main, m_core_port);
 			m_core_port = ((m_core_port + 1) % PORTS);
@@ -294,7 +299,7 @@ class cache {
 		 * 			the data element to be written.
 		 * \param[in] data	The data to be written.
 		 */
-		void set(const ap_uint<ADDR_SIZE> addr_main, const T data) {
+		void set(const addr_main_type addr_main, const T data) {
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			assert(addr_main < MAIN_SIZE);
@@ -606,8 +611,7 @@ MEM_IF_LOOP:		while (1) {
 			}
 		}
 
-		void get_line(const T * const mem,
-				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr,
+		void get_line(const T * const mem, const addr_main_type addr,
 				line_type &line) {
 #pragma HLS inline
 			const T * const mem_line = &(mem[addr & (-1U << OFF_SIZE)]);
@@ -618,8 +622,7 @@ MEM_IF_LOOP:		while (1) {
 			}
 		}
 
-		void set_line(T * const mem,
-				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr,
+		void set_line(T * const mem, const addr_main_type addr,
 				const line_type &line) {
 #pragma HLS inline
 			T * const mem_line = &(mem[addr & (-1U << OFF_SIZE)]);
@@ -648,10 +651,10 @@ MEM_IF_LOOP:		while (1) {
 		class square_bracket_proxy {
 			private:
 				cache *m_cache;
-				const ap_uint<ADDR_SIZE> m_addr_main;
+				const addr_main_type m_addr_main;
 			public:
 				square_bracket_proxy(cache *c,
-						const ap_uint<ADDR_SIZE> addr_main):
+						const addr_main_type addr_main):
 					m_cache(c), m_addr_main(addr_main) {
 #pragma HLS inline
 					}
@@ -687,7 +690,7 @@ MEM_IF_LOOP:		while (1) {
 		};
 
 	public:
-		square_bracket_proxy operator[](const ap_uint<ADDR_SIZE> addr_main) {
+		square_bracket_proxy operator[](const addr_main_type addr_main) {
 #pragma HLS inline
 			return square_bracket_proxy(this, addr_main);
 		}

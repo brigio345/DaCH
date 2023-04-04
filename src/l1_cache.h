@@ -32,6 +32,11 @@ class l1_cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, SWAP_TAG_SET>
 			addr_type;
+#ifdef __SYNTHESIS__
+		typedef ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main_type;
+#else
+		typedef unsigned long int addr_main_type;
+#endif /* __SYNTHESIS__ */
 		typedef replacer<false, addr_type, ((N_SETS > 0) ? N_SETS : 1),
 			((N_WAYS > 0) ? N_WAYS : 1), N_WORDS_PER_LINE> replacer_type;
 
@@ -51,7 +56,7 @@ class l1_cache {
 			m_replacer.init();
 		}
 
-		bool get_line(const ap_uint<ADDR_SIZE> addr_main, LINE_TYPE &line) const {
+		bool get_line(const addr_main_type addr_main, LINE_TYPE &line) const {
 #pragma HLS inline
 			addr_type addr(addr_main);
 			const auto way = hit(addr);
@@ -65,7 +70,7 @@ class l1_cache {
 			return true;
 		}
 
-		void set_line(const ap_uint<ADDR_SIZE> addr_main,
+		void set_line(const addr_main_type addr_main,
 				const LINE_TYPE &line) {
 #pragma HLS inline
 			addr_type addr(addr_main);
@@ -79,7 +84,7 @@ class l1_cache {
 			m_replacer.notify_insertion(addr);
 		}
 
-		void notify_write(const ap_uint<ADDR_SIZE> addr_main) {
+		void notify_write(const addr_main_type addr_main) {
 #pragma HLS inline
 			const addr_type addr(addr_main);
 
