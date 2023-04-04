@@ -18,13 +18,13 @@
  */
 
 #include <cstddef>
-#define AP_INT_MAX_W (1 << 15)
 #include "address.h"
 #include "replacer.h"
 #include "l1_cache.h"
 #include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
+#include "hls_vector.h"
 #include "ap_utils.h"
 #include "ap_int.h"
 #include "utils.h"
@@ -43,7 +43,6 @@ class cache {
 		static const size_t OFF_SIZE = utils::log2_ceil(N_WORDS_PER_LINE);
 		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
-		static const size_t WORD_SIZE = (sizeof(T) * 8);
 
 		static_assert((RD_ENABLED || WR_ENABLED),
 				"RD_ENABLED and/or WR_ENABLED must be true");
@@ -64,7 +63,7 @@ class cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, SWAP_TAG_SET>
 			address_type;
-		typedef ap_uint<WORD_SIZE * N_WORDS_PER_LINE> line_type;
+		typedef hls::vector<T, N_WORDS_PER_LINE> line_type;
 		typedef l1_cache<line_type, MAIN_SIZE, N_L1_SETS, N_L1_WAYS,
 			N_WORDS_PER_LINE, SWAP_TAG_SET> l1_cache_type;
 		typedef raw_cache<line_type, (N_SETS * N_WAYS * N_WORDS_PER_LINE), 2>
@@ -101,8 +100,8 @@ class cache {
 		} mem_req_type;
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];	// 0
-		ap_uint<N_SETS * N_WAYS> m_valid;				// 1
-		ap_uint<N_SETS * N_WAYS> m_dirty;				// 2
+		hls::vector<bool, N_SETS * N_WAYS> m_valid;			// 1
+		hls::vector<bool, N_SETS * N_WAYS> m_dirty;			// 2
 		line_type m_cache_mem[N_SETS * N_WAYS];				// 3
 		hls::stream<core_req_type, (LATENCY * PORTS)> m_core_req[PORTS];// 4
 		hls::stream<line_type, (LATENCY * PORTS)> m_core_resp[PORTS];	// 5
@@ -278,10 +277,7 @@ class cache {
 			// extract information from address
 			address_type addr(addr_main);
 
-			const auto LSB = (addr.m_off * WORD_SIZE);
-			const auto MSB = (LSB + WORD_SIZE - 1);
-			ap_uint<WORD_SIZE> buff = line(LSB, MSB);
-			return *reinterpret_cast<T *>(&buff);
+			return line[addr.m_off];
 		}
 
 		/**
@@ -445,9 +441,7 @@ class cache {
 
 			if (!read) {
 				// modify the line
-				const auto LSB = (addr.m_off * WORD_SIZE);
-				const auto MSB = (LSB + WORD_SIZE - 1);
-				line(LSB, MSB) = *reinterpret_cast<ap_uint<WORD_SIZE> *>(&(req.data));
+				line[addr.m_off] = req.data;
 
 				// store the modified line to cache
 				m_raw_cache_core.set_line(m_cache_mem,
@@ -629,10 +623,7 @@ MEM_IF_LOOP:		while (1) {
 
 			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				const auto LSB = (off * WORD_SIZE);
-				const auto MSB = (LSB + WORD_SIZE - 1);
-				line(LSB, MSB) = *const_cast<ap_uint<WORD_SIZE> *>(
-						reinterpret_cast<const ap_uint<WORD_SIZE> *>(&mem_line[off]));
+				line[off] = mem_line[off];
 			}
 		}
 
@@ -644,10 +635,7 @@ MEM_IF_LOOP:		while (1) {
 
 			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				const auto LSB = (off * WORD_SIZE);
-				const auto MSB = (LSB + WORD_SIZE - 1);
-				ap_uint<WORD_SIZE> buff = line(LSB, MSB);
-				mem_line[off] = *reinterpret_cast<T *>(&buff);
+				mem_line[off] = line[off];
 			}
 		}
 

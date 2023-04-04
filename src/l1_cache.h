@@ -4,6 +4,7 @@
 #include "address.h"
 #include "utils.h"
 #include "ap_int.h"
+#include "hls_vector.h"
 
 template <typename LINE_TYPE, size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS,
 	 size_t N_WORDS_PER_LINE, bool SWAP_TAG_SET>
@@ -35,7 +36,7 @@ class l1_cache {
 			((N_WAYS > 0) ? N_WAYS : 1), N_WORDS_PER_LINE> replacer_type;
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_LINES];	// 1
-		ap_uint<N_LINES> m_valid;				// 2
+		hls::vector<bool, N_LINES> m_valid;			// 2
 		LINE_TYPE m_cache_mem[N_LINES];				// 3
 		replacer_type m_replacer;				// 4
 
