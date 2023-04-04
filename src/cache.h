@@ -134,15 +134,6 @@ class cache {
 		cache(T * const main_mem): m_main_mem(main_mem) {}
 #endif /* __SYNTHESIS__ */
 
-		cache() {
-#pragma HLS array_partition variable=m_tag type=complete dim=0
-			if (PORTS > 1) {
-#pragma HLS array_partition variable=m_core_req type=complete dim=0
-#pragma HLS array_partition variable=m_core_resp type=complete dim=0
-#pragma HLS array_partition variable=m_l1_cache_get type=complete dim=0
-			}
-		}
-
 		/**
 		 * \brief	Initialize the cache.
 		 *
