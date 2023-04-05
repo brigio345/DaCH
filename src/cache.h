@@ -24,7 +24,7 @@
 #include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include "hls_stream.h"
-#include "hls_vector.h"
+#include <array>
 #include "ap_utils.h"
 #include "ap_int.h"
 #include "utils.h"
@@ -68,7 +68,7 @@ class cache {
 #else
 		typedef unsigned long int addr_main_type;
 #endif /* __SYNTHESIS__ */
-		typedef hls::vector<T, N_WORDS_PER_LINE> line_type;
+		typedef std::array<T, N_WORDS_PER_LINE> line_type;
 		typedef l1_cache<line_type, MAIN_SIZE, N_L1_SETS, N_L1_WAYS,
 			N_WORDS_PER_LINE, SWAP_TAG_SET> l1_cache_type;
 		typedef raw_cache<line_type, (N_SETS * N_WAYS * N_WORDS_PER_LINE), 2>
@@ -105,8 +105,8 @@ class cache {
 		} mem_req_type;
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];	// 0
-		hls::vector<bool, N_SETS * N_WAYS> m_valid;			// 1
-		hls::vector<bool, N_SETS * N_WAYS> m_dirty;			// 2
+		std::array<bool, N_SETS * N_WAYS> m_valid;			// 1
+		std::array<bool, N_SETS * N_WAYS> m_dirty;			// 2
 		line_type m_cache_mem[N_SETS * N_WAYS];				// 3
 		hls::stream<core_req_type, (LATENCY * PORTS)> m_core_req[PORTS];// 4
 		hls::stream<line_type, (LATENCY * PORTS)> m_core_resp[PORTS];	// 5
@@ -147,7 +147,7 @@ class cache {
 		void init() {
 #ifndef __SYNTHESIS__
 			// invalidate all cache lines
-			m_valid = 0;
+			m_valid = {0};
 
 			m_replacer.init();
 			m_raw_cache_core.init();
@@ -479,7 +479,7 @@ class cache {
 		void run_core() {
 #pragma HLS inline off
 			// invalidate all cache lines
-			m_valid = 0;
+			m_valid = {0};
 
 			m_replacer.init();
 			m_raw_cache_core.init();
