@@ -12,6 +12,12 @@
 #include "utils.h"
 #include <ap_int.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wpedantic"
+#pragma GCC diagnostic error "-Wall"
+#pragma GCC diagnostic error "-Wextra"
+#pragma GCC diagnostic ignored "-Wunused-label"
+
 template <bool LRU, typename ADDR_T, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE>
 class replacer {
 	private:
@@ -100,6 +106,8 @@ class replacer {
 			return (LRU ? m_lru[addr.m_set][0] : m_lifo[addr.m_set]);
 		}
 };
+
+#pragma GCC diagnostic pop
 
 #endif /* REPLACER_H */
 

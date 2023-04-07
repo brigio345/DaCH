@@ -4,6 +4,12 @@
 #include "utils.h"
 #include <ap_int.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wpedantic"
+#pragma GCC diagnostic error "-Wall"
+#pragma GCC diagnostic error "-Wextra"
+#pragma GCC diagnostic ignored "-Wunused-label"
+
 template <typename T, size_t MAIN_SIZE, size_t DISTANCE>
 class raw_cache {
 	private:
@@ -62,6 +68,8 @@ class raw_cache {
 			return -1;
 		}
 };
+
+#pragma GCC diagnostic pop
 
 #endif /* RAW_CACHE_H */
 

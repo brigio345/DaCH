@@ -5,6 +5,12 @@
 #include "utils.h"
 #include <ap_int.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wpedantic"
+#pragma GCC diagnostic error "-Wall"
+#pragma GCC diagnostic error "-Wextra"
+#pragma GCC diagnostic ignored "-Wunused-label"
+
 template <typename LINE_TYPE, size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS,
 	 size_t N_WORDS_PER_LINE, bool SWAP_TAG_SET>
 class l1_cache {
@@ -102,6 +108,8 @@ class l1_cache {
 			return hit_way;
 		}
 };
+
+#pragma GCC diagnostic pop
 
 #endif /* L1_CACHE_H */
 

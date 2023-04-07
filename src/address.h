@@ -3,6 +3,12 @@
 
 #include <ap_int.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wpedantic"
+#pragma GCC diagnostic error "-Wall"
+#pragma GCC diagnostic error "-Wextra"
+#pragma GCC diagnostic ignored "-Wunused-label"
+
 template <size_t ADDR_SIZE, size_t TAG_SIZE, size_t SET_SIZE, size_t WAY_SIZE,
 	 bool SWAP_TAG_SET>
 class address {
@@ -137,6 +143,8 @@ class address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, true> {
 					(static_cast<addr_cache_type>(m_way) << OFF_SIZE) | m_off);
 		}
 };
+
+#pragma GCC diagnostic pop
 
 #endif /* ADDRESS_H */
 

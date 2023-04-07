@@ -32,6 +32,12 @@
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wpedantic"
+#pragma GCC diagnostic error "-Wall"
+#pragma GCC diagnostic error "-Wextra"
+#pragma GCC diagnostic ignored "-Wunused-label"
+
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
 	 bool LRU, size_t N_L1_SETS, size_t N_L1_WAYS, bool SWAP_TAG_SET, size_t LATENCY>
@@ -755,6 +761,8 @@ void cache_wrapper(T &&fn, ARGS_TYPES&&... args) {
 	fn(args...);
 	stop(args...);
 }
+
+#pragma GCC diagnostic pop
 
 #endif /* CACHE_H */
 

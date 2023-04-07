@@ -1,6 +1,12 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wpedantic"
+#pragma GCC diagnostic error "-Wall"
+#pragma GCC diagnostic error "-Wextra"
+#pragma GCC diagnostic ignored "-Wunused-label"
+
 namespace utils {
 	constexpr unsigned log2_floor(const unsigned x) {
 		    return ((x > 1) ? (1 + log2_floor(x >> 1)) : 0);
@@ -27,6 +33,8 @@ namespace utils {
 			return data;
 		}
 }
+
+#pragma GCC diagnostic pop
 
 #endif /* UTILS_H */
 
