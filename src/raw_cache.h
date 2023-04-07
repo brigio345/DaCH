@@ -38,7 +38,7 @@ class raw_cache {
 #pragma HLS inline
 			main_mem[addr_main] = line;
 
-			for (auto way = (DISTANCE - 1); way > 0; way--) {
+			for (int way = (DISTANCE - 1); way > 0; way--) {
 #pragma HLS unroll
 				m_cache_mem[way] = m_cache_mem[way - 1];
 				m_tag[way] = m_tag[way - 1];
@@ -53,7 +53,7 @@ class raw_cache {
 	private:
 		int hit(const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main) const {
 #pragma HLS inline
-			for (auto way = 0; way < DISTANCE; way++) {
+			for (size_t way = 0; way < DISTANCE; way++) {
 #pragma HLS unroll
 				if (m_valid[way] && (addr_main == m_tag[way]))
 					return way;
