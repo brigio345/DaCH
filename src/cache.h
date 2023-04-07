@@ -30,6 +30,7 @@
 #include <ap_utils.h>
 #pragma GCC diagnostic pop
 #include <ap_int.h>
+#include <array>
 #include "utils.h"
 #ifndef __SYNTHESIS__
 #include <cassert>
@@ -73,7 +74,7 @@ class cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, SWAP_TAG_SET>
 			address_type;
-		typedef ap_uint<WORD_SIZE * N_WORDS_PER_LINE> line_type;
+		typedef std::array<T, N_WORDS_PER_LINE> line_type;
 		typedef l1_cache<line_type, MAIN_SIZE, N_L1_SETS, N_L1_WAYS,
 			N_WORDS_PER_LINE, SWAP_TAG_SET> l1_cache_type;
 		typedef raw_cache<line_type, (N_SETS * N_WAYS * N_WORDS_PER_LINE), 2>
@@ -272,6 +273,7 @@ class cache {
 		T get(const ap_uint<ADDR_SIZE> addr_main, const unsigned int port) {
 #pragma HLS inline
 			line_type line;
+#pragma HLS array_partition variable=line type=complete dim=0
 
 			// get the whole cache line
 			get_line(addr_main, port, line);
@@ -279,10 +281,7 @@ class cache {
 			// extract information from address
 			address_type addr(addr_main);
 
-			const auto LSB = (addr.m_off * WORD_SIZE);
-			const auto MSB = (LSB + WORD_SIZE - 1);
-			ap_uint<WORD_SIZE> buff = line(LSB, MSB);
-			return *reinterpret_cast<T *>(&buff);
+			return line[addr.m_off];
 		}
 
 		/**
@@ -444,9 +443,7 @@ class cache {
 
 			if (!read) {
 				// modify the line
-				const auto LSB = (addr.m_off * WORD_SIZE);
-				const auto MSB = (LSB + WORD_SIZE - 1);
-				line(LSB, MSB) = *reinterpret_cast<ap_uint<WORD_SIZE> *>(&(req.data));
+				line[addr.m_off] = req.data;
 
 				// store the modified line to cache
 				m_raw_cache_core.set_line(m_cache_mem,
@@ -505,6 +502,7 @@ CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 						break;
 
 					line_type line;
+#pragma HLS array_partition variable=line type=complete dim=0
 					exec_core_req(req, line);
 
 					if ((RD_ENABLED && (req.op == READ_OP)) ||
@@ -553,6 +551,7 @@ MEM_IF_LOOP:		while (1) {
 					break;
 
 				line_type line;
+#pragma HLS array_partition variable=line type=complete dim=0
 				exec_mem_req(main_mem, req, line);
 
 				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
@@ -630,10 +629,7 @@ MEM_IF_LOOP:		while (1) {
 
 			for (size_t off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				const auto LSB = (off * WORD_SIZE);
-				const auto MSB = (LSB + WORD_SIZE - 1);
-				line(LSB, MSB) = *const_cast<ap_uint<WORD_SIZE> *>(
-						reinterpret_cast<const ap_uint<WORD_SIZE> *>(&mem_line[off]));
+				line[off] = mem_line[off];
 			}
 		}
 
@@ -645,10 +641,7 @@ MEM_IF_LOOP:		while (1) {
 
 			for (size_t off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
-				const auto LSB = (off * WORD_SIZE);
-				const auto MSB = (LSB + WORD_SIZE - 1);
-				ap_uint<WORD_SIZE> buff = line(LSB, MSB);
-				mem_line[off] = *reinterpret_cast<T *>(&buff);
+				mem_line[off] = line[off];
 			}
 		}
 
