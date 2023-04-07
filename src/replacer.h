@@ -69,7 +69,7 @@ class replacer {
 				// fill the vacant position of the last used way,
 				// by shifting other ways to the left
 				for (size_t way = 0; way < (N_WAYS - 1); way++) {
-					if (way >= lru_way) {
+					if ((int)way >= lru_way) {
 						m_lru[addr.m_set][way] =
 							m_lru[addr.m_set][way + 1];
 					}
