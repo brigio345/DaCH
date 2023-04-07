@@ -180,7 +180,9 @@ class cache {
 		 */
 		void stop() {
 #ifdef __SYNTHESIS__
-			m_core_req[m_core_port].write((core_req_type){.op = STOP_OP});
+			core_req_type stop_req;
+			stop_req.op = STOP_OP;
+			m_core_req[m_core_port].write(stop_req);
 #else
 			flush();
 #endif /* __SYNTHESIS__ */
@@ -219,10 +221,9 @@ class cache {
 			auto hit_status = L1_HIT;
 #endif /* __SYNTHESIS__ */
 			if (!l1_hit) {
-				core_req_type req = {
-					.op = READ_OP,
-					.addr = addr_main
-				};
+				core_req_type req;
+				req.op = READ_OP;
+				req.addr = addr_main;
 
 #ifdef __SYNTHESIS__
 				// send read request to cache
@@ -513,7 +514,9 @@ CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 
 #ifdef __SYNTHESIS__
 			// stop memory interface
-			m_mem_req.write((mem_req_type){.op = STOP_OP});
+			mem_req_type stop_req;
+			stop_req.op = STOP_OP;
+			m_mem_req.write(stop_req);
 #endif /* __SYNTHESIS__ */
 		}
 
