@@ -373,7 +373,7 @@ class cache {
 			m_replacer.notify_use(addr);
 
 			mem_req_type mem_req;
-			address_type *wb_addr_ptr;
+			typename address_type::addr_line_type addr_cache_rd = addr.m_addr_line;
 			if (!is_hit) {
 				// read from main memory
 				mem_req.op = READ_OP;
@@ -385,16 +385,16 @@ class cache {
 					// build write-back address
 					address_type write_back_addr(m_tag[addr.m_addr_line],
 							addr.m_set, 0, addr.m_way);
-					wb_addr_ptr = &write_back_addr;
+					addr_cache_rd = write_back_addr.m_addr_line;
 					mem_req.op = READ_WRITE_OP;
 					mem_req.write_back_addr = write_back_addr.m_addr_main;
 				}
 			}
 
+			// mem_req.op is READ_WRITE_OP only in case of write back
 			if (is_hit || (mem_req.op == READ_WRITE_OP)) {
 				// read from cache memory
-				m_raw_cache_core.get_line(m_cache_mem,
-						is_hit ? addr.m_addr_line : wb_addr_ptr->m_addr_line,
+				m_raw_cache_core.get_line(m_cache_mem, addr_cache_rd,
 						is_hit ? line : mem_req.line);
 			}
 	
