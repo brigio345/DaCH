@@ -152,7 +152,7 @@ class cache {
 			m_core_port = 0;
 
 			if (L1_CACHE) {
-				for (auto port = 0; port < PORTS; port++)
+				for (size_t port = 0; port < PORTS; port++)
 					m_l1_cache_get[port].init();
 			}
 		}
@@ -484,7 +484,7 @@ class cache {
 			m_replacer.init();
 			m_raw_cache_core.init();
 
-CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
+CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 #pragma HLS pipeline II=1 style=flp
 #pragma HLS dependence variable=m_cache_mem inter RAW distance=3 true
 				core_req_type req;
@@ -566,7 +566,7 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			auto addr_tmp = addr;
 			auto hit_way = -1;
-			for (auto way = 0; way < N_WAYS; way++) {
+			for (size_t way = 0; way < N_WAYS; way++) {
 				addr_tmp.set_way(way);
 				if (m_valid[addr_tmp.m_addr_line] &&
 						(addr_tmp.m_tag == m_tag[addr_tmp.m_addr_line])) {
@@ -582,8 +582,8 @@ MEM_IF_LOOP:		while (1) {
 		 */
 		void flush() {
 #pragma HLS inline
-			for (auto set = 0; set < N_SETS; set++) {
-				for (auto way = 0; way < N_WAYS; way++) {
+			for (size_t set = 0; set < N_SETS; set++) {
+				for (size_t way = 0; way < N_WAYS; way++) {
 					const address_type addr(
 							m_tag[set * N_WAYS + way],
 							set, 0, way);
@@ -619,7 +619,7 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			const T * const mem_line = &(mem[addr & (-1U << OFF_SIZE)]);
 
-			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
+			for (size_t off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
 				const auto LSB = (off * WORD_SIZE);
 				const auto MSB = (LSB + WORD_SIZE - 1);
@@ -634,7 +634,7 @@ MEM_IF_LOOP:		while (1) {
 #pragma HLS inline
 			T * const mem_line = &(mem[addr & (-1U << OFF_SIZE)]);
 
-			for (auto off = 0; off < N_WORDS_PER_LINE; off++) {
+			for (size_t off = 0; off < N_WORDS_PER_LINE; off++) {
 #pragma HLS unroll
 				const auto LSB = (off * WORD_SIZE);
 				const auto MSB = (LSB + WORD_SIZE - 1);
