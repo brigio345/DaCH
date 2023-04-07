@@ -25,7 +25,10 @@
 #include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include <hls_stream.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
 #include <ap_utils.h>
+#pragma GCC diagnostic pop
 #include <ap_int.h>
 #include "utils.h"
 #ifndef __SYNTHESIS__

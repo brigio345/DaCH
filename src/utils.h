@@ -6,6 +6,7 @@
 #pragma GCC diagnostic error "-Wall"
 #pragma GCC diagnostic error "-Wextra"
 #pragma GCC diagnostic ignored "-Wunused-label"
+#pragma GCC diagnostic ignored "-Wattributes"
 
 namespace utils {
 	constexpr unsigned log2_floor(const unsigned x) {
