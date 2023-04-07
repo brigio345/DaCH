@@ -18,7 +18,7 @@
  */
 
 #include <cstddef>
-#define AP_INT_MAX_W (1 << 15)
+#define AP_INT_MAX_W 8192
 #include "address.h"
 #include "replacer.h"
 #include "l1_cache.h"
