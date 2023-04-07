@@ -10,7 +10,7 @@
 
 #include "address.h"
 #include "utils.h"
-#include "ap_int.h"
+#include <ap_int.h>
 
 template <bool LRU, typename ADDR_T, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE>
 class replacer {

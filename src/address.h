@@ -1,7 +1,7 @@
 #ifndef ADDRESS_H
 #define ADDRESS_H
 
-#include "ap_int.h"
+#include <ap_int.h>
 
 template <size_t ADDR_SIZE, size_t TAG_SIZE, size_t SET_SIZE, size_t WAY_SIZE,
 	 bool SWAP_TAG_SET>

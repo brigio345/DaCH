@@ -3,7 +3,7 @@
 
 #include "address.h"
 #include "utils.h"
-#include "ap_int.h"
+#include <ap_int.h>
 
 template <typename LINE_TYPE, size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS,
 	 size_t N_WORDS_PER_LINE, bool SWAP_TAG_SET>

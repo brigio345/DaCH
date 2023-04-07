@@ -2,7 +2,7 @@
 #define RAW_CACHE_H
 
 #include "utils.h"
-#include "ap_int.h"
+#include <ap_int.h>
 
 template <typename T, size_t MAIN_SIZE, size_t DISTANCE>
 class raw_cache {
