@@ -98,8 +98,8 @@ class address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, true> {
 #endif /* __SYNTHESIS__ */
 
 		const addr_main_type m_addr_main;
-		const tag_type m_tag;
 		const set_type m_set;
+		const tag_type m_tag;
 		const off_type m_off;
 		addr_cache_type m_addr_cache;
 		addr_line_type m_addr_line;
@@ -124,7 +124,7 @@ class address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, true> {
 				const unsigned int off, const unsigned int way):
 				m_addr_main((static_cast<addr_main_type>(set) << (TAG_SIZE + OFF_SIZE)) |
 						(static_cast<addr_main_type>(tag) << OFF_SIZE) | off),
-				m_tag(tag), m_set(set), m_off(off) {
+				m_set(set), m_tag(tag), m_off(off) {
 #pragma HLS inline
 			set_way(way);
 		}
