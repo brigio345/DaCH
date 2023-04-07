@@ -113,7 +113,7 @@ class cache {
 		replacer_type m_replacer;					// 10
 		unsigned int m_core_port;					// 11
 #ifndef __SYNTHESIS__
-		T *m_main_mem;
+		T * const m_main_mem;
 		int m_n_reqs[PORTS] = {0};
 		int m_n_hits[PORTS] = {0};
 		int m_n_l1_reqs[PORTS] = {0};
@@ -121,7 +121,8 @@ class cache {
 #endif /* __SYNTHESIS__ */
 
 	public:
-		cache(T *main_mem) {
+#ifdef __SYNTHESIS__
+		cache(T * const main_mem) {
 #pragma HLS array_partition variable=m_tag type=complete dim=0
 			if (PORTS > 1) {
 #pragma HLS array_partition variable=m_core_req type=complete dim=0
@@ -130,15 +131,9 @@ class cache {
 			}
 			run(main_mem);
 		}
-
-		cache() {
-#pragma HLS array_partition variable=m_tag type=complete dim=0
-			if (PORTS > 1) {
-#pragma HLS array_partition variable=m_core_req type=complete dim=0
-#pragma HLS array_partition variable=m_core_resp type=complete dim=0
-#pragma HLS array_partition variable=m_l1_cache_get type=complete dim=0
-			}
-		}
+#else
+		cache(T * const main_mem): m_main_mem(main_mem) {}
+#endif /* __SYNTHESIS__ */
 
 		/**
 		 * \brief	Initialize the cache.
@@ -171,14 +166,10 @@ class cache {
 		 * 			the function in which cache is
 		 * 			accessed.
 		 */
-		void run(T *main_mem) {
+		void run(T * const main_mem) {
 #pragma HLS inline
-#ifdef __SYNTHESIS__
 			run_core();
 			run_mem_if(main_mem);
-#else
-			m_main_mem = main_mem;
-#endif /* __SYNTHESIS__ */
 		}
 
 		/**
@@ -462,7 +453,7 @@ class cache {
 #endif /* __SYNTHESIS__ */
 		}
 
-		void exec_mem_req(T *main_mem, mem_req_type &req,
+		void exec_mem_req(T * const main_mem, mem_req_type &req,
 				line_type &line) {
 #pragma HLS inline
 			if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
