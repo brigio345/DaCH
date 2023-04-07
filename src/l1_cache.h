@@ -91,7 +91,7 @@ class l1_cache {
 #pragma HLS inline
 			addr_type addr_tmp = addr;
 			auto hit_way = -1;
-			for (auto way = 0; way < N_WAYS; way++) {
+			for (size_t way = 0; way < N_WAYS; way++) {
 				addr_tmp.set_way(way);
 				if (m_valid[addr_tmp.m_addr_line] &&
 						(addr_tmp.m_tag == m_tag[addr_tmp.m_addr_line])) {
