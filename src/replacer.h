@@ -32,13 +32,13 @@ class replacer {
 		void init() {
 #pragma HLS inline
 			if (LRU) {
-				for (auto set = 0; set < N_SETS; set++) {
+				for (size_t set = 0; set < N_SETS; set++) {
 #pragma HLS unroll
-					for (auto way = 0; way < N_WAYS; way++)
+					for (size_t way = 0; way < N_WAYS; way++)
 						m_lru[set][way] = way;
 				}
 			} else {
-				for (auto set = 0; set < N_SETS; set++) {
+				for (size_t set = 0; set < N_SETS; set++) {
 #pragma HLS unroll
 					m_lifo[set] = 0;
 				}
@@ -55,14 +55,14 @@ class replacer {
 			if (LRU) {
 				// find the position of the last used way
 				int lru_way = -1;
-				for (auto way = 0; way < N_WAYS; way++) {
+				for (size_t way = 0; way < N_WAYS; way++) {
 					if (m_lru[addr.m_set][way] == addr.m_way)
 						lru_way = way;
 				}
 
 				// fill the vacant position of the last used way,
 				// by shifting other ways to the left
-				for (auto way = 0; way < (N_WAYS - 1); way++) {
+				for (size_t way = 0; way < (N_WAYS - 1); way++) {
 					if (way >= lru_way) {
 						m_lru[addr.m_set][way] =
 							m_lru[addr.m_set][way + 1];
