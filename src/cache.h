@@ -236,7 +236,7 @@ class cache {
 				// read response from cache
 				read_resp(line, dep, port);
 #else
-				hit_status = exec_core_req(req, port, line);
+				hit_status = exec_core_req(req, line);
 #endif /* __SYNTHESIS__ */
 
 				if (L1_CACHE) {
@@ -317,7 +317,7 @@ class cache {
 			m_core_req[0].write(req);
 #else
 			line_type dummy;
-			const auto hit_status = exec_core_req(req, 0, dummy);
+			const auto hit_status = exec_core_req(req, dummy);
 			update_profiling(hit_status, 0);
 #endif /* __SYNTHESIS__ */
 		}
@@ -351,11 +351,9 @@ class cache {
 
 	private:
 #ifdef __SYNTHESIS__
-		void exec_core_req(core_req_type &req,
-				const unsigned int port, line_type &line) {
+		void exec_core_req(core_req_type &req, line_type &line) {
 #else
-		hit_status_type exec_core_req(core_req_type &req,
-				const unsigned int port, line_type &line) {
+		hit_status_type exec_core_req(core_req_type &req, line_type &line) {
 #endif /* __SYNTHESIS__ */
 #pragma HLS inline
 			// check the request type
@@ -498,7 +496,7 @@ CORE_LOOP:		for (auto port = 0; ; port = ((port + 1) % PORTS)) {
 						break;
 
 					line_type line;
-					exec_core_req(req, port, line);
+					exec_core_req(req, line);
 
 					if ((RD_ENABLED && (req.op == READ_OP)) ||
 							(!WR_ENABLED)) {
@@ -723,6 +721,7 @@ void init() {}
 template <typename HEAD_TYPE, typename... TAIL_TYPES>
 typename std::enable_if<!is_cache<HEAD_TYPE>::value, void>::type
 init(HEAD_TYPE &&head, TAIL_TYPES&&... tail) {
+	(void) head;
 	init(tail...);
 }
 
@@ -738,6 +737,7 @@ void stop() {}
 template <typename HEAD_TYPE, typename... TAIL_TYPES>
 typename std::enable_if<!is_cache<HEAD_TYPE>::value, void>::type
 stop(HEAD_TYPE &&head, TAIL_TYPES&&... tail) {
+	(void) head;
 	stop(tail...);
 }
 
