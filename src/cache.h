@@ -48,6 +48,7 @@ template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 class cache {
 	private:
 		static const bool L1_CACHE = ((N_L1_SETS * N_L1_WAYS) > 0);
+		static const bool RAW_CACHE = (RD_ENABLED && WR_ENABLED);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
 		static const size_t OFF_SIZE = utils::log2_ceil(N_WORDS_PER_LINE);
@@ -156,7 +157,8 @@ class cache {
 			m_valid = 0;
 
 			m_replacer.init();
-			m_raw_cache_core.init();
+			if (RAW_CACHE)
+				m_raw_cache_core.init();
 #endif /* __SYNTHESIS__ */
 
 			m_core_port = 0;
@@ -402,8 +404,18 @@ class cache {
 			// mem_req.op is READ_WRITE_OP only in case of write back
 			if (is_hit || (mem_req.op == READ_WRITE_OP)) {
 				// read from cache memory
-				m_raw_cache_core.get_line(m_cache_mem, addr_cache_rd,
-						is_hit ? line : mem_req.line);
+				if (RAW_CACHE) {
+					m_raw_cache_core.get_line(m_cache_mem,
+							addr_cache_rd,
+							is_hit ? line : mem_req.line);
+				} else {
+					if (is_hit) {
+						line = m_cache_mem[addr_cache_rd];
+					} else {
+						mem_req.line =
+							m_cache_mem[addr_cache_rd];
+					}
+				}
 			}
 	
 			if (!is_hit) {
@@ -436,18 +448,30 @@ class cache {
 
 				if (read) {
 					// store loaded line to cache
-					m_raw_cache_core.set_line(m_cache_mem,
-							addr.m_addr_line, line);
+					if (RAW_CACHE) {
+						m_raw_cache_core.set_line(
+								m_cache_mem,
+								addr.m_addr_line,
+								line);
+					} else {
+						m_cache_mem[addr.m_addr_line] =
+							line;
+					}
 				}
 			}
 
 			if (!read) {
-				// modify the line
-				line[addr.m_off] = req.data;
+				if (RAW_CACHE) {
+					// modify the line
+					line[addr.m_off] = req.data;
 
-				// store the modified line to cache
-				m_raw_cache_core.set_line(m_cache_mem,
-						addr.m_addr_line, line);
+					// store the modified line to cache
+					m_raw_cache_core.set_line(m_cache_mem,
+							addr.m_addr_line, line);
+				} else {
+					m_cache_mem[addr.m_addr_line][addr.m_off] =
+						req.data;
+				}
 
 
 				m_dirty[addr.m_addr_line] = true;
@@ -488,11 +512,14 @@ class cache {
 			m_valid = 0;
 
 			m_replacer.init();
-			m_raw_cache_core.init();
+			if (RAW_CACHE)
+				m_raw_cache_core.init();
 
 CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 #pragma HLS pipeline II=1 style=flp
+				if (RAW_CACHE) {
 #pragma HLS dependence variable=m_cache_mem inter RAW distance=3 true
+				}
 				core_req_type req;
 				// get request and
 				// make pipeline flushable (to avoid deadlock)
