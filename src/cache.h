@@ -25,6 +25,7 @@
 #include "raw_cache.h"
 #define HLS_STREAM_THREAD_SAFE
 #include <hls_stream.h>
+#include "sliced_stream.h"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wattributes"
 #include <ap_utils.h>
@@ -107,22 +108,27 @@ class cache {
 		typedef struct {
 			op_type op;
 			ap_uint<ADDR_SIZE> load_addr;
+		} mem_req_type;
+
+		typedef struct {
 			ap_uint<ADDR_SIZE> write_back_addr;
 			line_type line;
-		} mem_req_type;
+		} mem_st_req_type;
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];	// 0
 		ap_uint<N_SETS * N_WAYS> m_valid;				// 1
 		ap_uint<N_SETS * N_WAYS> m_dirty;				// 2
 		line_type m_cache_mem[N_SETS * N_WAYS];				// 3
 		hls::stream<core_req_type, (LATENCY * PORTS)> m_core_req[PORTS];// 4
-		hls::stream<line_type, (LATENCY * PORTS)> m_core_resp[PORTS];	// 5
+		sliced_stream<T, N_WORDS_PER_LINE, (LATENCY * PORTS)>
+			m_core_resp[PORTS];					// 5
 		hls::stream<mem_req_type, 2> m_mem_req;				// 6
-		hls::stream<line_type, 2> m_mem_resp;				// 7
-		raw_cache_type m_raw_cache_core;				// 8
-		l1_cache_type m_l1_cache_get[PORTS];				// 9
-		replacer_type m_replacer;					// 10
-		unsigned int m_core_port;					// 11
+		hls::stream<mem_st_req_type, 2> m_mem_st_req;			// 7
+		sliced_stream<T, N_WORDS_PER_LINE, 2> m_mem_resp;		// 8
+		raw_cache_type m_raw_cache_core;				// 9
+		l1_cache_type m_l1_cache_get[PORTS];				// 10
+		replacer_type m_replacer;					// 11
+		unsigned int m_core_port;					// 12
 #ifndef __SYNTHESIS__
 		T * const m_main_mem;
 		int m_n_reqs[PORTS] = {0};
@@ -383,6 +389,7 @@ class cache {
 			m_replacer.notify_use(addr);
 
 			mem_req_type mem_req;
+			mem_st_req_type mem_st_req;
 			typename address_type::addr_line_type addr_cache_rd = addr.m_addr_line;
 			if (!is_hit) {
 				// read from main memory
@@ -397,7 +404,7 @@ class cache {
 							addr.m_set, 0, addr.m_way);
 					addr_cache_rd = write_back_addr.m_addr_line;
 					mem_req.op = READ_WRITE_OP;
-					mem_req.write_back_addr = write_back_addr.m_addr_main;
+					mem_st_req.write_back_addr = write_back_addr.m_addr_main;
 				}
 			}
 
@@ -407,12 +414,12 @@ class cache {
 				if (RAW_CACHE) {
 					m_raw_cache_core.get_line(m_cache_mem,
 							addr_cache_rd,
-							is_hit ? line : mem_req.line);
+							is_hit ? line : mem_st_req.line);
 				} else {
 					if (is_hit) {
 						line = m_cache_mem[addr_cache_rd];
 					} else {
-						mem_req.line =
+						mem_st_req.line =
 							m_cache_mem[addr_cache_rd];
 					}
 				}
@@ -425,6 +432,8 @@ class cache {
 				// write request if
 				// write-back is necessary
 				m_mem_req.write(mem_req);
+				if (WR_ENABLED)
+					m_mem_st_req.write(mem_st_req);
 
 				// force FIFO write and
 				// FIFO read to separate
@@ -435,9 +444,9 @@ class cache {
 
 				// read response from
 				// memory interface
-				m_mem_resp.read(line);
+				line = m_mem_resp.read();
 #else
-				exec_mem_req(m_main_mem, mem_req, line);
+				exec_mem_req(m_main_mem, mem_req, mem_st_req, line);
 #endif /* __SYNTHESIS__ */
 
 				m_tag[addr.m_addr_line] = addr.m_tag;
@@ -483,7 +492,7 @@ class cache {
 		}
 
 		void exec_mem_req(T * const main_mem, mem_req_type &req,
-				line_type &line) {
+				mem_st_req_type &st_req, line_type &line) {
 #pragma HLS inline
 			if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
 				// read line from main memory
@@ -493,8 +502,8 @@ class cache {
 			if (WR_ENABLED && ((req.op == WRITE_OP) ||
 						(req.op == READ_WRITE_OP))) {
 				// write line to main memory
-				set_line(main_mem, req.write_back_addr,
-						req.line);
+				set_line(main_mem, st_req.write_back_addr,
+						st_req.line);
 			}
 		}
 
@@ -570,6 +579,7 @@ CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 MEM_IF_LOOP:		while (1) {
 #pragma HLS pipeline off
 				mem_req_type req;
+				mem_st_req_type st_req;
 				// get request
 				m_mem_req.read(req);
 
@@ -577,11 +587,15 @@ MEM_IF_LOOP:		while (1) {
 				if (req.op == STOP_OP)
 					break;
 
+				if (WR_ENABLED)
+					m_mem_st_req.read(st_req);
+
 				line_type line;
 #pragma HLS array_partition variable=line type=complete dim=0
-				exec_mem_req(main_mem, req, line);
+				exec_mem_req(main_mem, req, st_req, line);
 
-				if ((req.op == READ_OP) || (req.op == READ_WRITE_OP)) {
+				if ((req.op == READ_OP) ||
+						(req.op == READ_WRITE_OP)) {
 					// send the response to the read request
 					m_mem_resp.write(line);
 				}
@@ -631,15 +645,20 @@ MEM_IF_LOOP:		while (1) {
 						// read line
 						line = m_cache_mem[addr.m_addr_line];
 
-						mem_req_type req = {WRITE_OP, 0,
+						mem_req_type req = {
+							WRITE_OP, 0};
+						mem_st_req_type st_req = {
 							addr.m_addr_main, line};
 #ifdef __SYNTHESIS__
 						// send write request to memory
 						// interface
 						m_mem_req.write(req);
+						m_mem_st_req.write(st_req);
 #else
 						line_type dummy;
-						exec_mem_req(m_main_mem, req, dummy);
+						exec_mem_req(m_main_mem,
+								req, st_req,
+								dummy);
 #endif /* __SYNTHESIS__ */
 
 						m_dirty[addr.m_addr_line] = false;
