@@ -23,9 +23,6 @@
 #include "replacer.h"
 #include "l1_cache.h"
 #include "raw_cache.h"
-#define HLS_STREAM_THREAD_SAFE
-#include <hls_stream.h>
-#include "sliced_stream.h"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wattributes"
 #include <ap_utils.h>
@@ -33,7 +30,11 @@
 #include <ap_int.h>
 #include <array>
 #include "utils.h"
-#ifndef __SYNTHESIS__
+#ifdef __SYNTHESIS__
+#define HLS_STREAM_THREAD_SAFE
+#include <hls_stream.h>
+#include "sliced_stream.h"
+#else
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
@@ -119,17 +120,18 @@ class cache {
 		ap_uint<N_SETS * N_WAYS> m_valid;				// 1
 		ap_uint<N_SETS * N_WAYS> m_dirty;				// 2
 		line_type m_cache_mem[N_SETS * N_WAYS];				// 3
-		hls::stream<core_req_type, (LATENCY * PORTS)> m_core_req[PORTS];// 4
+		raw_cache_type m_raw_cache_core;				// 4
+		l1_cache_type m_l1_cache_get[PORTS];				// 5
+		replacer_type m_replacer;					// 6
+		unsigned int m_core_port;					// 7
+#ifdef __SYNTHESIS__
+		hls::stream<core_req_type, (LATENCY * PORTS)> m_core_req[PORTS];// 8
 		sliced_stream<T, N_WORDS_PER_LINE, (LATENCY * PORTS)>
-			m_core_resp[PORTS];					// 5
-		hls::stream<mem_req_type, 2> m_mem_req;				// 6
-		hls::stream<mem_st_req_type, 2> m_mem_st_req;			// 7
-		sliced_stream<T, N_WORDS_PER_LINE, 2> m_mem_resp;		// 8
-		raw_cache_type m_raw_cache_core;				// 9
-		l1_cache_type m_l1_cache_get[PORTS];				// 10
-		replacer_type m_replacer;					// 11
-		unsigned int m_core_port;					// 12
-#ifndef __SYNTHESIS__
+			m_core_resp[PORTS];					// 9
+		hls::stream<mem_req_type, 2> m_mem_req;				// 10
+		hls::stream<mem_st_req_type, 2> m_mem_st_req;			// 11
+		sliced_stream<T, N_WORDS_PER_LINE, 2> m_mem_resp;		// 12
+#else
 		T * const m_main_mem;
 		int m_n_reqs[PORTS] = {0};
 		int m_n_hits[PORTS] = {0};
@@ -175,6 +177,7 @@ class cache {
 			}
 		}
 
+#ifdef __SYNTHESIS__
 		/**
 		 * \brief		Start cache internal processes.
 		 *
@@ -189,6 +192,7 @@ class cache {
 			run_core();
 			run_mem_if(main_mem);
 		}
+#endif /* __SYNTHESIS__ */
 
 		/**
 		 * \brief	Stop cache internal processes.
@@ -206,6 +210,7 @@ class cache {
 #endif /* __SYNTHESIS__ */
 		}
 
+#ifdef __SYNTHESIS__
 		bool write_req(const core_req_type req, const unsigned int port) {
 #pragma HLS function_instantiate variable=port
 			return m_core_req[port].write_dep(req, false);
@@ -215,6 +220,7 @@ class cache {
 #pragma HLS function_instantiate variable=port
 			m_core_resp[port].read_dep(line, dep);
 		}
+#endif /* __SYNTHESIS__ */
 
 		/**
 		 * \brief		Request to read a whole cache line.
@@ -507,6 +513,7 @@ class cache {
 			}
 		}
 
+#ifdef __SYNTHESIS__
 		/**
 		 * \brief		Infinite loop managing the cache access
 		 * 			requests (sent from the outside).
@@ -553,12 +560,10 @@ CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 			if (WR_ENABLED)
 				flush();
 
-#ifdef __SYNTHESIS__
 			// stop memory interface
 			mem_req_type stop_req;
 			stop_req.op = STOP_OP;
 			m_mem_req.write(stop_req);
-#endif /* __SYNTHESIS__ */
 		}
 
 		/**
@@ -602,6 +607,7 @@ MEM_IF_LOOP:		while (1) {
 			}
 
 		}
+#endif /* __SYNTHESIS__ */
 
 		/**
 		 * \brief		Check if \p addr causes an HIT or a MISS.
