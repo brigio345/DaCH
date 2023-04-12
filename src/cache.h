@@ -582,7 +582,7 @@ CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 		void run_mem_if(T * const main_mem) {
 #pragma HLS inline off
 MEM_IF_LOOP:		while (1) {
-#pragma HLS pipeline off
+#pragma HLS pipeline II=128
 				mem_req_type req;
 				mem_st_req_type st_req;
 				// get request
@@ -596,7 +596,6 @@ MEM_IF_LOOP:		while (1) {
 					m_mem_st_req.read(st_req);
 
 				line_type line;
-#pragma HLS array_partition variable=line type=complete dim=0
 				exec_mem_req(main_mem, req, st_req, line);
 
 				if ((req.op == READ_OP) ||

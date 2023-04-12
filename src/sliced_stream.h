@@ -45,6 +45,7 @@ class sliced_stream {
 			for (size_t slice = 0; slice < N_SLICES; slice++) {
 				slice_type slice_buff = m_stream[slice].read();
 				for (size_t off = 0; off < SLICE_SIZE; off++) {
+#pragma HLS unroll
 					line[(slice * SLICE_SIZE) + off] =
 						slice_buff[off];
 				}
@@ -64,6 +65,7 @@ class sliced_stream {
 			for (size_t slice = 0; slice < N_SLICES; slice++) {
 				slice_type slice_buff;
 				for (size_t off = 0; off < SLICE_SIZE; off++) {
+#pragma HLS unroll
 					slice_buff[off] =
 						line[(slice * SLICE_SIZE) + off];
 				}
