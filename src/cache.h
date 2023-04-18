@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #define AP_INT_MAX_W 8192
+#include "types.h"
 #include "address.h"
 #include "replacer.h"
 #include "l1_cache.h"
@@ -44,9 +45,13 @@
 #pragma GCC diagnostic error "-Wextra"
 #pragma GCC diagnostic ignored "-Wunused-label"
 
+using namespace types;
+
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
-	 bool LRU, size_t N_L1_SETS, size_t N_L1_WAYS, bool SWAP_TAG_SET, size_t LATENCY>
+	 bool LRU, size_t N_L1_SETS, size_t N_L1_WAYS, bool SWAP_TAG_SET,
+	 size_t LATENCY, storage_impl_type L2_STORAGE_IMPL = AUTO,
+	 storage_impl_type L1_STORAGE_IMPL = AUTO>
 class cache {
 	private:
 		static const bool L1_CACHE = ((N_L1_SETS * N_L1_WAYS) > 0);
@@ -79,7 +84,7 @@ class cache {
 			address_type;
 		typedef std::array<T, N_WORDS_PER_LINE> line_type;
 		typedef l1_cache<line_type, MAIN_SIZE, N_L1_SETS, N_L1_WAYS,
-			N_WORDS_PER_LINE, SWAP_TAG_SET> l1_cache_type;
+			N_WORDS_PER_LINE, SWAP_TAG_SET, L1_STORAGE_IMPL> l1_cache_type;
 		typedef raw_cache<line_type, (N_SETS * N_WAYS * N_WORDS_PER_LINE), 2>
 			raw_cache_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
@@ -148,6 +153,22 @@ class cache {
 #pragma HLS array_partition variable=m_core_resp type=complete dim=0
 #pragma HLS array_partition variable=m_l1_cache_get type=complete dim=0
 			}
+
+			switch (L2_STORAGE_IMPL) {
+				case URAM:
+#pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=URAM
+					break;
+				case BRAM:
+#pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=BRAM
+					break;
+				case LUTRAM:
+#pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=LUTRAM
+					break;
+				default:
+#pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=AUTO
+					break;
+			}
+
 			run(main_mem);
 		}
 #else

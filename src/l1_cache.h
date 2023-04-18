@@ -1,6 +1,7 @@
 #ifndef L1_CACHE_H
 #define L1_CACHE_H
 
+#include "types.h"
 #include "address.h"
 #include "utils.h"
 #include <ap_int.h>
@@ -11,8 +12,10 @@
 #pragma GCC diagnostic error "-Wextra"
 #pragma GCC diagnostic ignored "-Wunused-label"
 
+using namespace types;
+
 template <typename LINE_TYPE, size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS,
-	 size_t N_WORDS_PER_LINE, bool SWAP_TAG_SET>
+	 size_t N_WORDS_PER_LINE, bool SWAP_TAG_SET, storage_impl_type STORAGE_IMPL>
 class l1_cache {
 	private:
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
@@ -48,6 +51,21 @@ class l1_cache {
 	public:
 		l1_cache() {
 #pragma HLS array_partition variable=m_tag type=complete dim=0
+
+			switch (STORAGE_IMPL) {
+				case URAM:
+#pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=URAM
+					break;
+				case BRAM:
+#pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=BRAM
+					break;
+				case LUTRAM:
+#pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=LUTRAM
+					break;
+				default:
+#pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=AUTO
+					break;
+			}
 		}
 
 		void init() {
