@@ -785,10 +785,13 @@ struct is_cache : std::false_type {};
 
 template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 	 size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS, size_t N_WORDS_PER_LINE,
-	 bool LRU, size_t N_L1_SETS, size_t N_L1_WAYS, bool SWAP_TAG_SET, size_t LATENCY>
+	 bool LRU, size_t N_L1_SETS, size_t N_L1_WAYS, bool SWAP_TAG_SET,
+	 size_t LATENCY, storage_impl_type L2_STORAGE_IMPL,
+	 storage_impl_type L1_STORAGE_IMPL>
 	 struct is_cache<cache<T, RD_ENABLED, WR_ENABLED, PORTS, MAIN_SIZE,
 	 N_SETS, N_WAYS, N_WORDS_PER_LINE, LRU, N_L1_SETS, N_L1_WAYS,
-	 SWAP_TAG_SET, LATENCY>&> : std::true_type {};
+	 SWAP_TAG_SET, LATENCY, L2_STORAGE_IMPL, L1_STORAGE_IMPL>&> :
+	 std::true_type {};
 
 void init() {}
 
