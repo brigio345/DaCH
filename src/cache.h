@@ -29,7 +29,7 @@
 #include <ap_utils.h>
 #pragma GCC diagnostic pop
 #include <ap_int.h>
-#include <array>
+#include <hls_vector.h>
 #include "utils.h"
 #ifdef __SYNTHESIS__
 #define HLS_STREAM_THREAD_SAFE
@@ -82,7 +82,7 @@ class cache {
 
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, SWAP_TAG_SET>
 			address_type;
-		typedef std::array<T, N_WORDS_PER_LINE> line_type;
+		typedef hls::vector<T, N_WORDS_PER_LINE> line_type;
 		typedef l1_cache<line_type, MAIN_SIZE, N_L1_SETS, N_L1_WAYS,
 			N_WORDS_PER_LINE, SWAP_TAG_SET, L1_STORAGE_IMPL> l1_cache_type;
 		typedef raw_cache<line_type, (N_SETS * N_WAYS * N_WORDS_PER_LINE), 2>

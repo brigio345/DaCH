@@ -2,7 +2,7 @@
 #define SLICED_STREAM_H
 
 #include <hls_stream.h>
-#include <array>
+#include <hls_vector.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic error "-Wpedantic"
@@ -23,8 +23,8 @@ class sliced_stream {
 		static const size_t SLICE_BYTES =
 			(SLICE_SIZE * sizeof(DATA_TYPE));
 
-		typedef std::array<DATA_TYPE, LINE_SIZE> line_type;
-		typedef std::array<DATA_TYPE, SLICE_SIZE> slice_type;
+		typedef hls::vector<DATA_TYPE, LINE_SIZE> line_type;
+		typedef hls::vector<DATA_TYPE, SLICE_SIZE> slice_type;
 
 		hls::stream<slice_type, STREAM_DEPTH> m_stream[N_SLICES];
 
