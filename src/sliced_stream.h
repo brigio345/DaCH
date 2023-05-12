@@ -2,7 +2,6 @@
 #define SLICED_STREAM_H
 
 #include <hls_stream.h>
-#include <hls_vector.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic error "-Wpedantic"
@@ -23,50 +22,50 @@ class sliced_stream {
 		static const size_t SLICE_BYTES =
 			(SLICE_SIZE * sizeof(DATA_TYPE));
 
-		typedef hls::vector<DATA_TYPE, LINE_SIZE> line_type;
-		typedef hls::vector<DATA_TYPE, SLICE_SIZE> slice_type;
+		typedef DATA_TYPE line_type[LINE_SIZE];
+		typedef DATA_TYPE slice_type[SLICE_SIZE];
+		typedef struct {
+			slice_type payload;
+		} slice_pack_type;
 
-		hls::stream<slice_type, STREAM_DEPTH> m_stream[N_SLICES];
+		hls::stream<slice_pack_type, STREAM_DEPTH> m_stream[N_SLICES];
 
 	public:
 		sliced_stream() {
 #pragma HLS array_partition variable=m_stream type=complete dim=0
 		}
 
-		bool read_dep(line_type &line, volatile bool dep) {
+		bool read_dep(line_type line, volatile bool dep) {
 #pragma HLS inline off
-			line = read();
+			read(line);
 			return dep;
 		}
 
-		line_type read() {
+		void read(line_type line) {
 #pragma HLS inline
-			line_type line;
 			for (size_t slice = 0; slice < N_SLICES; slice++) {
-				slice_type slice_buff = m_stream[slice].read();
+				slice_pack_type slice_buff = m_stream[slice].read();
 				for (size_t off = 0; off < SLICE_SIZE; off++) {
 #pragma HLS unroll
 					line[(slice * SLICE_SIZE) + off] =
-						slice_buff[off];
+						slice_buff.payload[off];
 				}
 			}
-
-			return line;
 		}
 
-		bool write_dep(const line_type &line, volatile bool dep) {
+		bool write_dep(const line_type line, volatile bool dep) {
 #pragma HLS inline off
 			write(line);
 			return dep;
 		}
 
-		void write(const line_type &line) {
+		void write(const line_type line) {
 #pragma HLS inline
 			for (size_t slice = 0; slice < N_SLICES; slice++) {
-				slice_type slice_buff;
+				slice_pack_type slice_buff;
 				for (size_t off = 0; off < SLICE_SIZE; off++) {
 #pragma HLS unroll
-					slice_buff[off] =
+					slice_buff.payload[off] =
 						line[(slice * SLICE_SIZE) + off];
 				}
 				m_stream[slice].write(slice_buff);

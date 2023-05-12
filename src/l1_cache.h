@@ -14,7 +14,7 @@
 
 using namespace types;
 
-template <typename LINE_TYPE, size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS,
+template <typename WORD_TYPE, size_t MAIN_SIZE, size_t N_SETS, size_t N_WAYS,
 	 size_t N_WORDS_PER_LINE, bool SWAP_TAG_SET, storage_impl_type STORAGE_IMPL>
 class l1_cache {
 	private:
@@ -38,6 +38,7 @@ class l1_cache {
 		static_assert((MAIN_SIZE >= (N_SETS * N_WAYS * N_WORDS_PER_LINE)),
 				"N_SETS and/or N_WAYS and/or N_WORDS_PER_LINE are too big for the specified MAIN_SIZE");
 
+		typedef WORD_TYPE line_type[N_WORDS_PER_LINE];
 		typedef address<ADDR_SIZE, TAG_SIZE, SET_SIZE, WAY_SIZE, SWAP_TAG_SET>
 			addr_type;
 		typedef replacer<false, addr_type, ((N_SETS > 0) ? N_SETS : 1),
@@ -45,11 +46,12 @@ class l1_cache {
 
 		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_LINES];	// 1
 		ap_uint<N_LINES> m_valid;				// 2
-		LINE_TYPE m_cache_mem[N_LINES];				// 3
+		WORD_TYPE m_cache_mem[N_LINES][N_WORDS_PER_LINE];	// 3
 		replacer_type m_replacer;				// 4
 
 	public:
 		l1_cache() {
+#pragma HLS array_reshape variable=m_cache_mem type=complete dim=2
 #pragma HLS array_partition variable=m_tag type=complete dim=0
 
 			switch (STORAGE_IMPL) {
@@ -63,7 +65,6 @@ class l1_cache {
 #pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=LUTRAM
 					break;
 				default:
-#pragma HLS bind_storage variable=m_cache_mem type=RAM_2P impl=AUTO
 					break;
 			}
 		}
@@ -74,7 +75,7 @@ class l1_cache {
 			m_replacer.init();
 		}
 
-		bool get_line(const ap_uint<ADDR_SIZE> addr_main, LINE_TYPE &line) const {
+		bool get_line(const ap_uint<ADDR_SIZE> addr_main, line_type line) const {
 #pragma HLS inline
 			addr_type addr(addr_main);
 			const auto way = hit(addr);
@@ -83,19 +84,25 @@ class l1_cache {
 				return false;
 
 			addr.set_way(way);
-			line = m_cache_mem[addr.m_addr_line];
+			for (size_t off = 0; off < N_WORDS_PER_LINE; off++) {
+#pragma HLS unroll
+				line[off] = m_cache_mem[addr.m_addr_line][off];
+			}
 
 			return true;
 		}
 
 		void set_line(const ap_uint<ADDR_SIZE> addr_main,
-				const LINE_TYPE &line) {
+				const line_type line) {
 #pragma HLS inline
 			addr_type addr(addr_main);
 
 			addr.set_way(m_replacer.get_way(addr));
 
-			m_cache_mem[addr.m_addr_line] = line;
+			for (size_t off = 0; off < N_WORDS_PER_LINE; off++) {
+#pragma HLS unroll
+				m_cache_mem[addr.m_addr_line][off] = line[off];
+			}
 			m_valid[addr.m_addr_line] = true;
 			m_tag[addr.m_addr_line] = addr.m_tag;
 

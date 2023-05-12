@@ -10,13 +10,17 @@
 #pragma GCC diagnostic error "-Wextra"
 #pragma GCC diagnostic ignored "-Wunused-label"
 
-template <typename T, size_t MAIN_SIZE, size_t DISTANCE>
+template <typename WORD_TYPE, size_t N_LINES, size_t N_WORDS_PER_LINE,
+	 size_t DISTANCE>
 class raw_cache {
 	private:
+		static const size_t MAIN_SIZE = (N_LINES * N_WORDS_PER_LINE);
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 
+		typedef WORD_TYPE line_type[N_WORDS_PER_LINE];
+
 		ap_uint<DISTANCE> m_valid;
-		T m_cache_mem[DISTANCE];
+		WORD_TYPE m_cache_mem[DISTANCE][N_WORDS_PER_LINE];
 		ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> m_tag[DISTANCE];
 
 	public:
@@ -30,28 +34,37 @@ class raw_cache {
 			m_valid = 0;
 		}
 
-		void get_line(const T * const main_mem,
+		void get_line(const WORD_TYPE main_mem[N_LINES][N_WORDS_PER_LINE],
 				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main,
-				T &data) const {
+				line_type line) const {
 #pragma HLS inline
 			const auto way = hit(addr_main);
-			data = (way != -1) ? m_cache_mem[way] : main_mem[addr_main];
+			if (way != -1) {
+				for (size_t off = 0; off < N_WORDS_PER_LINE; off++)
+					line[off] = m_cache_mem[way][off];
+			} else {
+				for (size_t off = 0; off < N_WORDS_PER_LINE; off++)
+					line[off] = main_mem[addr_main][off];
+			}
 		}
 
-		void set_line(T * const main_mem,
+		void set_line(WORD_TYPE main_mem[N_LINES][N_WORDS_PER_LINE],
 				const ap_uint<(ADDR_SIZE > 0) ? ADDR_SIZE : 1> addr_main,
-				const T &line) {
+				const line_type line) {
 #pragma HLS inline
-			main_mem[addr_main] = line;
+			for (size_t off = 0; off < N_WORDS_PER_LINE; off++)
+				main_mem[addr_main][off] = line[off];
 
 			for (int way = (DISTANCE - 1); way > 0; way--) {
 #pragma HLS unroll
-				m_cache_mem[way] = m_cache_mem[way - 1];
+				for (size_t off = 0; off < N_WORDS_PER_LINE; off++)
+					m_cache_mem[way][off] = m_cache_mem[way - 1][off];
 				m_tag[way] = m_tag[way - 1];
 				m_valid[way] = m_valid[way - 1];
 			}
 
-			m_cache_mem[0] = line;
+			for (size_t off = 0; off < N_WORDS_PER_LINE; off++)
+				m_cache_mem[0][off] = line[off];
 			m_tag[0] = addr_main;
 			m_valid[0] = true;
 		}
