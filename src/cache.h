@@ -35,6 +35,7 @@
 #include <hls_stream.h>
 #include "sliced_stream.h"
 #else
+#include <mutex>
 #include <cassert>
 #endif /* __SYNTHESIS__ */
 
@@ -141,6 +142,7 @@ class cache {
 		int m_n_hits[PORTS] = {0};
 		int m_n_l1_reqs[PORTS] = {0};
 		int m_n_l1_hits[PORTS] = {0};
+		std::mutex m_core_mutex;
 #endif /* __SYNTHESIS__ */
 
 	public:
@@ -398,6 +400,10 @@ class cache {
 		hit_status_type exec_core_req(core_req_type &req, line_type line) {
 #endif /* __SYNTHESIS__ */
 #pragma HLS inline
+#ifndef __SYNTHESIS__
+			std::unique_lock<std::mutex> lock(m_core_mutex);
+#endif /* __SYNTHESIS__ */
+
 			// check the request type
 			const auto read = ((RD_ENABLED && (req.op == READ_OP)) ||
 					(!WR_ENABLED));
@@ -514,6 +520,7 @@ class cache {
 			}
 
 #ifndef __SYNTHESIS__
+			lock.unlock();
 			return (is_hit ? HIT : MISS);
 #endif /* __SYNTHESIS__ */
 		}
