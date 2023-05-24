@@ -107,6 +107,51 @@ class replacer {
 		}
 };
 
+template <bool LRU, typename ADDR_T, size_t N_SETS, size_t N_WORDS_PER_LINE>
+class replacer<LRU, ADDR_T, N_SETS, 1, N_WORDS_PER_LINE> {
+	public:
+		/**
+		 * \brief	Initialize replacement policy data structures.
+		 */
+		void init() {
+#pragma HLS inline
+		}
+
+		/**
+		 * \brief	Update replacement policy data structures.
+		 *
+		 * \param addr	The address which has been used.
+		 */
+		void notify_use(const ADDR_T &addr) {
+#pragma HLS inline
+			(void)addr;
+		}
+
+		/**
+		 * \brief	Update replacement policy data structures.
+		 *
+		 * \param addr	The address which has been inserted.
+		 */
+		void notify_insertion(const ADDR_T &addr) {
+#pragma HLS inline
+			(void)addr;
+		}
+
+		/**
+		 * \brief	Return the least recently used way associable
+		 * 		with \p addr.
+		 *
+		 * \param addr	The address to be associated.
+		 *
+		 * \return	The least recently used way.
+		 */
+		inline int get_way(const ADDR_T &addr) const {
+#pragma HLS inline
+			(void)addr;
+			return 0;
+		}
+};
+
 #pragma GCC diagnostic pop
 
 #endif /* REPLACER_H */
