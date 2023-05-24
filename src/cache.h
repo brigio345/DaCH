@@ -18,6 +18,7 @@
  */
 
 #include <cstddef>
+#include <type_traits>
 #define AP_INT_MAX_W 8192
 #include "types.h"
 #include "address.h"
