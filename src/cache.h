@@ -183,20 +183,29 @@ class cache {
 		 * \note	Must be called before calling \ref run.
 		 */
 		void init() {
-#ifndef __SYNTHESIS__
-			// invalidate all cache lines
-			m_valid = 0;
+			for (unsigned int port = 0; port < PORTS; port++) {
+#pragma HLS unroll
+				init(port);
+			}
+		}
 
-			m_replacer.init();
-			if (RAW_CACHE)
-				m_raw_cache_core.init();
+		void init(const unsigned int port) {
+#pragma HLS inline
+			if (port == 0) {
+#ifndef __SYNTHESIS__
+				// invalidate all cache lines
+				m_valid = 0;
+
+				m_replacer.init();
+				if (RAW_CACHE)
+					m_raw_cache_core.init();
 #endif /* __SYNTHESIS__ */
 
-			m_core_port = 0;
+				m_core_port = 0;
+			}
 
 			if (L1_CACHE) {
-				for (size_t port = 0; port < PORTS; port++)
-					m_l1_cache_get[port].init();
+				m_l1_cache_get[port].init();
 			}
 		}
 
