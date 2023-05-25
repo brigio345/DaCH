@@ -154,7 +154,7 @@ class cache {
 			if (PORTS > 1) {
 #pragma HLS array_partition variable=m_core_req type=complete dim=0
 #pragma HLS array_partition variable=m_core_resp type=complete dim=0
-#pragma HLS array_partition variable=m_l1_cache_get type=complete dim=0
+#pragma HLS array_partition variable=m_l1_cache_get type=complete dim=1
 			}
 
 			switch (L2_STORAGE_IMPL) {

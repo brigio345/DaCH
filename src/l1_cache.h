@@ -51,7 +51,7 @@ class l1_cache {
 
 	public:
 		l1_cache() {
-#pragma HLS array_reshape variable=m_cache_mem type=complete dim=2
+#pragma HLS array_partition variable=m_cache_mem type=complete dim=2
 #pragma HLS array_partition variable=m_tag type=complete dim=0
 
 			switch (STORAGE_IMPL) {
