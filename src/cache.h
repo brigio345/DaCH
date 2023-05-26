@@ -620,7 +620,7 @@ CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 		void run_mem_if(T * const main_mem) {
 #pragma HLS inline off
 MEM_IF_LOOP:		while (1) {
-#pragma HLS pipeline II=128
+#pragma HLS pipeline off
 				mem_req_type req;
 				mem_st_req_type st_req;
 				// get request
