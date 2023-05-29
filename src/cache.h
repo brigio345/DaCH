@@ -91,12 +91,13 @@ class cache {
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
 			N_WORDS_PER_LINE> replacer_type;
 
-		typedef enum {
-			READ_OP,
-			WRITE_OP,
-			READ_WRITE_OP,
-			STOP_OP
-		} op_type;
+		enum op_enum {
+			READ_OP 	= 1,
+			WRITE_OP 	= 2,
+			READ_WRITE_OP 	= 3,
+			STOP_OP 	= 0
+		};
+		typedef ap_uint<1 + WR_ENABLED> op_type;
 
 #ifndef __SYNTHESIS__
 		typedef enum {
