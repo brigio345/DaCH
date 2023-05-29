@@ -107,11 +107,19 @@ class cache {
 		} hit_status_type;
 #endif /* __SYNTHESIS__ */
 
-		typedef struct {
-			op_type op;
-			ap_uint<ADDR_SIZE> addr;
-			T data;
-		} core_req_type;
+		template <bool WR_EN, size_t ADDR_SZ> struct op_struct {};
+		template <size_t ADDR_SZ>
+			struct op_struct<false, ADDR_SZ> {
+				op_type op;
+				ap_uint<ADDR_SZ> addr;
+			};
+		template <size_t ADDR_SZ>
+			struct op_struct<true, ADDR_SZ> {
+				op_type op;
+				ap_uint<ADDR_SZ> addr;
+				T data;
+			};
+		typedef op_struct<WR_ENABLED, ADDR_SIZE> core_req_type;
 
 		typedef struct {
 			op_type op;
@@ -405,6 +413,34 @@ class cache {
 #endif /* __SYNTHESIS__ */
 
 	private:
+		template <bool WR_EN>
+		typename std::enable_if<WR_EN, void>::type
+			write_cache(line_type line, const core_req_type &req,
+					const address_type &addr) {
+#pragma HLS inline
+				if (RAW_CACHE) {
+					// modify the line
+					line[addr.m_off] = req.data;
+
+					// store the modified line to cache
+					m_raw_cache_core.set_line(m_cache_mem,
+							addr.m_addr_line, line);
+				} else {
+					m_cache_mem[addr.m_addr_line][addr.m_off] =
+						req.data;
+				}
+			}
+
+		template <bool WR_EN>
+		typename std::enable_if<(!WR_EN), void>::type
+			write_cache(line_type line, const core_req_type &req,
+					const address_type &addr) {
+#pragma HLS inline
+					(void)line;
+					(void)req;
+					(void)addr;
+			}
+
 #ifdef __SYNTHESIS__
 		void exec_core_req(core_req_type &req, line_type line) {
 #else
@@ -514,18 +550,7 @@ class cache {
 			}
 
 			if (!read) {
-				if (RAW_CACHE) {
-					// modify the line
-					line[addr.m_off] = req.data;
-
-					// store the modified line to cache
-					m_raw_cache_core.set_line(m_cache_mem,
-							addr.m_addr_line, line);
-				} else {
-					m_cache_mem[addr.m_addr_line][addr.m_off] =
-						req.data;
-				}
-
+				write_cache<WR_ENABLED>(line, req, addr);
 
 				m_dirty[addr.m_addr_line] = true;
 			}
