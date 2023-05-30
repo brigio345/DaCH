@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+# CITATION.cff created with https://github.com/monperrus/bibtexbrowser/
+preferred-citation:
+  title: "Array-Specific Dataflow Caches for High-Level Synthesis of Memory-Intensive Algorithms on FPGAs"
+  doi: "10.1109/ACCESS.2022.3219868"
+  year: "2022"
+  type: article
+  journal: "IEEE Access"
+  authors:
+    - family-names: Brignone
+      given-names: Giovanni
+    - family-names: Jamal
+      given-names: M. Usman
+    - family-names: Lazarescu
+      given-names: Mihai T.
+    - family-names: Lavagno
+      given-names: Luciano
