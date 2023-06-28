@@ -27,7 +27,7 @@
 #include "raw_cache.h"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wattributes"
-#include <ap_utils.h>
+#include <etc/autopilot_ssdm_op.h>
 #pragma GCC diagnostic pop
 #include <ap_int.h>
 #include "utils.h"
