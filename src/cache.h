@@ -56,7 +56,7 @@ template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 class cache {
 	private:
 		static const bool L1_CACHE = ((N_L1_SETS * N_L1_WAYS) > 0);
-		static const bool RAW_CACHE = (RD_ENABLED && WR_ENABLED);
+		static const bool RAW_CACHE = WR_ENABLED;
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
 		static const size_t OFF_SIZE = utils::log2_ceil(N_WORDS_PER_LINE);
