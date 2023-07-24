@@ -303,11 +303,11 @@ class cache {
 #else
 				hit_status = exec_core_req(req, line);
 #endif /* __SYNTHESIS__ */
+			}
 
-				if (L1_CACHE) {
-					// store line to L1 cache
-					m_l1_cache_get[port].set_line(addr_main, line);
-				}
+			if (L1_CACHE) {
+				// store line to L1 cache
+				m_l1_cache_get[port].set_line(addr_main, line);
 			}
 
 #ifndef __SYNTHESIS__
