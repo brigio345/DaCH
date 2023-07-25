@@ -63,6 +63,7 @@ class cache {
 		static const size_t TAG_SIZE = (ADDR_SIZE - (SET_SIZE + OFF_SIZE));
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
 		static const size_t WORD_SIZE = (sizeof(T) * 8);
+		static const size_t MEM_IF_PORTS = PORTS;
 
 		static_assert((RD_ENABLED || WR_ENABLED),
 				"RD_ENABLED and/or WR_ENABLED must be true");
@@ -143,9 +144,9 @@ class cache {
 		hls::stream<core_req_type, (LATENCY * PORTS)> m_core_req[PORTS];// 8
 		sliced_stream<T, N_WORDS_PER_LINE, (LATENCY * PORTS)>
 			m_core_resp[PORTS];					// 9
-		hls::stream<mem_req_type, 2> m_mem_req;				// 10
-		hls::stream<mem_st_req_type, 2> m_mem_st_req;			// 11
-		sliced_stream<T, N_WORDS_PER_LINE, 2> m_mem_resp;		// 12
+		hls::stream<mem_req_type, 2> m_mem_req[MEM_IF_PORTS];		// 10
+		hls::stream<mem_st_req_type, 2> m_mem_st_req[MEM_IF_PORTS];	// 11
+		sliced_stream<T, N_WORDS_PER_LINE, 2> m_mem_resp[MEM_IF_PORTS];	// 12
 #else
 		T * const m_main_mem;
 		int m_n_reqs[PORTS] = {0};
@@ -163,6 +164,9 @@ class cache {
 			if (PORTS > 1) {
 #pragma HLS array_partition variable=m_core_req type=complete dim=0
 #pragma HLS array_partition variable=m_core_resp type=complete dim=0
+#pragma HLS array_partition variable=m_mem_req type=complete dim=0
+#pragma HLS array_partition variable=m_mem_st_req type=complete dim=0
+#pragma HLS array_partition variable=m_mem_resp type=complete dim=0
 #pragma HLS array_partition variable=m_l1_cache_get type=complete dim=1
 			}
 
@@ -442,10 +446,12 @@ class cache {
 			}
 
 #ifdef __SYNTHESIS__
-		void exec_core_req(core_req_type &req, line_type line) {
+		void exec_core_req(core_req_type &req, line_type line,
+				const unsigned int port)
 #else
-		hit_status_type exec_core_req(core_req_type &req, line_type line) {
+		hit_status_type exec_core_req(core_req_type &req, line_type line)
 #endif /* __SYNTHESIS__ */
+		{
 #pragma HLS inline
 #ifndef __SYNTHESIS__
 			std::unique_lock<std::mutex> lock(m_core_mutex);
@@ -511,9 +517,9 @@ class cache {
 				// memory interface and
 				// write request if
 				// write-back is necessary
-				m_mem_req.write(mem_req);
+				m_mem_req[port].write(mem_req);
 				if (WR_ENABLED)
-					m_mem_st_req.write(mem_st_req);
+					m_mem_st_req[port].write(mem_st_req);
 
 				// force FIFO write and
 				// FIFO read to separate
@@ -524,7 +530,7 @@ class cache {
 
 				// read response from
 				// memory interface
-				m_mem_resp.read(line);
+				m_mem_resp[port].read(line);
 #else
 				exec_mem_req(m_main_mem, mem_req, mem_st_req, line);
 #endif /* __SYNTHESIS__ */
@@ -610,7 +616,7 @@ CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 
 					line_type line;
 #pragma HLS array_partition variable=line type=complete dim=0
-					exec_core_req(req, line);
+					exec_core_req(req, line, (MEM_IF_PORTS == PORTS) ? port : 0);
 
 					if ((RD_ENABLED && (req.op == READ_OP)) ||
 							(!WR_ENABLED)) {
@@ -627,7 +633,7 @@ CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 			// stop memory interface
 			mem_req_type stop_req;
 			stop_req.op = STOP_OP;
-			m_mem_req.write(stop_req);
+			m_mem_req[0].write(stop_req);
 		}
 
 		/**
@@ -645,19 +651,20 @@ CORE_LOOP:		for (size_t port = 0; ; port = ((port + 1) % PORTS)) {
 		 */
 		void run_mem_if(T * const main_mem) {
 #pragma HLS inline off
-MEM_IF_LOOP:		while (1) {
+MEM_IF_LOOP:		for (size_t port = 0; ; port = ((port + 1) % MEM_IF_PORTS)) {
 #pragma HLS pipeline off
 				mem_req_type req;
 				mem_st_req_type st_req;
 				// get request
-				m_mem_req.read(req);
+				if (!(m_mem_req[port].read_nb(req)))
+					continue;
 
 				// exit the loop if request is "end-of-request"
 				if (req.op == STOP_OP)
 					break;
 
 				if (WR_ENABLED)
-					m_mem_st_req.read(st_req);
+					m_mem_st_req[port].read(st_req);
 
 				line_type line;
 				exec_mem_req(main_mem, req, st_req, line);
@@ -665,7 +672,7 @@ MEM_IF_LOOP:		while (1) {
 				if ((req.op == READ_OP) ||
 						(req.op == READ_WRITE_OP)) {
 					// send the response to the read request
-					m_mem_resp.write(line);
+					m_mem_resp[port].write(line);
 				}
 			}
 
@@ -724,8 +731,8 @@ MEM_IF_LOOP:		while (1) {
 #ifdef __SYNTHESIS__
 						// send write request to memory
 						// interface
-						m_mem_req.write(req);
-						m_mem_st_req.write(st_req);
+						m_mem_req[0].write(req);
+						m_mem_st_req[0].write(st_req);
 #else
 						line_type dummy;
 						exec_mem_req(m_main_mem,
