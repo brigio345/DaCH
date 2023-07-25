@@ -56,6 +56,7 @@ template <typename T, bool RD_ENABLED, bool WR_ENABLED, size_t PORTS,
 class cache {
 	private:
 		static const bool L1_CACHE = ((N_L1_SETS * N_L1_WAYS) > 0);
+		static const bool L2_CACHE = ((N_SETS * N_WAYS) > 0);
 		static const bool RAW_CACHE = WR_ENABLED;
 		static const size_t ADDR_SIZE = utils::log2_ceil(MAIN_SIZE);
 		static const size_t SET_SIZE = utils::log2_ceil(N_SETS);
@@ -64,6 +65,8 @@ class cache {
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
 		static const size_t WORD_SIZE = (sizeof(T) * 8);
 		static const size_t MEM_IF_PORTS = PORTS;
+		static const size_t N_LINES = (((N_SETS * N_WAYS) > 0) ?
+				(N_SETS * N_WAYS) : 1);
 
 		static_assert((RD_ENABLED || WR_ENABLED),
 				"RD_ENABLED and/or WR_ENABLED must be true");
@@ -72,10 +75,10 @@ class cache {
 				"PORTS must be equal to 1 when WR_ENABLED is true");
 		static_assert(((MAIN_SIZE > 0) && ((1 << ADDR_SIZE) == MAIN_SIZE)),
 				"MAIN_SIZE must be a power of 2 greater than 0");
-		static_assert(((N_SETS > 0) && ((1 << SET_SIZE) == N_SETS)),
-				"N_SETS must be a power of 2 greater than 0");
-		static_assert(((N_WAYS > 0) && ((1 << WAY_SIZE) == N_WAYS)),
-				"N_WAYS must be a power of 2 greater than 0");
+		static_assert(((N_SETS == 0) || ((1 << SET_SIZE) == N_SETS)),
+				"N_SETS must be a power of 2");
+		static_assert(((N_WAYS == 0) || ((1 << WAY_SIZE) == N_WAYS)),
+				"N_WAYS must be a power of 2");
 		static_assert(((N_WORDS_PER_LINE > 0) &&
 					((1 << OFF_SIZE) == N_WORDS_PER_LINE)),
 				"N_WORDS_PER_LINE must be a power of 2 greater than 0");
@@ -87,7 +90,7 @@ class cache {
 		typedef T line_type[N_WORDS_PER_LINE];
 		typedef l1_cache<T, MAIN_SIZE, N_L1_SETS, N_L1_WAYS,
 			N_WORDS_PER_LINE, SWAP_TAG_SET, L1_STORAGE_IMPL> l1_cache_type;
-		typedef raw_cache<T, (N_SETS * N_WAYS), N_WORDS_PER_LINE, 2>
+		typedef raw_cache<T, (N_LINES), N_WORDS_PER_LINE, 2>
 			raw_cache_type;
 		typedef replacer<LRU, address_type, N_SETS, N_WAYS,
 			N_WORDS_PER_LINE> replacer_type;
@@ -132,10 +135,10 @@ class cache {
 			line_type line;
 		} mem_st_req_type;
 
-		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_SETS * N_WAYS];	// 0
-		ap_uint<N_SETS * N_WAYS> m_valid;				// 1
-		ap_uint<N_SETS * N_WAYS> m_dirty;				// 2
-		T m_cache_mem[N_SETS * N_WAYS][N_WORDS_PER_LINE];		// 3
+		ap_uint<(TAG_SIZE > 0) ? TAG_SIZE : 1> m_tag[N_LINES];		// 0
+		ap_uint<N_LINES> m_valid;					// 1
+		ap_uint<N_LINES> m_dirty;					// 2
+		T m_cache_mem[N_LINES][N_WORDS_PER_LINE];			// 3
 		raw_cache_type m_raw_cache_core;				// 4
 		l1_cache_type m_l1_cache_get[PORTS];				// 5
 		replacer_type m_replacer;					// 6
@@ -184,7 +187,7 @@ class cache {
 					break;
 			}
 
-			run(main_mem);
+			run<L2_CACHE>(main_mem);
 		}
 #else
 		cache(T * const main_mem): m_main_mem(main_mem) {}
@@ -232,11 +235,38 @@ class cache {
 		 * 			the function in which cache is
 		 * 			accessed.
 		 */
-		void run(T * const main_mem) {
+		template <bool L2_C>
+			typename std::enable_if<L2_C, void>::type
+			run(T * const main_mem) {
 #pragma HLS inline
-			run_core();
-			run_mem_if(main_mem);
-		}
+				run_core();
+				run_mem_if(main_mem);
+			}
+
+		template <bool L2_C>
+			typename std::enable_if<(!L2_C), void>::type
+			run(T * const main_mem) {
+#pragma HLS inline
+				run_mem_if(main_mem);
+			}
+
+		template <bool L2_C>
+			typename std::enable_if<L2_C, void>::type
+			write_stop() {
+#pragma HLS inline
+				core_req_type stop_req;
+				stop_req.op = STOP_OP;
+				m_core_req[0].write(stop_req);
+			}
+
+		template <bool L2_C>
+			typename std::enable_if<(!L2_C), void>::type
+			write_stop() {
+#pragma HLS inline
+				mem_req_type stop_req;
+				stop_req.op = STOP_OP;
+				m_mem_req[0].write(stop_req);
+			}
 #endif /* __SYNTHESIS__ */
 
 		/**
@@ -247,9 +277,7 @@ class cache {
 		 */
 		void stop() {
 #ifdef __SYNTHESIS__
-			core_req_type stop_req;
-			stop_req.op = STOP_OP;
-			m_core_req[0].write(stop_req);
+			write_stop<L2_CACHE>();
 #else
 			flush();
 #endif /* __SYNTHESIS__ */
@@ -264,6 +292,16 @@ class cache {
 		void read_resp(line_type line, bool dep, const unsigned int port) {
 #pragma HLS function_instantiate variable=port
 			m_core_resp[port].read_dep(line, dep);
+		}
+
+		bool write_mem_req(const mem_req_type req, const unsigned int port) {
+#pragma HLS function_instantiate variable=port
+			return m_mem_req[port].write_dep(req, false);
+		}
+
+		void read_mem_resp(line_type line, bool dep, const unsigned int port) {
+#pragma HLS function_instantiate variable=port
+			m_mem_resp[port].read_dep(line, dep);
 		}
 #endif /* __SYNTHESIS__ */
 
@@ -290,23 +328,45 @@ class cache {
 			auto hit_status = L1_HIT;
 #endif /* __SYNTHESIS__ */
 			if (!l1_hit) {
-				core_req_type req;
-				req.op = READ_OP;
-				req.addr = addr_main;
+				if (L2_CACHE) {
+					core_req_type req;
+					req.op = READ_OP;
+					req.addr = addr_main;
 
 #ifdef __SYNTHESIS__
-				// send read request to cache
-				auto dep = write_req(req, port);
-				// force FIFO write and FIFO read to separate
-				// pipeline stages to avoid deadlock due to
-				// the blocking read
-				dep = utils::delay<LATENCY>(dep);
+					// send read request to cache
+					auto dep = write_req(req, port);
+					// force FIFO write and FIFO read to separate
+					// pipeline stages to avoid deadlock due to
+					// the blocking read
+					dep = utils::delay<LATENCY>(dep);
 
-				// read response from cache
-				read_resp(line, dep, port);
+					// read response from cache
+					read_resp(line, dep, port);
 #else
-				hit_status = exec_core_req(req, line);
+					hit_status = exec_core_req(req, line);
 #endif /* __SYNTHESIS__ */
+				} else {
+					mem_req_type req;
+					req.op = READ_OP;
+					req.load_addr = addr_main;
+
+#ifdef __SYNTHESIS__
+					// send read request to cache interface
+					auto dep = write_mem_req(req, port);
+					// force FIFO write and FIFO read to separate
+					// pipeline stages to avoid deadlock due to
+					// the blocking read
+					dep = utils::delay<LATENCY>(dep);
+
+					// read response from cache
+					read_mem_resp(line, dep, port);
+#else
+					hit_status = MISS;
+					mem_st_req_type dummy;
+					exec_mem_req(m_main_mem, req, dummy, line);
+#endif /* __SYNTHESIS__ */
+				}
 			}
 
 			if (L1_CACHE) {

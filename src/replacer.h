@@ -23,8 +23,8 @@ class replacer {
 	private:
 		static const size_t WAY_SIZE = utils::log2_ceil(N_WAYS);
 
-		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> m_lru[N_SETS][N_WAYS];
-		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> m_lifo[N_SETS];
+		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> m_lru[(N_SETS > 0) ? N_SETS : 1][(N_WAYS > 0) ? N_WAYS : 1];
+		ap_uint<(WAY_SIZE > 0) ? WAY_SIZE : 1> m_lifo[(N_SETS > 0) ? N_SETS : 1];
 
 	public:
 		replacer() {
