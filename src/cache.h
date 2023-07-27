@@ -144,12 +144,14 @@ class cache {
 		replacer_type m_replacer;					// 6
 		unsigned int m_core_port;					// 7
 #ifdef __SYNTHESIS__
-		hls::stream<core_req_type, (LATENCY * PORTS)> m_core_req[PORTS];// 8
-		sliced_stream<T, N_WORDS_PER_LINE, (LATENCY * PORTS)>
-			m_core_resp[PORTS];					// 9
-		hls::stream<mem_req_type, 2> m_mem_req[MEM_IF_PORTS];		// 10
-		hls::stream<mem_st_req_type, 2> m_mem_st_req[MEM_IF_PORTS];	// 11
-		sliced_stream<T, N_WORDS_PER_LINE, 2> m_mem_resp[MEM_IF_PORTS];	// 12
+		hls::stream<core_req_type, LATENCY> m_core_req[PORTS];		// 8
+		sliced_stream<T, N_WORDS_PER_LINE, LATENCY> m_core_resp[PORTS];	// 9
+		hls::stream<mem_req_type, (L2_CACHE ? 1 : LATENCY)>
+			m_mem_req[MEM_IF_PORTS];				// 10
+		hls::stream<mem_st_req_type, (L2_CACHE ? 1 : LATENCY)>
+			m_mem_st_req[MEM_IF_PORTS];				// 11
+		sliced_stream<T, N_WORDS_PER_LINE, (L2_CACHE ? 1 : LATENCY)>
+			m_mem_resp[MEM_IF_PORTS];				// 12
 #else
 		T * const m_main_mem;
 		int m_n_reqs[PORTS] = {0};
